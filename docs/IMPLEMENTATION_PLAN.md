@@ -253,7 +253,7 @@ Generate and read `.forge-lock.yaml` to track blueprint provenance, variable val
 
 ---
 
-### 1.10 — `forge create` Command — Full End-to-End Flow
+### 1.10 — `forge create` Command — Full End-to-End Flow [DONE]
 
 Wire all the pieces together into the `forge create` command.
 

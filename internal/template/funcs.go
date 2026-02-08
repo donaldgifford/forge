@@ -89,9 +89,19 @@ func now(layout string) string {
 }
 
 // defaultVal returns val if it's non-empty, otherwise returns def.
-func defaultVal(def, val string) string {
-	if val != "" {
-		return val
+// Accepts any type for val to handle missingkey=zero (nil values).
+func defaultVal(def string, val any) string {
+	if val == nil {
+		return def
+	}
+
+	s, ok := val.(string)
+	if !ok {
+		return def
+	}
+
+	if s != "" {
+		return s
 	}
 
 	return def
