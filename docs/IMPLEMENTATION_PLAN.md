@@ -111,7 +111,7 @@ go-getter replaces both a dedicated git client and a custom HTTP downloader. It 
 
 ---
 
-### 1.5 — Registry Resolver
+### 1.5 — Registry Resolver [DONE]
 
 Given a user input like `go/api`, `go/api@v2.1.0`, or a full URL, resolve it to a concrete registry URL + blueprint path + ref.
 
