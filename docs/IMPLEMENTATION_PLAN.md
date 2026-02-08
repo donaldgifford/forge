@@ -225,7 +225,7 @@ Prompt the user for blueprint variables, using declared types, defaults, and val
 
 ---
 
-### 1.9 — Lockfile Manager
+### 1.9 — Lockfile Manager [DONE]
 
 Generate and read `.forge-lock.yaml` to track blueprint provenance, variable values, default file sources, and tool versions.
 
