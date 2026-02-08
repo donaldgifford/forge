@@ -471,7 +471,7 @@ Parse tool declarations from `registry.yaml`, category `_defaults/tools.yaml`, a
 
 ---
 
-### 2.8 — Platform Resolver and Tool Downloader
+### 2.8 — Platform Resolver and Tool Downloader [DONE]
 
 Download tools from various sources using go-getter for download-based sources and exec for package-manager sources.
 
