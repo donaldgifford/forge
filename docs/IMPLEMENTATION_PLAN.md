@@ -139,7 +139,7 @@ Given a user input like `go/api`, `go/api@v2.1.0`, or a full URL, resolve it to 
 
 ---
 
-### 1.6 — Defaults Inheritance Resolver
+### 1.6 — Defaults Inheritance Resolver [DONE]
 
 Walk the registry directory tree and merge the layered `_defaults/` directories with the blueprint's own files, applying exclusions.
 
