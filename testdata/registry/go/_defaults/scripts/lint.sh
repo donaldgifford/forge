@@ -1,0 +1,3 @@
+#!/bin/sh
+# Go-specific lint script (overrides root default)
+golangci-lint run ./...

@@ -1,0 +1,65 @@
+apiVersion: v1
+name: "go-api"
+description: "Go API service with HTTP and optional gRPC"
+version: "1.0.0"
+tags: ["go", "api", "grpc"]
+
+defaults:
+  exclude:
+    - ".pre-commit-config.yaml"
+  override_strategy:
+    "renovate.json": merge
+
+variables:
+  - name: project_name
+    description: "Name of the project"
+    type: string
+    required: true
+    validate: "^[a-z][a-z0-9-]*$"
+
+  - name: go_module
+    description: "Go module path"
+    type: string
+    default: "github.com/example/{{ .project_name }}"
+
+  - name: use_grpc
+    description: "Include gRPC support?"
+    type: bool
+    default: "false"
+
+  - name: license
+    description: "License type"
+    type: choice
+    choices: ["MIT", "Apache-2.0", "BSD-3-Clause", "none"]
+    default: "Apache-2.0"
+
+conditions:
+  - when: "{{ not .use_grpc }}"
+    exclude:
+      - "proto/"
+      - "internal/grpc/"
+
+tools:
+  - name: golangci-lint
+    version: "1.62.2"
+    description: "Go linters aggregator"
+    source:
+      type: github-release
+      repo: "golangci/golangci-lint"
+      asset_pattern: "golangci-lint-{{version}}-{{os}}-{{arch}}.tar.gz"
+    install_path: ".forge/tools/golangci-lint"
+
+hooks:
+  post_create:
+    - "git init"
+    - "go mod tidy"
+
+sync:
+  managed_files:
+    - path: "Makefile"
+      strategy: merge
+  ignore:
+    - "vendor/"
+
+rename:
+  "{{project_name}}/": "."

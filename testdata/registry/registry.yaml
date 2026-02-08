@@ -1,0 +1,35 @@
+apiVersion: v1
+name: "test-blueprints"
+description: "Test blueprint registry"
+maintainers:
+  - name: "Test Team"
+    email: "test@example.com"
+
+defaults:
+  sync_strategy: overwrite
+  managed: true
+
+tools:
+  - name: actionlint
+    version: "1.7.7"
+    description: "GitHub Actions workflow linter"
+    source:
+      type: github-release
+      repo: "rhysd/actionlint"
+      asset_pattern: "actionlint_{{version}}_{{os}}_{{arch}}.tar.gz"
+    install_path: ".forge/tools/actionlint"
+
+blueprints:
+  - name: go/api
+    path: go/api
+    description: "Go API service with HTTP and optional gRPC"
+    version: "1.0.0"
+    tags: ["go", "api", "grpc"]
+    latest_commit: "abc123def456"
+
+  - name: go/cli
+    path: go/cli
+    description: "Go CLI application with Cobra"
+    version: "1.0.0"
+    tags: ["go", "cli", "cobra"]
+    latest_commit: "abc123def456"
