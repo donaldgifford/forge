@@ -94,6 +94,18 @@ func TestRenderPath(t *testing.T) {
 			vars:     map[string]any{"project_name": "my-api", "module": "cmd"},
 			expected: "my-api/cmd/main.go",
 		},
+		{
+			name:     "shorthand without dot",
+			path:     "{{project_name}}/cmd/main.go",
+			vars:     map[string]any{"project_name": "my-api"},
+			expected: "my-api/cmd/main.go",
+		},
+		{
+			name:     "mixed shorthand and dot notation",
+			path:     "{{project_name}}/{{.module}}/main.go",
+			vars:     map[string]any{"project_name": "my-api", "module": "cmd"},
+			expected: "my-api/cmd/main.go",
+		},
 	}
 
 	for _, tt := range tests {

@@ -303,7 +303,7 @@ Do not implement hooks or tools yet — log a message like `"skipping hooks (not
 
 ---
 
-### 1.11 — Registry Cache
+### 1.11 — Registry Cache [DONE]
 
 Cache fetched registries locally to avoid re-downloading on every command.
 
