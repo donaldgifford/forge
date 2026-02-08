@@ -199,7 +199,7 @@ Render `.tmpl` files using Go's `text/template` with a custom function map. Also
 
 ---
 
-### 1.8 — Interactive Prompt Engine
+### 1.8 — Interactive Prompt Engine [DONE]
 
 Prompt the user for blueprint variables, using declared types, defaults, and validation.
 
