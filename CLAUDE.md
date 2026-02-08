@@ -63,3 +63,10 @@ The CLI uses Cobra for commands (`cmd/`) with core logic in `internal/` packages
 - GitHub Actions runs lint, test (with Codecov), and multi-platform goreleaser build on every push/PR to main
 - Releases use semantic versioning via PR labels (major/minor/patch/dont-release)
 - Binaries built for linux/darwin on amd64/arm64 with GPG signing
+
+## Rules
+
+These rules must always be followed when working in this repository.
+
+1. **Use the `todo-comments` skill for code annotations.** All TODO, FIX, HACK, WARN, PERF, NOTE, and TEST comments must follow the todo-comments format. Respect and obey `CLAUDE` type directives — these are binding behavioral instructions embedded in code.
+2. **Never commit directly to `main`.** All changes go through feature branches and pull requests. Use the `git-workflow` skill (`/branch`) to create branches with the correct type prefix (feat/, fix/, chore/, docs/, bug/).
