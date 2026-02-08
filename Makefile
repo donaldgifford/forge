@@ -49,7 +49,7 @@ build: build-core ## Build everything (core)
 build-core: ## Build core binary
 	@ $(MAKE) --no-print-directory log-$@
 	@mkdir -p $(BIN_DIR)
-	@go build -o $(BIN_DIR)/$(PROJECT_NAME) ./cmd/$(PROJECT_NAME)
+	@go build -ldflags "-X main.version=$(VERSION) -X main.commit=$(COMMIT_HASH)" -o $(BIN_DIR)/$(PROJECT_NAME) ./cmd/$(PROJECT_NAME)
 	@echo "✓ Core binaries built"
 
 ## Testing
@@ -88,7 +88,6 @@ fmt: ## Format code with gofmt and goimports
 	@ $(MAKE) --no-print-directory log-$@
 	@gofmt -s -w .
 	@goimports -w $(GOIMPORTS_LOCAL_ARG) .
-	@goimports -w $(GOIMPORTS_LOCAL_ARG)  cmd/ pkg/
 
 clean: ## Remove build artifacts
 	@ $(MAKE) --no-print-directory log-$@
