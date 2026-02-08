@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/donaldgifford/forge/internal/config"
@@ -14,6 +15,7 @@ import (
 	"github.com/donaldgifford/forge/internal/prompt"
 	"github.com/donaldgifford/forge/internal/registry"
 	tmpl "github.com/donaldgifford/forge/internal/template"
+	"github.com/donaldgifford/forge/internal/tools"
 )
 
 // Opts holds the options for the create command.
@@ -88,6 +90,11 @@ func Run(opts *Opts) (*Result, error) {
 		return nil, fmt.Errorf("resolving defaults: %w", err)
 	}
 
+	// 7b. Evaluate conditions to exclude files.
+	if err := EvaluateConditions(bp.Conditions, vars, fileSet); err != nil {
+		return nil, fmt.Errorf("evaluating conditions: %w", err)
+	}
+
 	logger.Debug("resolved files", "count", fileSet.Len())
 
 	// 8. Determine and create output directory.
@@ -103,9 +110,15 @@ func Run(opts *Opts) (*Result, error) {
 		return nil, err
 	}
 
-	// 10. Generate lockfile.
+	// 10. Resolve and install tools.
+	resolvedTools, err := resolveTools(opts, bp, vars, logger)
+	if err != nil {
+		return nil, err
+	}
+
+	// 11. Generate lockfile.
 	lockPath := filepath.Join(outputDir, lockfile.FileName)
-	lock := buildLockfile(resolved, bp, vars, fileSet, opts.ForgeVersion)
+	lock := buildLockfile(resolved, bp, vars, fileSet, resolvedTools, opts.ForgeVersion)
 
 	if err := lockfile.Write(lockPath, lock); err != nil {
 		return nil, fmt.Errorf("writing lockfile: %w", err)
@@ -268,12 +281,50 @@ func applyRename(path string, rename map[string]string, vars map[string]any) str
 	return path
 }
 
+// resolveTools resolves the merged tool list from registry and blueprint declarations.
+func resolveTools(opts *Opts, bp *config.Blueprint, vars map[string]any, logger *slog.Logger) ([]tools.ResolvedTool, error) {
+	if opts.NoTools {
+		return nil, nil
+	}
+
+	// Build category tools path.
+	categoryToolsPath := ""
+	if opts.RegistryDir != "" {
+		parts := strings.SplitN(bp.Name, "-", 2)
+		if len(parts) > 0 {
+			candidate := filepath.Join(opts.RegistryDir, parts[0], "_defaults", "tools.yaml")
+			if _, err := os.Stat(candidate); err == nil {
+				categoryToolsPath = candidate
+			}
+		}
+	}
+
+	// Load registry tools.
+	var registryTools []config.Tool
+	if opts.RegistryDir != "" {
+		reg, err := registry.LoadIndex(opts.RegistryDir)
+		if err == nil {
+			registryTools = reg.Tools
+		}
+	}
+
+	resolved, err := tools.ResolveTools(registryTools, categoryToolsPath, bp.Tools, vars)
+	if err != nil {
+		return nil, fmt.Errorf("resolving tools: %w", err)
+	}
+
+	logger.Debug("resolved tools", "count", len(resolved))
+
+	return resolved, nil
+}
+
 // buildLockfile creates a Lockfile from the create operation results.
 func buildLockfile(
 	resolved *registry.ResolvedBlueprint,
 	bp *config.Blueprint,
 	vars map[string]any,
 	fileSet *defaults.FileSet,
+	resolvedTools []tools.ResolvedTool,
 	forgeVersion string,
 ) *lockfile.Lockfile {
 	now := time.Now().UTC()
@@ -308,6 +359,16 @@ func buildLockfile(
 		lock.ManagedFiles = append(lock.ManagedFiles, lockfile.ManagedFileEntry{
 			Path:     mf.Path,
 			Strategy: mf.Strategy,
+		})
+	}
+
+	// Record resolved tools.
+	for i := range resolvedTools {
+		t := &resolvedTools[i]
+		lock.Tools = append(lock.Tools, lockfile.ToolEntry{
+			Name:    t.Name,
+			Version: t.Version,
+			Source:  t.Source.Type,
 		})
 	}
 

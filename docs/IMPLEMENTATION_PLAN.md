@@ -526,7 +526,7 @@ Wire tool management into CLI subcommands.
 
 ---
 
-### 2.10 — Wire Tools into `forge create`
+### 2.10 — Wire Tools into `forge create` [DONE]
 
 Update the create flow to resolve, download, and install tools after file generation.
 
