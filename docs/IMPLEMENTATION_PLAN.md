@@ -432,7 +432,7 @@ Execute shell commands after scaffolding.
 
 ---
 
-### 2.6 — `forge init` Command
+### 2.6 — `forge init` Command [DONE]
 
 Scaffold a new blueprint directory with a starter `blueprint.yaml`.
 
