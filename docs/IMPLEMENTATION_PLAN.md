@@ -502,7 +502,7 @@ Download tools from various sources using go-getter for download-based sources a
 
 ---
 
-### 2.9 — `forge tools` Commands
+### 2.9 — `forge tools` Commands [DONE]
 
 Wire tool management into CLI subcommands.
 
