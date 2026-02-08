@@ -369,7 +369,7 @@ Search across registries by name, description, or tags.
 
 ---
 
-### 2.3 — Global Config and Multi-Registry Support
+### 2.3 — Global Config and Multi-Registry Support [DONE]
 
 Allow users to configure default registries and preferences.
 
