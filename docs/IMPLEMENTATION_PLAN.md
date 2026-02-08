@@ -392,7 +392,7 @@ Allow users to configure default registries and preferences.
 
 ---
 
-### 2.4 — Conditional File Inclusion
+### 2.4 — Conditional File Inclusion [DONE]
 
 Evaluate `conditions` from `blueprint.yaml` to exclude files based on template expressions.
 
