@@ -412,7 +412,7 @@ Evaluate `conditions` from `blueprint.yaml` to exclude files based on template e
 
 ---
 
-### 2.5 — Post-Create Hooks
+### 2.5 — Post-Create Hooks [DONE]
 
 Execute shell commands after scaffolding.
 

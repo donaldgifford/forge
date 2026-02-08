@@ -15,6 +15,7 @@ var (
 	outputDir  string
 	useDefault bool
 	noTools    bool
+	noHooks    bool
 )
 
 var createCmd = &cobra.Command{
@@ -32,6 +33,7 @@ func init() {
 	createCmd.Flags().StringVarP(&outputDir, "output-dir", "o", "", "target output directory")
 	createCmd.Flags().BoolVar(&useDefault, "defaults", false, "use all default values without prompting")
 	createCmd.Flags().BoolVar(&noTools, "no-tools", false, "skip tool installation")
+	createCmd.Flags().BoolVar(&noHooks, "no-hooks", false, "skip post-create hooks")
 	rootCmd.AddCommand(createCmd)
 }
 
@@ -44,6 +46,7 @@ func runCreate(_ *cobra.Command, args []string) error {
 		Overrides:    overrides,
 		UseDefaults:  useDefault,
 		NoTools:      noTools,
+		NoHooks:      noHooks,
 		ForgeVersion: buildVersion,
 		Logger:       slog.Default(),
 	}

@@ -33,6 +33,9 @@ type Opts struct {
 	// NoTools skips tool installation.
 	NoTools bool
 
+	// NoHooks skips post-create hook execution.
+	NoHooks bool
+
 	// DefaultRegistryURL is the default registry URL from global config.
 	DefaultRegistryURL string
 
