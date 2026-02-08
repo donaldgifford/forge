@@ -30,9 +30,10 @@ type Opts struct {
 
 // Result holds the outcome of a sync operation.
 type Result struct {
-	Updated   []string
-	Skipped   []string
-	Conflicts []string
+	Updated       []string
+	Skipped       []string
+	Conflicts     []string
+	ConflictFiles []ConflictFile
 }
 
 // Run executes the sync workflow.
@@ -178,6 +179,10 @@ func applyMerge(
 
 	if merged.HasConflicts {
 		result.Conflicts = append(result.Conflicts, mf.Path)
+		result.ConflictFiles = append(result.ConflictFiles, ConflictFile{
+			Path:      mf.Path,
+			Conflicts: merged.Conflicts,
+		})
 	}
 
 	return applyOverwrite(localPath, merged.Content, opts.DryRun, result)

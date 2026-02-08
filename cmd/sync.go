@@ -94,6 +94,11 @@ func runSync(cmd *cobra.Command, _ []string) error {
 		logger.Info("tool sync not yet implemented")
 	}
 
+	// Report conflicts to stderr and return error if any exist.
+	if len(result.ConflictFiles) > 0 {
+		return forgesync.ReportConflicts(os.Stderr, result.ConflictFiles)
+	}
+
 	return nil
 }
 

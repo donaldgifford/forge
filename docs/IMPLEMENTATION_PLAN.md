@@ -664,7 +664,7 @@ Wire the sync engine into a CLI command.
 
 ---
 
-### 3.5 — Conflict Resolution UX
+### 3.5 — Conflict Resolution UX [DONE]
 
 When three-way merge produces conflicts, provide a usable resolution workflow.
 
