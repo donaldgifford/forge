@@ -331,7 +331,7 @@ Cache fetched registries locally to avoid re-downloading on every command.
 
 **Goal:** Users can browse registries, author new blueprints, and manage remote tools.
 
-### 2.1 — `forge list` Command
+### 2.1 — `forge list` Command [DONE]
 
 List blueprints from one or more registries.
 
