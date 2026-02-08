@@ -1028,7 +1028,7 @@ jobs:
 | `github.com/spf13/cobra` | CLI framework | latest |
 | `github.com/spf13/viper` | Config file handling | latest |
 | `gopkg.in/yaml.v3` | YAML parsing | latest |
-| `github.com/go-git/go-git/v5` | Pure Go git client | latest |
+| `github.com/hashicorp/go-getter` | Source fetching (git, HTTP, S3), archive extraction, checksums | latest |
 | `github.com/charmbracelet/huh` | Interactive prompts | latest |
 | `github.com/charmbracelet/lipgloss` | Terminal styling | latest |
 | `github.com/olekukonez/tablewriter` | CLI table output | latest |
