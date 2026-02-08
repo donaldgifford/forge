@@ -641,7 +641,7 @@ For `strategy: merge` files, compute a three-way merge using the last-synced ver
 
 ---
 
-### 3.4 — `forge sync` Command
+### 3.4 — `forge sync` Command [DONE]
 
 Wire the sync engine into a CLI command.
 
