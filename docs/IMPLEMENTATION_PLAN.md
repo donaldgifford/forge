@@ -350,7 +350,7 @@ List blueprints from one or more registries.
 
 ---
 
-### 2.2 — `forge search` Command
+### 2.2 — `forge search` Command [DONE]
 
 Search across registries by name, description, or tags.
 
