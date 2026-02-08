@@ -551,7 +551,7 @@ Update the create flow to resolve, download, and install tools after file genera
 
 **Goal:** `forge check` detects drift. `forge sync` updates managed files and defaults using overwrite or three-way merge.
 
-### 3.1 — `forge check` Command
+### 3.1 — `forge check` Command [DONE]
 
 Compare local project state against the source blueprint for defaults, managed files, and tools.
 
