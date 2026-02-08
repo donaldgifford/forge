@@ -451,7 +451,7 @@ Scaffold a new blueprint directory with a starter `blueprint.yaml`.
 
 ---
 
-### 2.7 — Tool Manifest Parser and Inheritance
+### 2.7 — Tool Manifest Parser and Inheritance [DONE]
 
 Parse tool declarations from `registry.yaml`, category `_defaults/tools.yaml`, and `blueprint.yaml`, then merge them with the same layered-inheritance logic.
 
