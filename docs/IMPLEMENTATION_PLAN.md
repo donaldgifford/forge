@@ -609,7 +609,7 @@ Replace local files with the latest version from the blueprint/defaults.
 
 ---
 
-### 3.3 — Sync Engine — Three-Way Merge Strategy
+### 3.3 — Sync Engine — Three-Way Merge Strategy [DONE]
 
 For `strategy: merge` files, compute a three-way merge using the last-synced version as the common ancestor.
 

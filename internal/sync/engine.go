@@ -17,6 +17,9 @@ type Opts struct {
 	ProjectDir string
 	// RegistryDir is the local path to the current registry content.
 	RegistryDir string
+	// BaseDir is the local path to the base (last synced) registry content.
+	// Used as the common ancestor for three-way merge.
+	BaseDir string
 	// DryRun prints what would change without writing.
 	DryRun bool
 	// Force skips confirmation prompts.
@@ -137,7 +140,69 @@ func syncManagedFile(
 
 	localPath := filepath.Join(opts.ProjectDir, mf.Path)
 
+	if mf.Strategy == "merge" {
+		return applyMerge(opts, mf, lock, renderer, localPath, sourceContent, result)
+	}
+
 	return applyOverwrite(localPath, sourceContent, opts.DryRun, result)
+}
+
+func applyMerge(
+	opts *Opts,
+	mf *lockfile.ManagedFileEntry,
+	lock *lockfile.Lockfile,
+	renderer *tmpl.Renderer,
+	localPath string,
+	remoteContent []byte,
+	result *Result,
+) error {
+	// Read local file.
+	localContent, err := os.ReadFile(filepath.Clean(localPath))
+	if err != nil {
+		if os.IsNotExist(err) {
+			// No local file — accept remote content directly.
+			return applyOverwrite(localPath, remoteContent, opts.DryRun, result)
+		}
+
+		return fmt.Errorf("reading local file %s: %w", localPath, err)
+	}
+
+	// Resolve base content from the base registry directory.
+	baseContent, err := resolveBaseContent(opts, mf, lock, renderer)
+	if err != nil {
+		// If base is unavailable, fall back to overwrite.
+		return applyOverwrite(localPath, remoteContent, opts.DryRun, result)
+	}
+
+	merged := ThreeWayMerge(baseContent, localContent, remoteContent)
+
+	if merged.HasConflicts {
+		result.Conflicts = append(result.Conflicts, mf.Path)
+	}
+
+	return applyOverwrite(localPath, merged.Content, opts.DryRun, result)
+}
+
+func resolveBaseContent(
+	opts *Opts,
+	mf *lockfile.ManagedFileEntry,
+	lock *lockfile.Lockfile,
+	renderer *tmpl.Renderer,
+) ([]byte, error) {
+	if opts.BaseDir == "" {
+		return nil, fmt.Errorf("no base directory configured")
+	}
+
+	basePath := findSourceFile(opts.BaseDir, mf.Path)
+	if basePath == "" {
+		basePath = findBlueprintFile(opts.BaseDir, lock.Blueprint.Path, mf.Path)
+	}
+
+	if basePath == "" {
+		return nil, fmt.Errorf("base file not found for %s", mf.Path)
+	}
+
+	return readSourceContent(basePath, lock.Variables, renderer)
 }
 
 // findBlueprintFile looks for a file in the blueprint's own directory.
