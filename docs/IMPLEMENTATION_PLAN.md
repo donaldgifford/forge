@@ -582,7 +582,7 @@ Compare local project state against the source blueprint for defaults, managed f
 
 ---
 
-### 3.2 — Sync Engine — Overwrite Strategy
+### 3.2 — Sync Engine — Overwrite Strategy [DONE]
 
 Replace local files with the latest version from the blueprint/defaults.
 
