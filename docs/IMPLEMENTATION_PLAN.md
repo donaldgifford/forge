@@ -8,7 +8,7 @@ This document breaks the PROJECT_PLAN.md into concrete, ordered implementation s
 
 **Goal:** `forge create go/api` resolves from a local or remote registry, inherits defaults, prompts for variables, renders templates, and writes a working project.
 
-### 1.1 — Project Skeleton and Entry Point
+### 1.1 — Project Skeleton and Entry Point [DONE]
 
 Set up the Cobra CLI scaffold with a root command, version flag, and global config structure.
 
@@ -28,7 +28,7 @@ Set up the Cobra CLI scaffold with a root command, version flag, and global conf
 
 ---
 
-### 1.2 — YAML Schema Types and Config Loader
+### 1.2 — YAML Schema Types and Config Loader [DONE]
 
 Define Go structs for `blueprint.yaml` and `registry.yaml`, plus a loader that reads, unmarshals, and validates them.
 
@@ -54,7 +54,7 @@ Define Go structs for `blueprint.yaml` and `registry.yaml`, plus a loader that r
 
 ---
 
-### 1.3 — Test Fixtures
+### 1.3 — Test Fixtures [DONE]
 
 Create a minimal test registry on disk that all subsequent tests can use.
 
@@ -81,7 +81,7 @@ Create a minimal test registry on disk that all subsequent tests can use.
 
 ---
 
-### 1.4 — Source Fetcher (go-getter)
+### 1.4 — Source Fetcher (go-getter) [DONE]
 
 Wrap `hashicorp/go-getter` to fetch registries and (later) tool binaries from any supported source.
 
@@ -169,7 +169,7 @@ Walk the registry directory tree and merge the layered `_defaults/` directories 
 
 ---
 
-### 1.7 — Template Rendering Engine
+### 1.7 — Template Rendering Engine [DONE]
 
 Render `.tmpl` files using Go's `text/template` with a custom function map. Also handle directory name templating.
 
