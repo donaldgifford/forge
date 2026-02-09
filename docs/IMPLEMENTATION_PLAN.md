@@ -709,7 +709,7 @@ Audit all error paths and add user-friendly messaging with colored output.
 
 ---
 
-### 4.2 — `forge info` Command
+### 4.2 — `forge info` Command [DONE]
 
 Show detailed blueprint information including inherited defaults, tools, and variable schema.
 
