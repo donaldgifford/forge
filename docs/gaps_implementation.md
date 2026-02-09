@@ -119,7 +119,7 @@ Run the CLI binary against `testdata/registry/` and validate the full flow.
   the existing non-empty directory
 - [ ] Running the command again WITH `--force` succeeds
 
-### 1.4 — Write a CLI Integration Test
+### 1.4 — Write a CLI Integration Test [DONE]
 
 Add a test that calls `create.Run()` with the same opts the CLI would pass,
 validating the full wiring from flag parsing through file output.
