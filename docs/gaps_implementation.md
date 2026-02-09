@@ -80,7 +80,7 @@ registry.
 
 - `internal/create/create.go` — update `resolveAndLoad()` error message
 
-### 1.3 — Verify `forge create` End-to-End with Local Registry
+### 1.3 — Verify `forge create` End-to-End with Local Registry [DONE]
 
 Run the CLI binary against `testdata/registry/` and validate the full flow.
 

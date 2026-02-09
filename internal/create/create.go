@@ -145,16 +145,25 @@ func Run(opts *Opts) (*Result, error) {
 
 // resolveAndLoad resolves the blueprint reference, loads the registry index, and loads the blueprint config.
 func resolveAndLoad(opts *Opts) (*registry.ResolvedBlueprint, *config.Blueprint, error) {
-	resolved, err := registry.Resolve(opts.BlueprintRef, opts.DefaultRegistryURL)
-	if err != nil {
-		return nil, nil, fmt.Errorf("resolving blueprint: %w", err)
-	}
-
 	registryDir := opts.RegistryDir
 	if registryDir == "" {
 		return nil, nil, fmt.Errorf(
 			"no registry directory provided — use --registry-dir or configure a default registry in ~/.config/forge/config.yaml",
 		)
+	}
+
+	// When a registry directory is provided, we can resolve short names
+	// (e.g., "go/api") without needing a default registry URL — the
+	// blueprint path is extracted directly from the input.
+	resolved, err := registry.Resolve(opts.BlueprintRef, opts.DefaultRegistryURL)
+	if err != nil {
+		// If resolution failed due to missing default registry but we have a
+		// local registry dir, try resolving with a placeholder URL since we
+		// only need the BlueprintPath.
+		resolved, err = registry.Resolve(opts.BlueprintRef, registryDir)
+		if err != nil {
+			return nil, nil, fmt.Errorf("resolving blueprint: %w", err)
+		}
 	}
 
 	if err := validateRegistry(registryDir, resolved); err != nil {
@@ -292,8 +301,9 @@ func applyRename(path string, rename map[string]string, vars map[string]any) str
 	renderer := tmpl.NewRenderer()
 
 	for pattern, replacement := range rename {
-		// Render the pattern with variables.
-		renderedPattern, err := renderer.RenderString(pattern, vars)
+		// Render the pattern with variables using RenderPath to support
+		// shorthand {{varname}} syntax (without dot prefix).
+		renderedPattern, err := renderer.RenderPath(pattern, vars)
 		if err != nil {
 			continue
 		}
@@ -305,7 +315,14 @@ func applyRename(path string, rename map[string]string, vars map[string]any) str
 		}
 
 		if len(path) >= len(renderedPattern) && path[:len(renderedPattern)] == renderedPattern {
-			path = renderedReplacement + path[len(renderedPattern):]
+			remainder := path[len(renderedPattern):]
+
+			// "." means "current directory" — just use the remainder directly.
+			if renderedReplacement == "." {
+				path = remainder
+			} else {
+				path = renderedReplacement + remainder
+			}
 		}
 	}
 
