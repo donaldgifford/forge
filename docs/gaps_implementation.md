@@ -414,7 +414,7 @@ so both download paths (`github-release` and `go-install`) are testable.
 - `testdata/registry/go/api/blueprint.yaml` — add a `go-install` tool entry
   (e.g., `goimports` or another lightweight Go tool)
 
-### 5.3 — Fix `cmd/tools_install.go` Reconstruction
+### 5.3 — Fix `cmd/tools_install.go` Reconstruction [DONE]
 
 Use the expanded lockfile fields to reconstruct a complete `ResolvedTool`.
 
@@ -422,7 +422,7 @@ Use the expanded lockfile fields to reconstruct a complete `ResolvedTool`.
 
 - `cmd/tools_install.go` — map `ToolEntry` fields to full `ResolvedTool`
 
-### 5.4 — End-to-End Tools Test
+### 5.4 — End-to-End Tools Test [DONE]
 
 **Verification steps:**
 
