@@ -82,6 +82,21 @@ packages:
   platform-specific download sources (github-release, go-install, npm, cargo,
   url, script)
 
+### CLI Design Decisions
+
+See `docs/gaps_implementation.md` for the full history and rationale.
+
+- **`--registry-dir`** is a unified flag on `create`, `sync`, and `check`:
+  accepts local paths AND go-getter URLs (auto-detected via `os.Stat`)
+- **`forge create`** requires `--force` to write into a non-empty directory
+- **`forge check`** uses SHA256 hashes in lockfile for local drift detection,
+  plus `--registry-dir` for three-way upstream comparison (modified-locally,
+  upstream-changed, both-changed)
+- **`forge sync --ref`** pins to a specific registry version; outputs which ref
+  is being synced against
+- **Lockfile tool entries** store full source config (type, repo, asset_pattern,
+  module, etc.) enabling `forge tools install` without registry access
+
 ## Code Style
 
 - use `make lint` and `make fmt` to enforce our style guide.
