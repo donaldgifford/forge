@@ -831,7 +831,7 @@ All of Phase 1 ──► 1.10 (forge create)
 
 **Goal:** Post-release housekeeping — CI hardening, compliance automation, and operational improvements.
 
-### 5.1 — License Compliance CI Job
+### 5.1 — License Compliance CI Job [DONE]
 
 Add a GitHub Actions workflow that checks all Go module dependencies for license compatibility with Apache-2.0.
 
