@@ -38,6 +38,9 @@ type Opts struct {
 	// NoHooks skips post-create hook execution.
 	NoHooks bool
 
+	// ForceCreate allows overwriting a non-empty output directory.
+	ForceCreate bool
+
 	// DefaultRegistryURL is the default registry URL from global config.
 	DefaultRegistryURL string
 
@@ -100,6 +103,13 @@ func Run(opts *Opts) (*Result, error) {
 	// 8. Determine and create output directory.
 	outputDir := resolveOutputDir(opts.OutputDir, vars, bp.Name)
 
+	// Guard: refuse to write into a non-empty directory without --force.
+	if !opts.ForceCreate {
+		if err := checkOutputDirEmpty(outputDir); err != nil {
+			return nil, err
+		}
+	}
+
 	if err := os.MkdirAll(outputDir, 0o750); err != nil {
 		return nil, fmt.Errorf("creating output directory %s: %w", outputDir, err)
 	}
@@ -142,7 +152,9 @@ func resolveAndLoad(opts *Opts) (*registry.ResolvedBlueprint, *config.Blueprint,
 
 	registryDir := opts.RegistryDir
 	if registryDir == "" {
-		return nil, nil, fmt.Errorf("registry fetching not yet implemented; provide RegistryDir for local registries")
+		return nil, nil, fmt.Errorf(
+			"no registry directory provided — use --registry-dir or configure a default registry in ~/.config/forge/config.yaml",
+		)
 	}
 
 	if err := validateRegistry(registryDir, resolved); err != nil {
@@ -171,6 +183,25 @@ func validateRegistry(registryDir string, resolved *registry.ResolvedBlueprint) 
 		if err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+// checkOutputDirEmpty returns an error if the directory exists and is non-empty.
+func checkOutputDirEmpty(dir string) error {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		// Directory doesn't exist — that's fine, it will be created.
+		if os.IsNotExist(err) {
+			return nil
+		}
+
+		return fmt.Errorf("checking output directory: %w", err)
+	}
+
+	if len(entries) > 0 {
+		return fmt.Errorf("output directory %s is not empty — use --force to overwrite", dir)
 	}
 
 	return nil
