@@ -223,7 +223,7 @@ for version pinning.
 
 **Depends on**: Gap 2 (need a project with a valid `registry_url` in lockfile)
 
-### 3.1 — Add `--registry-dir` and `--ref` to `forge sync`
+### 3.1 — Add `--registry-dir` and `--ref` to `forge sync` [DONE]
 
 Add `--registry-dir` to override the lockfile's `registry_url` (same semantics
 as create: accepts local path or go-getter URL). Add `--ref` to sync against a
@@ -245,7 +245,7 @@ specific registry version.
 - For three-way merge base: fetch the registry at `lock.Blueprint.Commit`
   (the last-synced commit) as the merge base.
 
-### 3.2 — Ensure Lockfile `registry_url` is Usable by Sync
+### 3.2 — Ensure Lockfile `registry_url` is Usable by Sync [DONE]
 
 Verify that `forge create` stores a `registry_url` in the lockfile that
 `forge sync` can pass directly to go-getter.
@@ -257,7 +257,7 @@ Verify that `forge create` stores a `registry_url` in the lockfile that
 - When `--registry-dir` is a local path, store the absolute path in the
   lockfile so sync can find it later
 
-### 3.3 — End-to-End Sync Test
+### 3.3 — End-to-End Sync Test [DONE]
 
 **Verification steps:**
 
