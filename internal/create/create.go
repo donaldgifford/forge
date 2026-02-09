@@ -48,6 +48,11 @@ type Opts struct {
 	// Used in tests and when working with local registries.
 	RegistryDir string
 
+	// RegistryURL is the canonical URL to store in the lockfile for sync.
+	// For local registries, this is the absolute path. For remote registries,
+	// this is the go-getter URL. If empty, falls back to RegistryDir.
+	RegistryURL string
+
 	// ForgeVersion is the current forge build version for lockfile recording.
 	ForgeVersion string
 
@@ -128,7 +133,7 @@ func Run(opts *Opts) (*Result, error) {
 
 	// 11. Generate lockfile.
 	lockPath := filepath.Join(outputDir, lockfile.FileName)
-	lock := buildLockfile(resolved, bp, vars, fileSet, resolvedTools, opts.ForgeVersion)
+	lock := buildLockfile(resolved, bp, vars, fileSet, resolvedTools, opts.ForgeVersion, opts.RegistryURL)
 
 	if err := lockfile.Write(lockPath, lock); err != nil {
 		return nil, fmt.Errorf("writing lockfile: %w", err)
@@ -374,12 +379,20 @@ func buildLockfile(
 	fileSet *defaults.FileSet,
 	resolvedTools []tools.ResolvedTool,
 	forgeVersion string,
+	registryURL string,
 ) *lockfile.Lockfile {
 	now := time.Now().UTC()
 
+	// Use the explicit registry URL if provided (from --registry-dir),
+	// falling back to the resolver's URL.
+	lockRegistryURL := resolved.RegistryURL
+	if registryURL != "" {
+		lockRegistryURL = registryURL
+	}
+
 	lock := &lockfile.Lockfile{
 		Blueprint: lockfile.BlueprintRef{
-			RegistryURL: resolved.RegistryURL,
+			RegistryURL: lockRegistryURL,
 			Name:        bp.Name,
 			Path:        resolved.BlueprintPath,
 			Ref:         resolved.Ref,

@@ -148,7 +148,7 @@ registry using go-getter, then pass the resulting local directory to
 
 **Depends on**: Gap 1 (local create must work first)
 
-### 2.1 — Make `--registry-dir` Accept go-getter URLs
+### 2.1 — Make `--registry-dir` Accept go-getter URLs [DONE]
 
 Extend `--registry-dir` to detect whether the value is a local path or a
 remote URL. If remote, use `getter.Fetch()` to clone into a temp directory.
@@ -169,7 +169,7 @@ remote URL. If remote, use `getter.Fetch()` to clone into a temp directory.
 - The `--registry-dir` value is stored in the lockfile's
   `blueprint.registry_url` so that `forge sync` can re-fetch later.
 
-### 2.2 — Wire Default Registry Resolution (No `--registry-dir`)
+### 2.2 — Wire Default Registry Resolution (No `--registry-dir`) [DONE]
 
 When `--registry-dir` is not set, use `registry.Resolve()` to parse the
 blueprint reference and the default registry from global config.

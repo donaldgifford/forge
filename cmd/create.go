@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
@@ -9,7 +10,10 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/donaldgifford/forge/internal/config"
 	"github.com/donaldgifford/forge/internal/create"
+	"github.com/donaldgifford/forge/internal/getter"
+	"github.com/donaldgifford/forge/internal/registry"
 	"github.com/donaldgifford/forge/internal/ui"
 )
 
@@ -47,27 +51,54 @@ func init() {
 	rootCmd.AddCommand(createCmd)
 }
 
-func runCreate(_ *cobra.Command, args []string) error {
+func runCreate(cmd *cobra.Command, args []string) error {
 	overrides := parseOverrides(setVars)
 	logger := slog.Default()
+	blueprintRef := args[0]
 
-	// Resolve registry-dir to an absolute path if it's a local directory.
-	resolvedRegistryDir, err := resolveRegistryDir(registryDir)
-	if err != nil {
-		return err
+	var (
+		resolvedDir string
+		regURL      string
+		cleanup     func()
+		defaultURL  string
+		err         error
+	)
+
+	if registryDir != "" {
+		// Explicit --registry-dir: resolve as local path or go-getter URL.
+		resolvedDir, regURL, cleanup, err = resolveRegistrySource(
+			cmd.Context(), logger, registryDir,
+		)
+		if err != nil {
+			return err
+		}
+	} else {
+		// No --registry-dir: resolve from global config or full URL in blueprint ref.
+		resolvedDir, regURL, defaultURL, cleanup, err = resolveFromConfig(
+			cmd.Context(), logger, blueprintRef,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	if cleanup != nil {
+		defer cleanup()
 	}
 
 	opts := &create.Opts{
-		BlueprintRef: args[0],
-		OutputDir:    outputDir,
-		RegistryDir:  resolvedRegistryDir,
-		Overrides:    overrides,
-		UseDefaults:  useDefault,
-		NoTools:      noTools,
-		NoHooks:      noHooks,
-		ForceCreate:  forceCreate,
-		ForgeVersion: buildVersion,
-		Logger:       logger,
+		BlueprintRef:       blueprintRef,
+		OutputDir:          outputDir,
+		RegistryDir:        resolvedDir,
+		RegistryURL:        regURL,
+		DefaultRegistryURL: defaultURL,
+		Overrides:          overrides,
+		UseDefaults:        useDefault,
+		NoTools:            noTools,
+		NoHooks:            noHooks,
+		ForceCreate:        forceCreate,
+		ForgeVersion:       buildVersion,
+		Logger:             logger,
 	}
 
 	result, err := create.Run(opts)
@@ -81,26 +112,99 @@ func runCreate(_ *cobra.Command, args []string) error {
 	return nil
 }
 
-// resolveRegistryDir resolves --registry-dir to an absolute path if it points
-// to a local directory. Returns the value unchanged if empty.
-func resolveRegistryDir(dir string) (string, error) {
+// resolveFromConfig resolves a registry from global config when --registry-dir
+// is not provided. For full go-getter URLs (containing "//"), it fetches the
+// registry directly. For short names, it looks up the default registry from
+// config and fetches that.
+func resolveFromConfig(
+	ctx context.Context,
+	logger *slog.Logger,
+	blueprintRef string,
+) (localDir, registryURL, defaultRegistryURL string, cleanup func(), err error) {
+	// Check if the blueprint ref is a full go-getter URL.
+	if strings.Contains(blueprintRef, "//") {
+		resolved, resolveErr := registry.Resolve(blueprintRef, "")
+		if resolveErr != nil {
+			return "", "", "", nil, fmt.Errorf("resolving blueprint: %w", resolveErr)
+		}
+
+		dir, url, cleanFn, fetchErr := resolveRegistrySource(ctx, logger, resolved.RegistryURL)
+		if fetchErr != nil {
+			return "", "", "", nil, fetchErr
+		}
+
+		return dir, url, "", cleanFn, nil
+	}
+
+	// Short name — load global config and find default registry.
+	cfgPath := cfgFile
+	if cfgPath == "" {
+		cfgPath = filepath.Join(config.DefaultConfigDir(), "config.yaml")
+	}
+
+	globalCfg, cfgErr := config.LoadGlobalConfig(cfgPath)
+	if cfgErr != nil {
+		return "", "", "", nil, fmt.Errorf("loading config: %w", cfgErr)
+	}
+
+	reg, regErr := globalCfg.FindRegistry("")
+	if regErr != nil {
+		return "", "", "", nil, fmt.Errorf(
+			"no registry directory provided — use --registry-dir or configure a default registry in %s", cfgPath,
+		)
+	}
+
+	dir, url, cleanFn, fetchErr := resolveRegistrySource(ctx, logger, reg.URL)
+	if fetchErr != nil {
+		return "", "", "", nil, fetchErr
+	}
+
+	return dir, url, reg.URL, cleanFn, nil
+}
+
+// resolveRegistrySource resolves --registry-dir to a local directory path.
+// If the value is a local directory, it returns the absolute path.
+// If the value is a remote go-getter URL, it fetches into a temp directory
+// and returns both the temp path and a cleanup function.
+// The registryURL return value is the canonical URL to store in the lockfile.
+func resolveRegistrySource(
+	ctx context.Context,
+	logger *slog.Logger,
+	dir string,
+) (localDir, registryURL string, cleanup func(), err error) {
 	if dir == "" {
-		return "", nil
+		return "", "", nil, nil
 	}
 
 	// Check if the path exists on the local filesystem.
-	info, err := os.Stat(dir)
-	if err == nil && info.IsDir() {
-		abs, err := filepath.Abs(dir)
-		if err != nil {
-			return "", fmt.Errorf("resolving registry-dir path: %w", err)
+	info, statErr := os.Stat(dir)
+	if statErr == nil && info.IsDir() {
+		abs, absErr := filepath.Abs(dir)
+		if absErr != nil {
+			return "", "", nil, fmt.Errorf("resolving registry-dir path: %w", absErr)
 		}
 
-		return abs, nil
+		return abs, abs, nil, nil
 	}
 
-	// Not a local directory — return as-is (will be treated as go-getter URL in Gap 2).
-	return dir, nil
+	// Not a local directory — treat as a go-getter URL and fetch.
+	logger.Info("fetching registry", "source", dir)
+
+	tmpDir, tmpErr := os.MkdirTemp("", "forge-registry-*")
+	if tmpErr != nil {
+		return "", "", nil, fmt.Errorf("creating temp directory: %w", tmpErr)
+	}
+
+	g := getter.New(logger)
+	if fetchErr := g.Fetch(ctx, dir, tmpDir, getter.FetchOpts{}); fetchErr != nil {
+		cleanupDir(logger, tmpDir)
+
+		return "", "", nil, fmt.Errorf("fetching registry from %s: %w", dir, fetchErr)
+	}
+
+	cleanupFn := func() { cleanupDir(logger, tmpDir) }
+
+	return tmpDir, dir, cleanupFn, nil
 }
 
 // parseOverrides converts --set key=value strings to a map.
