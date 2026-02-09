@@ -42,7 +42,7 @@ func runToolsList(_ *cobra.Command, _ []string) error {
 
 	for i := range lock.Tools {
 		t := &lock.Tools[i]
-		if _, err := fmt.Fprintf(tw, "%s\t%s\t%s\n", t.Name, t.Version, t.Source); err != nil {
+		if _, err := fmt.Fprintf(tw, "%s\t%s\t%s\n", t.Name, t.Version, t.Source.Type); err != nil {
 			return err
 		}
 	}

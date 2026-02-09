@@ -455,7 +455,16 @@ func buildLockfile(
 		lock.Tools = append(lock.Tools, lockfile.ToolEntry{
 			Name:    t.Name,
 			Version: t.Version,
-			Source:  t.Source.Type,
+			Source: lockfile.ToolSourceEntry{
+				Type:         t.Source.Type,
+				Repo:         t.Source.Repo,
+				AssetPattern: t.Source.AssetPattern,
+				URL:          t.Source.URL,
+				Module:       t.Source.Module,
+				Package:      t.Source.Package,
+				Crate:        t.Source.Crate,
+			},
+			InstallPath: t.InstallPath,
 		})
 	}
 

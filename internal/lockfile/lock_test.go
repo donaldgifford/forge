@@ -44,7 +44,16 @@ func TestWriteAndRead_RoundTrip(t *testing.T) {
 			{Path: "Makefile", Strategy: "merge", SyncedCommit: "abc123"},
 		},
 		Tools: []lockfile.ToolEntry{
-			{Name: "golangci-lint", Version: "1.62.2", Source: "github-release"},
+			{
+				Name:    "golangci-lint",
+				Version: "1.62.2",
+				Source: lockfile.ToolSourceEntry{
+					Type:         "github-release",
+					Repo:         "golangci/golangci-lint",
+					AssetPattern: "golangci-lint-{{version}}-{{os}}-{{arch}}.tar.gz",
+				},
+				InstallPath: ".forge/tools/golangci-lint",
+			},
 		},
 	}
 
@@ -62,6 +71,9 @@ func TestWriteAndRead_RoundTrip(t *testing.T) {
 	assert.Len(t, loaded.ManagedFiles, 1)
 	assert.Len(t, loaded.Tools, 1)
 	assert.Equal(t, "golangci-lint", loaded.Tools[0].Name)
+	assert.Equal(t, "github-release", loaded.Tools[0].Source.Type)
+	assert.Equal(t, "golangci/golangci-lint", loaded.Tools[0].Source.Repo)
+	assert.Equal(t, ".forge/tools/golangci-lint", loaded.Tools[0].InstallPath)
 }
 
 func TestWrite_ContainsHeader(t *testing.T) {

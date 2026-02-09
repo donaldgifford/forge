@@ -49,7 +49,16 @@ func runToolsInstall(cmd *cobra.Command, _ []string) error {
 			Tool: tools.ResolvedTool{
 				Name:    t.Name,
 				Version: t.Version,
-				Source:  config.ToolSource{Type: t.Source},
+				Source: config.ToolSource{
+					Type:         t.Source.Type,
+					Repo:         t.Source.Repo,
+					AssetPattern: t.Source.AssetPattern,
+					URL:          t.Source.URL,
+					Module:       t.Source.Module,
+					Package:      t.Source.Package,
+					Crate:        t.Source.Crate,
+				},
+				InstallPath: t.InstallPath,
 			},
 			Platform: platform,
 			DestDir:  ".forge/tools",

@@ -373,7 +373,7 @@ The `cmd/tools_install.go` reconstructs a `ResolvedTool` with only
 
 **Depends on**: Gap 1 (lockfile needs to store enough to reinstall)
 
-### 5.1 — Expand `ToolEntry` in Lockfile
+### 5.1 — Expand `ToolEntry` in Lockfile [DONE]
 
 Store the full source configuration needed for download.
 
