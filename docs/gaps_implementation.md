@@ -404,7 +404,7 @@ type ToolSourceEntry struct {
 }
 ```
 
-### 5.2 — Add `go-install` Tool to Test Fixtures
+### 5.2 — Add `go-install` Tool to Test Fixtures [DONE]
 
 Add a `go-install` source tool to `testdata/registry/go/api/blueprint.yaml`
 so both download paths (`github-release` and `go-install`) are testable.

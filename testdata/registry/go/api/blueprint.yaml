@@ -49,6 +49,13 @@ tools:
       asset_pattern: "golangci-lint-{{version}}-{{os}}-{{arch}}.tar.gz"
     install_path: ".forge/tools/golangci-lint"
 
+  - name: goimports
+    version: "0.28.0"
+    description: "Go import organizer"
+    source:
+      type: go-install
+      module: "golang.org/x/tools/cmd/goimports"
+
 hooks:
   post_create:
     - "git init"
