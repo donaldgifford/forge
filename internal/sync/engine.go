@@ -83,6 +83,9 @@ func Run(opts *Opts) (*Result, error) {
 	if !opts.DryRun && len(result.Updated) > 0 {
 		lock.LastSynced = time.Now().UTC()
 
+		// Recompute content hashes for synced files.
+		updateFileHashes(projectDir, lock)
+
 		if err := lockfile.Write(lockPath, lock); err != nil {
 			return nil, fmt.Errorf("updating lockfile: %w", err)
 		}
@@ -208,6 +211,28 @@ func resolveBaseContent(
 	}
 
 	return readSourceContent(basePath, lock.Variables, renderer)
+}
+
+// updateFileHashes recomputes SHA256 hashes for all tracked files in the lockfile.
+func updateFileHashes(projectDir string, lock *lockfile.Lockfile) {
+	for i := range lock.Defaults {
+		d := &lock.Defaults[i]
+		renderedPath := tmpl.StripTemplateExtension(d.Path)
+		content, err := os.ReadFile(filepath.Clean(filepath.Join(projectDir, renderedPath)))
+
+		if err == nil {
+			d.Hash = lockfile.ContentHash(content)
+		}
+	}
+
+	for i := range lock.ManagedFiles {
+		mf := &lock.ManagedFiles[i]
+		content, err := os.ReadFile(filepath.Clean(filepath.Join(projectDir, mf.Path)))
+
+		if err == nil {
+			mf.Hash = lockfile.ContentHash(content)
+		}
+	}
 }
 
 // findBlueprintFile looks for a file in the blueprint's own directory.

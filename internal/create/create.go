@@ -131,9 +131,10 @@ func Run(opts *Opts) (*Result, error) {
 		return nil, err
 	}
 
-	// 11. Generate lockfile.
+	// 11. Generate lockfile with content hashes.
 	lockPath := filepath.Join(outputDir, lockfile.FileName)
 	lock := buildLockfile(resolved, bp, vars, fileSet, resolvedTools, opts.ForgeVersion, opts.RegistryURL)
+	computeFileHashes(outputDir, lock)
 
 	if err := lockfile.Write(lockPath, lock); err != nil {
 		return nil, fmt.Errorf("writing lockfile: %w", err)
@@ -369,6 +370,31 @@ func resolveTools(opts *Opts, bp *config.Blueprint, vars map[string]any, logger 
 	logger.Debug("resolved tools", "count", len(resolved))
 
 	return resolved, nil
+}
+
+// computeFileHashes reads the written output files and populates SHA256 hashes
+// in the lockfile entries. Errors are logged but don't fail the operation since
+// hashes are used for drift detection only.
+func computeFileHashes(outputDir string, lock *lockfile.Lockfile) {
+	for i := range lock.Defaults {
+		d := &lock.Defaults[i]
+		// Strip .tmpl extension from path to match the rendered output file.
+		renderedPath := tmpl.StripTemplateExtension(d.Path)
+		content, err := os.ReadFile(filepath.Clean(filepath.Join(outputDir, renderedPath)))
+
+		if err == nil {
+			d.Hash = lockfile.ContentHash(content)
+		}
+	}
+
+	for i := range lock.ManagedFiles {
+		mf := &lock.ManagedFiles[i]
+		content, err := os.ReadFile(filepath.Clean(filepath.Join(outputDir, mf.Path)))
+
+		if err == nil {
+			mf.Hash = lockfile.ContentHash(content)
+		}
+	}
 }
 
 // buildLockfile creates a Lockfile from the create operation results.

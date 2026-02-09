@@ -10,6 +10,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/donaldgifford/forge/internal/lockfile"
+	tmpl "github.com/donaldgifford/forge/internal/template"
 )
 
 // Opts configures the check operation.
@@ -66,8 +67,10 @@ func Run(opts *Opts) (*Result, error) {
 	// Check defaults.
 	for i := range lock.Defaults {
 		d := &lock.Defaults[i]
-		localPath := filepath.Join(projectDir, d.Path)
-		update := checkFile(localPath, d.Path, d.Source)
+		// Strip .tmpl extension from path to match rendered output file.
+		renderedPath := tmpl.StripTemplateExtension(d.Path)
+		localPath := filepath.Join(projectDir, renderedPath)
+		update := checkFile(localPath, renderedPath, d.Source, d.Hash)
 		result.DefaultsUpdates = append(result.DefaultsUpdates, update)
 	}
 
@@ -75,16 +78,31 @@ func Run(opts *Opts) (*Result, error) {
 	for i := range lock.ManagedFiles {
 		mf := &lock.ManagedFiles[i]
 		localPath := filepath.Join(projectDir, mf.Path)
-		update := checkFile(localPath, mf.Path, mf.Strategy)
+		update := checkFile(localPath, mf.Path, mf.Strategy, mf.Hash)
 		result.ManagedUpdates = append(result.ManagedUpdates, update)
 	}
 
 	return result, renderResult(opts.Writer, opts.OutputFormat, result)
 }
 
-func checkFile(localPath, relPath, source string) FileUpdate {
-	if _, err := os.Stat(localPath); os.IsNotExist(err) {
+func checkFile(localPath, relPath, source, expectedHash string) FileUpdate {
+	content, err := os.ReadFile(filepath.Clean(localPath))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return FileUpdate{Path: relPath, Status: StatusMissing, Source: source}
+		}
+		// Can't read — treat as missing.
 		return FileUpdate{Path: relPath, Status: StatusMissing, Source: source}
+	}
+
+	// If no hash stored in lockfile, existence is sufficient.
+	if expectedHash == "" {
+		return FileUpdate{Path: relPath, Status: StatusUpToDate, Source: source}
+	}
+
+	currentHash := lockfile.ContentHash(content)
+	if currentHash != expectedHash {
+		return FileUpdate{Path: relPath, Status: StatusModified, Source: source}
 	}
 
 	return FileUpdate{Path: relPath, Status: StatusUpToDate, Source: source}

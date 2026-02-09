@@ -305,7 +305,7 @@ mv testdata/registry/_defaults/.editorconfig.bak testdata/registry/_defaults/.ed
 doesn't exist). It doesn't compare file content to detect modifications,
 and it doesn't compare against the registry to detect upstream changes.
 
-### 4.1 — Add Hash-Based Local Drift Detection
+### 4.1 — Add Hash-Based Local Drift Detection [DONE]
 
 Store SHA256 content hashes in the lockfile at create/sync time. `forge check`
 compares current file hashes against stored hashes to detect local

@@ -2,6 +2,8 @@
 package lockfile
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"time"
@@ -43,6 +45,7 @@ type DefaultEntry struct {
 	Path         string `yaml:"path"`
 	Source       string `yaml:"source"`
 	Strategy     string `yaml:"strategy"`
+	Hash         string `yaml:"hash,omitempty"`
 	SyncedCommit string `yaml:"synced_commit,omitempty"`
 }
 
@@ -50,6 +53,7 @@ type DefaultEntry struct {
 type ManagedFileEntry struct {
 	Path         string `yaml:"path"`
 	Strategy     string `yaml:"strategy"`
+	Hash         string `yaml:"hash,omitempty"`
 	SyncedCommit string `yaml:"synced_commit,omitempty"`
 }
 
@@ -58,6 +62,12 @@ type ToolEntry struct {
 	Name    string `yaml:"name"`
 	Version string `yaml:"version"`
 	Source  string `yaml:"source"`
+}
+
+// ContentHash computes the SHA256 hash of content in the format "sha256:<hex>".
+func ContentHash(content []byte) string {
+	h := sha256.Sum256(content)
+	return "sha256:" + hex.EncodeToString(h[:])
 }
 
 // Write marshals the lockfile to YAML and writes it to the given path.

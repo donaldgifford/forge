@@ -19,27 +19,31 @@ func setupProject(t *testing.T) string {
 
 	dir := t.TempDir()
 
-	// Write lockfile.
+	editorContent := []byte("root = true")
+	golangciContent := []byte("run:\n")
+	makefileContent := []byte("all:\n")
+
+	// Write lockfile with content hashes.
 	lock := &lockfile.Lockfile{
 		Blueprint: lockfile.BlueprintRef{
 			Name: "test-bp",
 			Path: "test/bp",
 		},
 		Defaults: []lockfile.DefaultEntry{
-			{Path: ".editorconfig", Source: "registry-default", Strategy: "overwrite"},
-			{Path: ".golangci.yml", Source: "category-default", Strategy: "overwrite"},
+			{Path: ".editorconfig", Source: "registry-default", Strategy: "overwrite", Hash: lockfile.ContentHash(editorContent)},
+			{Path: ".golangci.yml", Source: "category-default", Strategy: "overwrite", Hash: lockfile.ContentHash(golangciContent)},
 		},
 		ManagedFiles: []lockfile.ManagedFileEntry{
-			{Path: "Makefile", Strategy: "overwrite"},
+			{Path: "Makefile", Strategy: "overwrite", Hash: lockfile.ContentHash(makefileContent)},
 		},
 	}
 
 	require.NoError(t, lockfile.Write(filepath.Join(dir, lockfile.FileName), lock))
 
 	// Create project files.
-	require.NoError(t, os.WriteFile(filepath.Join(dir, ".editorconfig"), []byte("root = true"), 0o644))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, ".golangci.yml"), []byte("run:\n"), 0o644))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "Makefile"), []byte("all:\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".editorconfig"), editorContent, 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".golangci.yml"), golangciContent, 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "Makefile"), makefileContent, 0o644))
 
 	return dir
 }
@@ -102,6 +106,79 @@ func TestRun_MissingFile(t *testing.T) {
 	}
 
 	assert.True(t, found, "should detect missing .golangci.yml")
+}
+
+func TestRun_ModifiedFile(t *testing.T) {
+	t.Parallel()
+
+	dir := setupProject(t)
+
+	// Modify a tracked file.
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".editorconfig"), []byte("root = false\nmodified"), 0o644))
+
+	var buf bytes.Buffer
+
+	opts := &check.Opts{
+		ProjectDir:   dir,
+		OutputFormat: "text",
+		Writer:       &buf,
+	}
+
+	result, err := check.Run(opts)
+	require.NoError(t, err)
+
+	var found bool
+
+	for _, u := range result.DefaultsUpdates {
+		if u.Path == ".editorconfig" {
+			assert.Equal(t, check.StatusModified, u.Status)
+
+			found = true
+		}
+	}
+
+	assert.True(t, found, "should detect modified .editorconfig")
+
+	// Unmodified file should still be up-to-date.
+	for _, u := range result.DefaultsUpdates {
+		if u.Path == ".golangci.yml" {
+			assert.Equal(t, check.StatusUpToDate, u.Status)
+		}
+	}
+}
+
+func TestRun_NoHashInLockfile(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	// Write lockfile WITHOUT hashes (backwards compatibility).
+	lock := &lockfile.Lockfile{
+		Blueprint: lockfile.BlueprintRef{
+			Name: "test-bp",
+			Path: "test/bp",
+		},
+		Defaults: []lockfile.DefaultEntry{
+			{Path: ".editorconfig", Source: "registry-default", Strategy: "overwrite"},
+		},
+	}
+
+	require.NoError(t, lockfile.Write(filepath.Join(dir, lockfile.FileName), lock))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".editorconfig"), []byte("anything"), 0o644))
+
+	var buf bytes.Buffer
+
+	opts := &check.Opts{
+		ProjectDir:   dir,
+		OutputFormat: "text",
+		Writer:       &buf,
+	}
+
+	result, err := check.Run(opts)
+	require.NoError(t, err)
+
+	// Without hash, file existence alone means up-to-date.
+	assert.Equal(t, check.StatusUpToDate, result.DefaultsUpdates[0].Status)
 }
 
 func TestRun_JSONOutput(t *testing.T) {
