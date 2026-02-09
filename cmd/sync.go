@@ -12,6 +12,7 @@ import (
 	"github.com/donaldgifford/forge/internal/getter"
 	"github.com/donaldgifford/forge/internal/lockfile"
 	forgesync "github.com/donaldgifford/forge/internal/sync"
+	"github.com/donaldgifford/forge/internal/ui"
 )
 
 var (
@@ -88,7 +89,8 @@ func runSync(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	printSyncSummary(result)
+	w := ui.NewWriter(noColor)
+	printSyncSummary(w, result)
 
 	if syncIncludeTools {
 		logger.Info("tool sync not yet implemented")
@@ -129,25 +131,25 @@ func cleanupDir(logger *slog.Logger, dir string) {
 	}
 }
 
-func printSyncSummary(result *forgesync.Result) {
+func printSyncSummary(w *ui.Writer, result *forgesync.Result) {
 	if len(result.Updated) == 0 && len(result.Conflicts) == 0 {
-		fmt.Println("Everything up to date.")
+		w.Success("Everything up to date.")
 
 		return
 	}
 
 	for _, f := range result.Updated {
-		fmt.Printf("  updated: %s\n", f)
+		w.Successf("updated: %s", f)
 	}
 
 	for _, f := range result.Conflicts {
-		fmt.Printf("  conflict: %s\n", f)
+		w.Warningf("conflict: %s", f)
 	}
 
 	for _, f := range result.Skipped {
-		fmt.Printf("  skipped: %s\n", f)
+		w.Infof("skipped: %s", f)
 	}
 
-	fmt.Printf("\n%d updated, %d conflicts, %d skipped\n",
+	w.Infof("%d updated, %d conflicts, %d skipped",
 		len(result.Updated), len(result.Conflicts), len(result.Skipped))
 }

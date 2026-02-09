@@ -688,7 +688,7 @@ When three-way merge produces conflicts, provide a usable resolution workflow.
 
 **Goal:** Production-ready v0.1.0 with comprehensive tests, good error UX, and documentation.
 
-### 4.1 — Error Handling and UX
+### 4.1 — Error Handling and UX [DONE]
 
 Audit all error paths and add user-friendly messaging with colored output.
 

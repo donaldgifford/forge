@@ -1,13 +1,13 @@
 package cmd
 
 import (
-	"fmt"
 	"log/slog"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/donaldgifford/forge/internal/create"
+	"github.com/donaldgifford/forge/internal/ui"
 )
 
 var (
@@ -56,7 +56,8 @@ func runCreate(_ *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Printf("Created project %q in %s (%d files)\n", result.Blueprint, result.OutputDir, result.FilesCreated)
+	w := ui.NewWriter(noColor)
+	w.Successf("Created project %q in %s (%d files)", result.Blueprint, result.OutputDir, result.FilesCreated)
 
 	return nil
 }
