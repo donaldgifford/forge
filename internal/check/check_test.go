@@ -217,6 +217,192 @@ func TestRun_NoLockfile(t *testing.T) {
 	assert.Contains(t, err.Error(), "reading lockfile")
 }
 
+// setupProjectWithRegistry creates a project and a matching registry directory
+// for three-way comparison tests.
+func setupProjectWithRegistry(t *testing.T) (projectDir, registryDir string) {
+	t.Helper()
+
+	projectDir = t.TempDir()
+	registryDir = t.TempDir()
+
+	editorContent := []byte("root = true")
+	makefileContent := []byte("all:\n")
+
+	// Write lockfile with content hashes.
+	lock := &lockfile.Lockfile{
+		Blueprint: lockfile.BlueprintRef{
+			Name: "test-bp",
+			Path: "test/bp",
+		},
+		Variables: map[string]any{"project_name": "test"},
+		Defaults: []lockfile.DefaultEntry{
+			{Path: ".editorconfig", Source: "registry-default", Strategy: "overwrite", Hash: lockfile.ContentHash(editorContent)},
+		},
+		ManagedFiles: []lockfile.ManagedFileEntry{
+			{Path: "Makefile", Strategy: "overwrite", Hash: lockfile.ContentHash(makefileContent)},
+		},
+	}
+
+	require.NoError(t, lockfile.Write(filepath.Join(projectDir, lockfile.FileName), lock))
+
+	// Create project files matching lockfile hashes.
+	require.NoError(t, os.WriteFile(filepath.Join(projectDir, ".editorconfig"), editorContent, 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(projectDir, "Makefile"), makefileContent, 0o644))
+
+	// Create registry source files matching lockfile hashes.
+	require.NoError(t, os.MkdirAll(filepath.Join(registryDir, "_defaults"), 0o750))
+	require.NoError(t, os.MkdirAll(filepath.Join(registryDir, "test", "bp"), 0o750))
+	require.NoError(t, os.WriteFile(filepath.Join(registryDir, "_defaults", ".editorconfig"), editorContent, 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(registryDir, "test", "bp", "Makefile"), makefileContent, 0o644))
+
+	return projectDir, registryDir
+}
+
+func TestRun_RegistryComparison_AllUpToDate(t *testing.T) {
+	t.Parallel()
+
+	projectDir, registryDir := setupProjectWithRegistry(t)
+	var buf bytes.Buffer
+
+	opts := &check.Opts{
+		ProjectDir:   projectDir,
+		RegistryDir:  registryDir,
+		OutputFormat: "text",
+		Writer:       &buf,
+	}
+
+	result, err := check.Run(opts)
+	require.NoError(t, err)
+
+	for _, u := range result.DefaultsUpdates {
+		assert.Equal(t, check.StatusUpToDate, u.Status, "file %s", u.Path)
+	}
+
+	for _, u := range result.ManagedUpdates {
+		assert.Equal(t, check.StatusUpToDate, u.Status, "file %s", u.Path)
+	}
+}
+
+func TestRun_RegistryComparison_UpstreamChanged(t *testing.T) {
+	t.Parallel()
+
+	projectDir, registryDir := setupProjectWithRegistry(t)
+
+	// Update the registry source (upstream change).
+	require.NoError(t, os.WriteFile(
+		filepath.Join(registryDir, "_defaults", ".editorconfig"),
+		[]byte("root = true\n# updated upstream"),
+		0o644,
+	))
+
+	var buf bytes.Buffer
+
+	opts := &check.Opts{
+		ProjectDir:   projectDir,
+		RegistryDir:  registryDir,
+		OutputFormat: "text",
+		Writer:       &buf,
+	}
+
+	result, err := check.Run(opts)
+	require.NoError(t, err)
+
+	assert.Equal(t, check.StatusUpstreamChanged, result.DefaultsUpdates[0].Status)
+}
+
+func TestRun_RegistryComparison_ModifiedLocally(t *testing.T) {
+	t.Parallel()
+
+	projectDir, registryDir := setupProjectWithRegistry(t)
+
+	// Modify local file (local change, registry unchanged).
+	require.NoError(t, os.WriteFile(
+		filepath.Join(projectDir, ".editorconfig"),
+		[]byte("root = false\nlocal edit"),
+		0o644,
+	))
+
+	var buf bytes.Buffer
+
+	opts := &check.Opts{
+		ProjectDir:   projectDir,
+		RegistryDir:  registryDir,
+		OutputFormat: "text",
+		Writer:       &buf,
+	}
+
+	result, err := check.Run(opts)
+	require.NoError(t, err)
+
+	assert.Equal(t, check.StatusModifiedLocally, result.DefaultsUpdates[0].Status)
+}
+
+func TestRun_RegistryComparison_BothChanged(t *testing.T) {
+	t.Parallel()
+
+	projectDir, registryDir := setupProjectWithRegistry(t)
+
+	// Modify local file.
+	require.NoError(t, os.WriteFile(
+		filepath.Join(projectDir, ".editorconfig"),
+		[]byte("local changes"),
+		0o644,
+	))
+
+	// Update registry source.
+	require.NoError(t, os.WriteFile(
+		filepath.Join(registryDir, "_defaults", ".editorconfig"),
+		[]byte("upstream changes"),
+		0o644,
+	))
+
+	var buf bytes.Buffer
+
+	opts := &check.Opts{
+		ProjectDir:   projectDir,
+		RegistryDir:  registryDir,
+		OutputFormat: "json",
+		Writer:       &buf,
+	}
+
+	result, err := check.Run(opts)
+	require.NoError(t, err)
+
+	assert.Equal(t, check.StatusBothChanged, result.DefaultsUpdates[0].Status)
+
+	// Verify JSON output includes the status.
+	var jsonResult check.Result
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &jsonResult))
+	assert.Equal(t, check.StatusBothChanged, jsonResult.DefaultsUpdates[0].Status)
+}
+
+func TestRun_RegistryComparison_ManagedFile_UpstreamChanged(t *testing.T) {
+	t.Parallel()
+
+	projectDir, registryDir := setupProjectWithRegistry(t)
+
+	// Update managed file in registry (blueprint directory).
+	require.NoError(t, os.WriteFile(
+		filepath.Join(registryDir, "test", "bp", "Makefile"),
+		[]byte("all:\n\t@echo updated\n"),
+		0o644,
+	))
+
+	var buf bytes.Buffer
+
+	opts := &check.Opts{
+		ProjectDir:   projectDir,
+		RegistryDir:  registryDir,
+		OutputFormat: "text",
+		Writer:       &buf,
+	}
+
+	result, err := check.Run(opts)
+	require.NoError(t, err)
+
+	assert.Equal(t, check.StatusUpstreamChanged, result.ManagedUpdates[0].Status)
+}
+
 func TestRun_TextOutput(t *testing.T) {
 	t.Parallel()
 

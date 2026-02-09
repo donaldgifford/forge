@@ -326,7 +326,7 @@ modifications without needing registry access.
   lockfile hashes. Report "up-to-date", "modified", or "missing".
 - New status: `StatusModified` is already defined but never set — wire it up.
 
-### 4.2 — Add Registry Comparison Mode
+### 4.2 — Add Registry Comparison Mode [DONE]
 
 When `--registry-dir` is provided, also compare local files against the
 registry source to detect upstream changes.
