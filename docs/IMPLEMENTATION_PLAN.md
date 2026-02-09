@@ -892,7 +892,7 @@ Add a GitHub Actions workflow that checks all Go module dependencies for license
 
 ---
 
-### 5.2 — Add `go-licenses` to Makefile and mise.toml
+### 5.2 — Add `go-licenses` to Makefile and mise.toml [DONE]
 
 Make license checking available locally, not just in CI.
 

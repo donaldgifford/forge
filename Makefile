@@ -107,9 +107,19 @@ run-local: build ## Run exporter with local config
 	@ $(MAKE) --no-print-directory log-$@
 	@$(BIN_DIR)/$(PROJECT_NAME)
 
+## License Compliance
+
+license-check: ## Check dependency licenses against allowed list
+	@ $(MAKE) --no-print-directory log-$@
+	@go-licenses check ./... --allowed_licenses=Apache-2.0,MIT,BSD-2-Clause,BSD-3-Clause,ISC,MPL-2.0
+
+license-report: ## Generate CSV report of all dependency licenses
+	@ $(MAKE) --no-print-directory log-$@
+	@go-licenses report ./... --template=csv
+
 ## CI/CD
 
-ci: lint test build ## Run CI pipeline (lint + test + build)
+ci: lint test build license-check ## Run CI pipeline (lint + test + build + license check)
 	@ $(MAKE) --no-print-directory log-$@
 	@echo "✓ CI pipeline complete"
 
