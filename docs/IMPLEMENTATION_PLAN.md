@@ -762,7 +762,7 @@ Fill in coverage gaps with integration tests that exercise the full flow.
 
 ---
 
-### 4.5 — Documentation
+### 4.5 — Documentation [DONE]
 
 Write user-facing docs.
 
