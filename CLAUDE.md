@@ -21,7 +21,9 @@ make test-coverage    # Tests with coverage report
 make lint             # Run golangci-lint
 make lint-fix         # Auto-fix lint issues
 make fmt              # Format with gofmt + goimports
-make ci               # Full CI: lint + test + build
+make ci               # Full CI: lint + test + build + license check
+make license-check    # Check dependency licenses
+make license-report   # Generate CSV license report
 make check            # Quick pre-commit: lint + test
 make run-local        # Build and run the CLI
 make release-local    # Test goreleaser locally
@@ -35,23 +37,35 @@ development environment.
 The CLI uses Cobra for commands (`cmd/`) with core logic in `internal/`
 packages:
 
-- **cmd/forge/** — Entry point and Cobra command definitions (create, init,
-  sync, check, list, search, tools)
-- **internal/config/** — `blueprint.yaml` parsing and validation
+- **cmd/forge/** — Entry point (`main.go`)
+- **cmd/** — Cobra command definitions (create, init, sync, check, list, search,
+  info, tools, cache)
+- **internal/config/** — `blueprint.yaml` and `registry.yaml` parsing, validation,
+  global config with multi-registry support
 - **internal/registry/** — Registry index (`registry.yaml`), blueprint
-  resolution, local cache
+  resolution, local cache with TTL
 - **internal/defaults/** — `_defaults/` layered inheritance resolution
   (registry-wide → category → blueprint, last wins)
 - **internal/getter/** — Source fetching via `hashicorp/go-getter` (registry
   cloning, tool downloads, archive extraction, checksum verification)
 - **internal/template/** — Go `text/template` rendering with custom functions
 - **internal/prompt/** — Interactive variable collection via charmbracelet/huh
+- **internal/create/** — Full create workflow orchestration (resolve, prompt,
+  render, conditions, tools, lockfile)
 - **internal/sync/** — Three-way merge sync engine for managed files
-  (overwrite/merge strategies)
+  (overwrite/merge strategies), conflict detection and resolution
 - **internal/tools/** — Remote tool manifest parsing, platform-aware download,
   local cache (`~/.cache/forge/tools/`)
 - **internal/lockfile/** — `.forge-lock.yaml` state tracking for scaffolded
   projects
+- **internal/check/** — Drift detection comparing lockfile vs local files
+- **internal/hooks/** — Post-create hook execution with context cancellation
+- **internal/list/** — Blueprint listing with tag filtering
+- **internal/search/** — Blueprint search across name, description, tags
+- **internal/info/** — Blueprint inspection with text/JSON output
+- **internal/initcmd/** — Blueprint scaffolding (`init` is Go reserved keyword)
+- **internal/ui/** — Styled CLI output (Success, Warning, Error, Info) respecting
+  NO_COLOR
 
 ### Key Concepts
 
@@ -86,8 +100,10 @@ packages:
 
 ## CI/CD
 
-- GitHub Actions runs lint, test (with Codecov), and multi-platform goreleaser
-  build on every push/PR to main
+- GitHub Actions runs lint, test (with Codecov), license check, and
+  multi-platform goreleaser build on every push/PR to main
+- License compliance check using `google/go-licenses` with Apache-2.0
+  compatible whitelist
 - Releases use semantic versioning via PR labels
   (major/minor/patch/dont-release)
 - Binaries built for linux/darwin on amd64/arm64 with GPG signing
