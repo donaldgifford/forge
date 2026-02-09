@@ -743,7 +743,7 @@ Clear cached registries and/or tools.
 
 ---
 
-### 4.4 — Comprehensive Test Suite
+### 4.4 — Comprehensive Test Suite [DONE]
 
 Fill in coverage gaps with integration tests that exercise the full flow.
 
