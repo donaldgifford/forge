@@ -775,7 +775,7 @@ Write user-facing docs.
 
 ---
 
-### 4.6 — Reference Registry
+### 4.6 — Reference Registry [DONE]
 
 Create a companion repository with starter blueprints demonstrating all features.
 
