@@ -110,7 +110,7 @@ func defaultVal(def string, val any) string {
 // splitWords splits a string into words by separators and casing transitions.
 func splitWords(s string) []string {
 	var words []string
-	var current []rune
+	current := make([]rune, 0, 2)
 
 	for i, r := range s {
 		switch {
