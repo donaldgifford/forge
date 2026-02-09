@@ -726,7 +726,7 @@ Show detailed blueprint information including inherited defaults, tools, and var
 
 ---
 
-### 4.3 — `forge cache clean` Command
+### 4.3 — `forge cache clean` Command [DONE]
 
 Clear cached registries and/or tools.
 
