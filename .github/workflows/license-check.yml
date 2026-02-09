@@ -29,7 +29,7 @@ jobs:
 
       - name: Generate license report
         if: always()
-        run: go-licenses report ./... --template=csv > licenses.csv
+        run: go-licenses report ./... --template=.github/licenses-csv.tpl > licenses.csv
 
       - name: Upload license report
         if: always()

@@ -115,7 +115,7 @@ license-check: ## Check dependency licenses against allowed list
 
 license-report: ## Generate CSV report of all dependency licenses
 	@ $(MAKE) --no-print-directory log-$@
-	@go-licenses report ./... --template=csv
+	@go-licenses report ./... --template=.github/licenses-csv.tpl
 
 ## CI/CD
 
