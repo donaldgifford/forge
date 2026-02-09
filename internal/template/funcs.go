@@ -110,18 +110,19 @@ func defaultVal(def string, val any) string {
 // splitWords splits a string into words by separators and casing transitions.
 func splitWords(s string) []string {
 	var words []string
-	current := make([]rune, 0, 2)
+	current := make([]rune, 0, len(s))
 
 	for i, r := range s {
 		switch {
 		case r == '_' || r == '-' || r == ' ' || r == '.':
 			if len(current) > 0 {
 				words = append(words, string(current))
-				current = nil
+				current = current[:0]
 			}
 		case unicode.IsUpper(r) && i > 0 && len(current) > 0:
 			words = append(words, string(current))
-			current = []rune{r}
+			current = current[:0]
+			current = append(current, r)
 		default:
 			current = append(current, r)
 		}
