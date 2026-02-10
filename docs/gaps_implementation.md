@@ -101,8 +101,8 @@ Run the CLI binary against `testdata/registry/` and validate the full flow.
 
 **Success criteria:**
 
-- [ ] Exit code 0
-- [ ] `/tmp/forge-test-create/` contains rendered files:
+- [x] Exit code 0
+- [x] `/tmp/forge-test-create/` contains rendered files:
   - `cmd/main.go` with `package main` and `github.com/example/my-test-api`
   - `go.mod` with correct module path
   - `README.md` with project name
@@ -111,13 +111,13 @@ Run the CLI binary against `testdata/registry/` and validate the full flow.
   - `scripts/lint.sh` from `go/_defaults/` (overrides root)
   - `.gitignore` rendered from template
   - `LICENSE` rendered from template
-- [ ] `.forge-lock.yaml` exists with correct `blueprint.name`, `variables`,
+- [x] `.forge-lock.yaml` exists with correct `blueprint.name`, `variables`,
   `defaults`, and `managed_files`
-- [ ] No `.tmpl` extensions in output files
-- [ ] `.pre-commit-config.yaml` is NOT present (excluded in blueprint.yaml)
-- [ ] Running the command again without `--force` produces a clear error about
+- [x] No `.tmpl` extensions in output files
+- [x] `.pre-commit-config.yaml` is NOT present (excluded in blueprint.yaml)
+- [x] Running the command again without `--force` produces a clear error about
   the existing non-empty directory
-- [ ] Running the command again WITH `--force` succeeds
+- [x] Running the command again WITH `--force` succeeds
 
 ### 1.4 — Write a CLI Integration Test [DONE]
 
@@ -130,12 +130,12 @@ validating the full wiring from flag parsing through file output.
 
 **Success criteria:**
 
-- [ ] Test creates a project from `testdata/registry/go/api`
-- [ ] Asserts all expected files exist with correct content
-- [ ] Asserts lockfile is valid and parseable
-- [ ] Tests the `--force` guard (non-empty directory rejected, accepted with
+- [x] Test creates a project from `testdata/registry/go/api`
+- [x] Asserts all expected files exist with correct content
+- [x] Asserts lockfile is valid and parseable
+- [x] Tests the `--force` guard (non-empty directory rejected, accepted with
   force)
-- [ ] Runs in `make test`
+- [x] Runs in `make test`
 
 ---
 
@@ -199,16 +199,16 @@ blueprint reference and the default registry from global config.
 
 **Success criteria:**
 
-- [ ] `forge create go/api --registry-dir ./local/path` works (from Gap 1)
-- [ ] `forge create go/api --registry-dir github.com/user/registry` fetches
+- [x] `forge create go/api --registry-dir ./local/path` works (from Gap 1)
+- [x] `forge create go/api --registry-dir github.com/user/registry` fetches
   via go-getter and creates a project
-- [ ] `forge create github.com/user/registry//go/api` fetches via go-getter
+- [x] `forge create github.com/user/registry//go/api` fetches via go-getter
   (full URL in blueprint ref)
-- [ ] `forge create go/api` with a configured default registry works
-- [ ] `forge create go/api` with NO configured registry and NO `--registry-dir`
+- [x] `forge create go/api` with a configured default registry works
+- [x] `forge create go/api` with NO configured registry and NO `--registry-dir`
   gives a clear error message
-- [ ] Temp directory is cleaned up after create (no leaked dirs in `/tmp`)
-- [ ] Lockfile `blueprint.registry_url` is set to the go-getter URL (so sync
+- [x] Temp directory is cleaned up after create (no leaked dirs in `/tmp`)
+- [x] Lockfile `blueprint.registry_url` is set to the go-getter URL (so sync
   can re-fetch)
 
 ---
@@ -284,18 +284,18 @@ mv testdata/registry/_defaults/.editorconfig.bak testdata/registry/_defaults/.ed
 
 **Success criteria:**
 
-- [ ] `forge sync --registry-dir ./path` updates files that changed in the
+- [x] `forge sync --registry-dir ./path` updates files that changed in the
   registry
-- [ ] `forge sync --dry-run` shows what would change without writing
-- [ ] `forge sync --file .editorconfig` syncs only that file
-- [ ] `forge sync --ref v1.0.0` syncs against a specific ref and outputs
+- [x] `forge sync --dry-run` shows what would change without writing
+- [x] `forge sync --file .editorconfig` syncs only that file
+- [x] `forge sync --ref v1.0.0` syncs against a specific ref and outputs
   `info: syncing against ref "v1.0.0"` as it runs
-- [ ] `forge sync` without `--ref` uses lockfile ref and outputs which ref
+- [x] `forge sync` without `--ref` uses lockfile ref and outputs which ref
   it is using
-- [ ] Three-way merge works for managed files with `strategy: merge`
-- [ ] Conflicts produce git-style markers and a non-zero exit code
-- [ ] `.forge-lock.yaml` `last_synced` timestamp is updated after sync
-- [ ] `forge check` after sync shows all files as up-to-date
+- [x] Three-way merge works for managed files with `strategy: merge`
+- [x] Conflicts produce git-style markers and a non-zero exit code
+- [x] `.forge-lock.yaml` `last_synced` timestamp is updated after sync
+- [x] `forge check` after sync shows all files as up-to-date
 
 ---
 
@@ -351,15 +351,15 @@ registry source to detect upstream changes.
 
 **Success criteria:**
 
-- [ ] `forge check` (no flags) detects when a file has been modified locally
+- [x] `forge check` (no flags) detects when a file has been modified locally
   by comparing SHA256 hashes
-- [ ] `forge check` distinguishes "up-to-date", "modified", and "missing"
-- [ ] `forge check --registry-dir ./path` also detects upstream changes in
+- [x] `forge check` distinguishes "up-to-date", "modified", and "missing"
+- [x] `forge check --registry-dir ./path` also detects upstream changes in
   the registry
-- [ ] `forge check --registry-dir ./path` distinguishes "modified-locally",
+- [x] `forge check --registry-dir ./path` distinguishes "modified-locally",
   "upstream-changed", and "both-changed"
-- [ ] JSON output (`--output json`) includes all statuses correctly
-- [ ] Hashes are stored in lockfile during `forge create` and updated during
+- [x] JSON output (`--output json`) includes all statuses correctly
+- [x] Hashes are stored in lockfile during `forge create` and updated during
   `forge sync`
 
 ---
@@ -445,14 +445,14 @@ ls -la .forge/tools/
 
 **Success criteria:**
 
-- [ ] `.forge-lock.yaml` tools section contains full source config (type, repo,
+- [x] `.forge-lock.yaml` tools section contains full source config (type, repo,
   asset_pattern for github-release; type, module for go-install)
-- [ ] `forge tools install` successfully downloads at least one tool
-- [ ] `forge tools list` shows installed tools with correct versions
-- [ ] Cache hit: running `forge tools install` a second time skips download
-- [ ] `go-install` source type works: `forge tools install` runs
+- [x] `forge tools install` successfully downloads at least one tool
+- [x] `forge tools list` shows installed tools with correct versions
+- [x] Cache hit: running `forge tools install` a second time skips download
+- [x] `go-install` source type works: `forge tools install` runs
   `go install module@version` and binary appears in `.forge/tools/`
-- [ ] `github-release` source type works: downloads, extracts archive, and
+- [x] `github-release` source type works: downloads, extracts archive, and
   binary appears in `.forge/tools/`
 
 ---
