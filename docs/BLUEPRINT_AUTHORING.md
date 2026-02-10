@@ -56,14 +56,6 @@ conditions:
     exclude:
       - LICENSE*
 
-tools:
-  - name: golangci-lint
-    version: v1.60.0
-    source:
-      type: github-release
-      repo: golangci/golangci-lint
-      asset_pattern: "golangci-lint-{{version}}-{{os}}-{{arch}}.tar.gz"
-
 hooks:
   post_create:
     - "go mod tidy"

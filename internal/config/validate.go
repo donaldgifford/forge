@@ -20,16 +20,6 @@ var validSyncStrategies = map[string]bool{
 	"merge":     true,
 }
 
-// validToolSourceTypes are the allowed tool source types.
-var validToolSourceTypes = map[string]bool{
-	"github-release": true,
-	"url":            true,
-	"go-install":     true,
-	"npm":            true,
-	"cargo-install":  true,
-	"script":         true,
-}
-
 // ValidateBlueprint checks a Blueprint for required fields and valid values.
 func ValidateBlueprint(bp *Blueprint) error {
 	if bp.APIVersion != "v1" {
@@ -61,12 +51,6 @@ func ValidateBlueprint(bp *Blueprint) error {
 		}
 	}
 
-	for i := range bp.Tools {
-		if err := validateTool(&bp.Tools[i], i); err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
@@ -86,12 +70,6 @@ func ValidateRegistry(reg *Registry) error {
 		}
 		if strings.TrimSpace(bp.Path) == "" {
 			return fmt.Errorf("blueprints[%d] (%s): path is required", i, bp.Name)
-		}
-	}
-
-	for i := range reg.Tools {
-		if err := validateTool(&reg.Tools[i], i); err != nil {
-			return err
 		}
 	}
 
@@ -119,25 +97,6 @@ func validateVariable(v *Variable, index int) error {
 		if _, err := regexp.Compile(v.Validate); err != nil {
 			return fmt.Errorf("variables[%d] (%s): invalid validate regex %q: %w", index, v.Name, v.Validate, err)
 		}
-	}
-
-	return nil
-}
-
-func validateTool(t *Tool, index int) error {
-	if strings.TrimSpace(t.Name) == "" {
-		return fmt.Errorf("tools[%d]: name is required", index)
-	}
-
-	if strings.TrimSpace(t.Version) == "" {
-		return fmt.Errorf("tools[%d] (%s): version is required", index, t.Name)
-	}
-
-	if t.Source.Type != "" && !validToolSourceTypes[t.Source.Type] {
-		return fmt.Errorf(
-			"tools[%d] (%s): invalid source type %q, must be one of: github-release, url, go-install, npm, cargo-install, script",
-			index, t.Name, t.Source.Type,
-		)
 	}
 
 	return nil

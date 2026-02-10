@@ -23,9 +23,6 @@ func sampleBlueprint() *config.Blueprint {
 			{Name: "project_name", Type: "string", Required: true},
 			{Name: "use_docker", Type: "bool", Default: "true"},
 		},
-		Tools: []config.Tool{
-			{Name: "golangci-lint", Version: "v1.60.0", Source: config.ToolSource{Type: "github-release"}},
-		},
 		Sync: config.SyncConfig{
 			ManagedFiles: []config.ManagedFile{
 				{Path: "Makefile", Strategy: "merge"},
@@ -54,8 +51,6 @@ func TestRun_TextOutput(t *testing.T) {
 	assert.Contains(t, output, "go, api")
 	assert.Contains(t, output, "Variables:")
 	assert.Contains(t, output, "project_name")
-	assert.Contains(t, output, "Tools:")
-	assert.Contains(t, output, "golangci-lint")
 	assert.Contains(t, output, "Managed Files:")
 	assert.Contains(t, output, "Makefile")
 }
@@ -98,5 +93,4 @@ func TestRun_MinimalBlueprint(t *testing.T) {
 	output := buf.String()
 	assert.Contains(t, output, "minimal")
 	assert.NotContains(t, output, "Variables:")
-	assert.NotContains(t, output, "Tools:")
 }

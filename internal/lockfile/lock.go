@@ -28,7 +28,6 @@ type Lockfile struct {
 	Variables    map[string]any     `yaml:"variables"`
 	Defaults     []DefaultEntry     `yaml:"defaults,omitempty"`
 	ManagedFiles []ManagedFileEntry `yaml:"managed_files,omitempty"`
-	Tools        []ToolEntry        `yaml:"tools,omitempty"`
 }
 
 // BlueprintRef identifies the source blueprint.
@@ -55,25 +54,6 @@ type ManagedFileEntry struct {
 	Strategy     string `yaml:"strategy"`
 	Hash         string `yaml:"hash,omitempty"`
 	SyncedCommit string `yaml:"synced_commit,omitempty"`
-}
-
-// ToolEntry tracks an installed tool with full source configuration for reinstallation.
-type ToolEntry struct {
-	Name        string          `yaml:"name"`
-	Version     string          `yaml:"version"`
-	Source      ToolSourceEntry `yaml:"source"`
-	InstallPath string          `yaml:"install_path,omitempty"`
-}
-
-// ToolSourceEntry stores the source configuration needed to download a tool.
-type ToolSourceEntry struct {
-	Type         string `yaml:"type"`
-	Repo         string `yaml:"repo,omitempty"`
-	AssetPattern string `yaml:"asset_pattern,omitempty"`
-	URL          string `yaml:"url,omitempty"`
-	Module       string `yaml:"module,omitempty"`
-	Package      string `yaml:"package,omitempty"`
-	Crate        string `yaml:"crate,omitempty"`
 }
 
 // ContentHash computes the SHA256 hash of content in the format "sha256:<hex>".
