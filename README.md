@@ -53,6 +53,9 @@ forge check
 forge sync --dry-run
 forge sync
 
+# Initialize a new blueprint registry
+forge registry init my-registry --name "My Blueprints" --category go --category python
+
 # Manage tools declared in the blueprint
 forge tools list
 forge tools install
@@ -74,6 +77,7 @@ forge cache clean
 | `forge tools list` | List tools declared in the blueprint |
 | `forge tools install` | Install tools declared in the blueprint |
 | `forge init` | Initialize a new blueprint |
+| `forge registry init <path>` | Scaffold a new blueprint registry |
 | `forge cache clean` | Clear cached registries and tools |
 
 ## Documentation
