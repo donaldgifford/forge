@@ -34,7 +34,6 @@ func newCLIOpts(t *testing.T, outputDir string) *create.Opts {
 		OutputDir:    outputDir,
 		RegistryDir:  absTestRegistryDir(t),
 		UseDefaults:  true,
-		NoTools:      true,
 		NoHooks:      true,
 		ForceCreate:  false,
 		ForgeVersion: "test-cli",
@@ -114,53 +113,6 @@ func TestCLI_CreateEndToEnd(t *testing.T) {
 	assert.Equal(t, "my-test-api", lock.Variables["project_name"])
 	assert.NotEmpty(t, lock.Defaults)
 	assert.NotEmpty(t, lock.ManagedFiles)
-}
-
-func TestCLI_CreateEndToEnd_ToolMetadata(t *testing.T) {
-	t.Parallel()
-
-	outputDir := filepath.Join(t.TempDir(), "tools-test")
-	opts := newCLIOpts(t, outputDir)
-	opts.NoTools = false // Enable tool resolution (not installation).
-
-	result, err := create.Run(opts)
-	require.NoError(t, err)
-	assert.Positive(t, result.FilesCreated)
-
-	// Verify lockfile has full tool source metadata.
-	lockPath := filepath.Join(outputDir, lockfile.FileName)
-	lock, err := lockfile.Read(lockPath)
-	require.NoError(t, err)
-
-	require.Len(t, lock.Tools, 3)
-
-	// Find tools by name for order-independent assertions.
-	toolsByName := make(map[string]lockfile.ToolEntry, len(lock.Tools))
-	for _, tool := range lock.Tools {
-		toolsByName[tool.Name] = tool
-	}
-
-	// Registry-level tool: actionlint (github-release).
-	actionlint, ok := toolsByName["actionlint"]
-	require.True(t, ok, "actionlint should be in lockfile tools")
-	assert.Equal(t, "github-release", actionlint.Source.Type)
-	assert.Equal(t, "rhysd/actionlint", actionlint.Source.Repo)
-
-	// Blueprint tool: golangci-lint (github-release).
-	golangciLint, ok := toolsByName["golangci-lint"]
-	require.True(t, ok, "golangci-lint should be in lockfile tools")
-	assert.Equal(t, "1.62.2", golangciLint.Version)
-	assert.Equal(t, "github-release", golangciLint.Source.Type)
-	assert.Equal(t, "golangci/golangci-lint", golangciLint.Source.Repo)
-	assert.NotEmpty(t, golangciLint.Source.AssetPattern)
-	assert.Equal(t, ".forge/tools/golangci-lint", golangciLint.InstallPath)
-
-	// Blueprint tool: goimports (go-install).
-	goimports, ok := toolsByName["goimports"]
-	require.True(t, ok, "goimports should be in lockfile tools")
-	assert.Equal(t, "0.28.0", goimports.Version)
-	assert.Equal(t, "go-install", goimports.Source.Type)
-	assert.Equal(t, "golang.org/x/tools/cmd/goimports", goimports.Source.Module)
 }
 
 func TestCLI_ForceGuard_RejectsNonEmptyDir(t *testing.T) {

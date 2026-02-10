@@ -16,12 +16,11 @@ import (
 )
 
 var (
-	syncDryRun       bool
-	syncForce        bool
-	syncFileFilter   string
-	syncIncludeTools bool
-	syncRegistryDir  string
-	syncRef          string
+	syncDryRun      bool
+	syncForce       bool
+	syncFileFilter  string
+	syncRegistryDir string
+	syncRef         string
 )
 
 var syncCmd = &cobra.Command{
@@ -40,7 +39,6 @@ func init() {
 	syncCmd.Flags().BoolVar(&syncDryRun, "dry-run", false, "print what would change without writing")
 	syncCmd.Flags().BoolVarP(&syncForce, "force", "f", false, "skip confirmation prompts")
 	syncCmd.Flags().StringVar(&syncFileFilter, "file", "", "sync only a specific file path")
-	syncCmd.Flags().BoolVar(&syncIncludeTools, "include-tools", false, "also update installed tools")
 	syncCmd.Flags().StringVar(&syncRegistryDir, "registry-dir", "", "override registry source (local path or go-getter URL)")
 	syncCmd.Flags().StringVar(&syncRef, "ref", "", "sync against a specific registry version/ref")
 	rootCmd.AddCommand(syncCmd)
@@ -107,10 +105,6 @@ func runSync(cmd *cobra.Command, _ []string) error {
 	}
 
 	printSyncSummary(w, result)
-
-	if syncIncludeTools {
-		logger.Info("tool sync not yet implemented")
-	}
 
 	// Report conflicts to stderr and return error if any exist.
 	if len(result.ConflictFiles) > 0 {

@@ -82,16 +82,6 @@ func renderSections(w io.Writer, bp *config.Blueprint) error {
 		}
 	}
 
-	if len(bp.Tools) > 0 {
-		if _, err := fmt.Fprintln(w, "\nTools:"); err != nil {
-			return err
-		}
-
-		if err := renderTools(w, bp.Tools); err != nil {
-			return err
-		}
-	}
-
 	if len(bp.Sync.ManagedFiles) > 0 {
 		if _, err := fmt.Fprintln(w, "\nManaged Files:"); err != nil {
 			return err
@@ -126,23 +116,6 @@ func renderVariables(w io.Writer, vars []config.Variable) error {
 	return tw.Flush()
 }
 
-func renderTools(w io.Writer, tools []config.Tool) error {
-	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-
-	if _, err := fmt.Fprintln(tw, "  NAME\tVERSION\tSOURCE"); err != nil {
-		return err
-	}
-
-	for i := range tools {
-		t := &tools[i]
-		if _, err := fmt.Fprintf(tw, "  %s\t%s\t%s\n", t.Name, t.Version, t.Source.Type); err != nil {
-			return err
-		}
-	}
-
-	return tw.Flush()
-}
-
 func renderManagedFiles(w io.Writer, files []config.ManagedFile) error {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 
@@ -169,15 +142,6 @@ func renderJSON(w io.Writer, bp *config.Blueprint) error {
 		Variables:   bp.Variables,
 	}
 
-	for i := range bp.Tools {
-		t := &bp.Tools[i]
-		out.Tools = append(out.Tools, jsonTool{
-			Name:    t.Name,
-			Version: t.Version,
-			Source:  t.Source.Type,
-		})
-	}
-
 	for i := range bp.Sync.ManagedFiles {
 		f := &bp.Sync.ManagedFiles[i]
 		out.ManagedFiles = append(out.ManagedFiles, jsonManagedFile{
@@ -198,14 +162,7 @@ type jsonOutput struct {
 	Description  string            `json:"description,omitempty"`
 	Tags         []string          `json:"tags,omitempty"`
 	Variables    []config.Variable `json:"variables,omitempty"`
-	Tools        []jsonTool        `json:"tools,omitempty"`
 	ManagedFiles []jsonManagedFile `json:"managed_files,omitempty"`
-}
-
-type jsonTool struct {
-	Name    string `json:"name"`
-	Version string `json:"version"`
-	Source  string `json:"source"`
 }
 
 type jsonManagedFile struct {

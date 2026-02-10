@@ -8,7 +8,7 @@ code in this repository.
 Forge is a Go CLI tool (Go 1.25.4, Cobra CLI) that scaffolds projects from
 **blueprints** — project templates in a Git-based **registry**. Inspired by
 Python's cookiecutter but with layered defaults inheritance, managed file sync,
-and remote tool resolution. The full specification lives in
+and registry-based browsing. The full specification lives in
 `docs/PROJECT_PLAN.md`.
 
 ## Build & Development Commands
@@ -39,7 +39,7 @@ packages:
 
 - **cmd/forge/** — Entry point (`main.go`)
 - **cmd/** — Cobra command definitions (create, init, sync, check, list, search,
-  info, tools, registry, cache)
+  info, registry, cache)
 - **internal/config/** — `blueprint.yaml` and `registry.yaml` parsing, validation,
   global config with multi-registry support
 - **internal/registry/** — Registry index (`registry.yaml`), blueprint
@@ -47,15 +47,13 @@ packages:
 - **internal/defaults/** — `_defaults/` layered inheritance resolution
   (registry-wide → category → blueprint, last wins)
 - **internal/getter/** — Source fetching via `hashicorp/go-getter` (registry
-  cloning, tool downloads, archive extraction, checksum verification)
+  cloning, archive extraction, checksum verification)
 - **internal/template/** — Go `text/template` rendering with custom functions
 - **internal/prompt/** — Interactive variable collection via charmbracelet/huh
 - **internal/create/** — Full create workflow orchestration (resolve, prompt,
-  render, conditions, tools, lockfile)
+  render, conditions, lockfile)
 - **internal/sync/** — Three-way merge sync engine for managed files
   (overwrite/merge strategies), conflict detection and resolution
-- **internal/tools/** — Remote tool manifest parsing, platform-aware download,
-  local cache (`~/.cache/forge/tools/`)
 - **internal/lockfile/** — `.forge-lock.yaml` state tracking for scaffolded
   projects
 - **internal/check/** — Drift detection comparing lockfile vs local files
@@ -79,9 +77,6 @@ packages:
   `blueprint.yaml`
 - **Managed Files**: Declared in sync manifest; kept aligned with blueprint via
   overwrite or three-way merge
-- **Tool Manifest**: Remote CLI tools declared with version pins and
-  platform-specific download sources (github-release, go-install, npm, cargo,
-  url, script)
 
 ### CLI Design Decisions
 
@@ -95,8 +90,6 @@ See `docs/gaps_implementation.md` for the full history and rationale.
   upstream-changed, both-changed)
 - **`forge sync --ref`** pins to a specific registry version; outputs which ref
   is being synced against
-- **Lockfile tool entries** store full source config (type, repo, asset_pattern,
-  module, etc.) enabling `forge tools install` without registry access
 
 ## Code Style
 

@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/donaldgifford/forge/internal/config"
@@ -15,7 +14,6 @@ import (
 	"github.com/donaldgifford/forge/internal/prompt"
 	"github.com/donaldgifford/forge/internal/registry"
 	tmpl "github.com/donaldgifford/forge/internal/template"
-	"github.com/donaldgifford/forge/internal/tools"
 )
 
 // Opts holds the options for the create command.
@@ -31,9 +29,6 @@ type Opts struct {
 
 	// UseDefaults skips interactive prompts and uses default values.
 	UseDefaults bool
-
-	// NoTools skips tool installation.
-	NoTools bool
 
 	// NoHooks skips post-create hook execution.
 	NoHooks bool
@@ -125,15 +120,9 @@ func Run(opts *Opts) (*Result, error) {
 		return nil, err
 	}
 
-	// 10. Resolve and install tools.
-	resolvedTools, err := resolveTools(opts, bp, vars, logger)
-	if err != nil {
-		return nil, err
-	}
-
-	// 11. Generate lockfile with content hashes.
+	// 10. Generate lockfile with content hashes.
 	lockPath := filepath.Join(outputDir, lockfile.FileName)
-	lock := buildLockfile(resolved, bp, vars, fileSet, resolvedTools, opts.ForgeVersion, opts.RegistryURL)
+	lock := buildLockfile(resolved, bp, vars, fileSet, opts.ForgeVersion, opts.RegistryURL)
 	computeFileHashes(outputDir, lock)
 
 	if err := lockfile.Write(lockPath, lock); err != nil {
@@ -335,43 +324,6 @@ func applyRename(path string, rename map[string]string, vars map[string]any) str
 	return path
 }
 
-// resolveTools resolves the merged tool list from registry and blueprint declarations.
-func resolveTools(opts *Opts, bp *config.Blueprint, vars map[string]any, logger *slog.Logger) ([]tools.ResolvedTool, error) {
-	if opts.NoTools {
-		return nil, nil
-	}
-
-	// Build category tools path.
-	categoryToolsPath := ""
-	if opts.RegistryDir != "" {
-		parts := strings.SplitN(bp.Name, "-", 2)
-		if len(parts) > 0 {
-			candidate := filepath.Join(opts.RegistryDir, parts[0], "_defaults", "tools.yaml")
-			if _, err := os.Stat(candidate); err == nil {
-				categoryToolsPath = candidate
-			}
-		}
-	}
-
-	// Load registry tools.
-	var registryTools []config.Tool
-	if opts.RegistryDir != "" {
-		reg, err := registry.LoadIndex(opts.RegistryDir)
-		if err == nil {
-			registryTools = reg.Tools
-		}
-	}
-
-	resolved, err := tools.ResolveTools(registryTools, categoryToolsPath, bp.Tools, vars)
-	if err != nil {
-		return nil, fmt.Errorf("resolving tools: %w", err)
-	}
-
-	logger.Debug("resolved tools", "count", len(resolved))
-
-	return resolved, nil
-}
-
 // computeFileHashes reads the written output files and populates SHA256 hashes
 // in the lockfile entries. Errors are logged but don't fail the operation since
 // hashes are used for drift detection only.
@@ -403,7 +355,6 @@ func buildLockfile(
 	bp *config.Blueprint,
 	vars map[string]any,
 	fileSet *defaults.FileSet,
-	resolvedTools []tools.ResolvedTool,
 	forgeVersion string,
 	registryURL string,
 ) *lockfile.Lockfile {
@@ -446,25 +397,6 @@ func buildLockfile(
 		lock.ManagedFiles = append(lock.ManagedFiles, lockfile.ManagedFileEntry{
 			Path:     mf.Path,
 			Strategy: mf.Strategy,
-		})
-	}
-
-	// Record resolved tools.
-	for i := range resolvedTools {
-		t := &resolvedTools[i]
-		lock.Tools = append(lock.Tools, lockfile.ToolEntry{
-			Name:    t.Name,
-			Version: t.Version,
-			Source: lockfile.ToolSourceEntry{
-				Type:         t.Source.Type,
-				Repo:         t.Source.Repo,
-				AssetPattern: t.Source.AssetPattern,
-				URL:          t.Source.URL,
-				Module:       t.Source.Module,
-				Package:      t.Source.Package,
-				Crate:        t.Source.Crate,
-			},
-			InstallPath: t.InstallPath,
 		})
 	}
 

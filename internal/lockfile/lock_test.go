@@ -43,18 +43,6 @@ func TestWriteAndRead_RoundTrip(t *testing.T) {
 		ManagedFiles: []lockfile.ManagedFileEntry{
 			{Path: "Makefile", Strategy: "merge", SyncedCommit: "abc123"},
 		},
-		Tools: []lockfile.ToolEntry{
-			{
-				Name:    "golangci-lint",
-				Version: "1.62.2",
-				Source: lockfile.ToolSourceEntry{
-					Type:         "github-release",
-					Repo:         "golangci/golangci-lint",
-					AssetPattern: "golangci-lint-{{version}}-{{os}}-{{arch}}.tar.gz",
-				},
-				InstallPath: ".forge/tools/golangci-lint",
-			},
-		},
 	}
 
 	err := lockfile.Write(path, original)
@@ -69,11 +57,6 @@ func TestWriteAndRead_RoundTrip(t *testing.T) {
 	assert.Equal(t, original.Variables["go_module"], loaded.Variables["go_module"])
 	assert.Len(t, loaded.Defaults, 2)
 	assert.Len(t, loaded.ManagedFiles, 1)
-	assert.Len(t, loaded.Tools, 1)
-	assert.Equal(t, "golangci-lint", loaded.Tools[0].Name)
-	assert.Equal(t, "github-release", loaded.Tools[0].Source.Type)
-	assert.Equal(t, "golangci/golangci-lint", loaded.Tools[0].Source.Repo)
-	assert.Equal(t, ".forge/tools/golangci-lint", loaded.Tools[0].InstallPath)
 }
 
 func TestWrite_ContainsHeader(t *testing.T) {
@@ -130,5 +113,4 @@ func TestWrite_EmptyLockfile(t *testing.T) {
 
 	assert.Empty(t, loaded.Defaults)
 	assert.Empty(t, loaded.ManagedFiles)
-	assert.Empty(t, loaded.Tools)
 }

@@ -6,7 +6,7 @@ The core logic is tested through the Go API (unit/integration tests pass
 `RegistryDir` directly), but the CLI-to-core wiring was never completed.
 
 This plan fixes those gaps in dependency order: create (local) -> create
-(remote) -> sync -> check -> tools.
+(remote) -> sync -> check.
 
 ## Design Decisions
 
@@ -28,10 +28,6 @@ These were resolved during review and are binding for implementation:
    specific registry version. When `--ref` is not set, uses the ref from the
    lockfile's blueprint config. The command outputs which ref it is syncing
    against as it runs.
-
-5. **Test fixtures include `go-install` tool**: Add a `go-install` source tool
-   (e.g., `goimports`) to `testdata/registry/` alongside the existing
-   `github-release` tool to validate both download paths.
 
 ---
 
@@ -94,7 +90,6 @@ Run the CLI binary against `testdata/registry/` and validate the full flow.
   --set go_module=github.com/example/my-test-api \
   --set use_grpc=false \
   --set license=MIT \
-  --no-tools \
   --no-hooks \
   -o /tmp/forge-test-create
 ```
@@ -264,7 +259,7 @@ Verify that `forge create` stores a `registry_url` in the lockfile that
 ```bash
 # 1. Create a project
 forge create go/api --registry-dir ./testdata/registry \
-  --defaults --set project_name=sync-test --no-tools --no-hooks \
+  --defaults --set project_name=sync-test --no-hooks \
   -o /tmp/forge-sync-test
 
 # 2. Modify a default file in the registry
@@ -364,99 +359,6 @@ registry source to detect upstream changes.
 
 ---
 
-## Gap 5: Tool Installation from Lockfile
-
-**Problem**: `lockfile.ToolEntry` only stores `{name, version, source_type}`.
-The `cmd/tools_install.go` reconstructs a `ResolvedTool` with only
-`Source.Type` set — all other source fields (`Repo`, `Module`, `URL`,
-`AssetPattern`) are empty. Every tool download fails.
-
-**Depends on**: Gap 1 (lockfile needs to store enough to reinstall)
-
-### 5.1 — Expand `ToolEntry` in Lockfile [DONE]
-
-Store the full source configuration needed for download.
-
-**Files to change:**
-
-- `internal/lockfile/lock.go` — expand `ToolEntry` struct
-- `internal/create/create.go` — populate new fields in `buildLockfile()`
-- `internal/lockfile/lock_test.go` — update round-trip tests
-
-**New `ToolEntry` structure:**
-
-```go
-type ToolEntry struct {
-    Name        string          `yaml:"name"`
-    Version     string          `yaml:"version"`
-    Source      ToolSourceEntry `yaml:"source"`
-    InstallPath string          `yaml:"install_path,omitempty"`
-}
-
-type ToolSourceEntry struct {
-    Type         string `yaml:"type"`
-    Repo         string `yaml:"repo,omitempty"`
-    AssetPattern string `yaml:"asset_pattern,omitempty"`
-    URL          string `yaml:"url,omitempty"`
-    Module       string `yaml:"module,omitempty"`
-    Package      string `yaml:"package,omitempty"`
-    Crate        string `yaml:"crate,omitempty"`
-}
-```
-
-### 5.2 — Add `go-install` Tool to Test Fixtures [DONE]
-
-Add a `go-install` source tool to `testdata/registry/go/api/blueprint.yaml`
-so both download paths (`github-release` and `go-install`) are testable.
-
-**Files to change:**
-
-- `testdata/registry/go/api/blueprint.yaml` — add a `go-install` tool entry
-  (e.g., `goimports` or another lightweight Go tool)
-
-### 5.3 — Fix `cmd/tools_install.go` Reconstruction [DONE]
-
-Use the expanded lockfile fields to reconstruct a complete `ResolvedTool`.
-
-**Files to change:**
-
-- `cmd/tools_install.go` — map `ToolEntry` fields to full `ResolvedTool`
-
-### 5.4 — End-to-End Tools Test [DONE]
-
-**Verification steps:**
-
-```bash
-# 1. Create a project with tools
-forge create go/api --registry-dir ./testdata/registry \
-  --defaults --set project_name=tools-test --no-hooks \
-  -o /tmp/forge-tools-test
-
-# 2. Check lockfile has full tool source metadata
-cat /tmp/forge-tools-test/.forge-lock.yaml
-
-# 3. Install tools from lockfile
-cd /tmp/forge-tools-test
-forge tools install
-
-# 4. Verify tool binary exists
-ls -la .forge/tools/
-```
-
-**Success criteria:**
-
-- [x] `.forge-lock.yaml` tools section contains full source config (type, repo,
-  asset_pattern for github-release; type, module for go-install)
-- [x] `forge tools install` successfully downloads at least one tool
-- [x] `forge tools list` shows installed tools with correct versions
-- [x] Cache hit: running `forge tools install` a second time skips download
-- [x] `go-install` source type works: `forge tools install` runs
-  `go install module@version` and binary appears in `.forge/tools/`
-- [x] `github-release` source type works: downloads, extracts archive, and
-  binary appears in `.forge/tools/`
-
----
-
 ## Implementation Order
 
 ```
@@ -474,14 +376,8 @@ Gap 3.3  End-to-end sync test
     │
 Gap 4.1  Hash-based local drift detection
 Gap 4.2  Registry comparison mode for check
-    │
-Gap 5.1  Expand ToolEntry in lockfile
-Gap 5.2  Add go-install tool to test fixtures
-Gap 5.3  Fix tools_install reconstruction
-Gap 5.4  End-to-end tools test
 ```
 
 Each gap builds on the previous. We validate locally first (Gap 1), then add
 remote go-getter support (Gap 2), then wire sync with `--ref` output (Gap 3),
-improve check with hashes and registry comparison (Gap 4), and finally fix
-tools with full lockfile metadata (Gap 5).
+and improve check with hashes and registry comparison (Gap 4).

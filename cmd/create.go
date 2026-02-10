@@ -21,7 +21,6 @@ var (
 	setVars     []string
 	outputDir   string
 	useDefault  bool
-	noTools     bool
 	noHooks     bool
 	registryDir string
 	forceCreate bool
@@ -45,7 +44,6 @@ func init() {
 	createCmd.Flags().StringVarP(&outputDir, "output-dir", "o", "", "target output directory")
 	createCmd.Flags().StringVar(&registryDir, "registry-dir", "", "path or URL to the blueprint registry")
 	createCmd.Flags().BoolVar(&useDefault, "defaults", false, "use all default values without prompting")
-	createCmd.Flags().BoolVar(&noTools, "no-tools", false, "skip tool installation")
 	createCmd.Flags().BoolVar(&noHooks, "no-hooks", false, "skip post-create hooks")
 	createCmd.Flags().BoolVar(&forceCreate, "force", false, "overwrite existing non-empty output directory")
 	rootCmd.AddCommand(createCmd)
@@ -94,7 +92,6 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		DefaultRegistryURL: defaultURL,
 		Overrides:          overrides,
 		UseDefaults:        useDefault,
-		NoTools:            noTools,
 		NoHooks:            noHooks,
 		ForceCreate:        forceCreate,
 		ForgeVersion:       buildVersion,

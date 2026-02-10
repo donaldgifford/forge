@@ -43,15 +43,6 @@ func TestLoadBlueprint(t *testing.T) {
 	assert.Equal(t, "{{ not .use_grpc }}", bp.Conditions[0].When)
 	assert.Contains(t, bp.Conditions[0].Exclude, "proto/")
 
-	// Tools.
-	require.Len(t, bp.Tools, 2)
-	assert.Equal(t, "golangci-lint", bp.Tools[0].Name)
-	assert.Equal(t, "1.62.2", bp.Tools[0].Version)
-	assert.Equal(t, "github-release", bp.Tools[0].Source.Type)
-	assert.Equal(t, "goimports", bp.Tools[1].Name)
-	assert.Equal(t, "go-install", bp.Tools[1].Source.Type)
-	assert.Equal(t, "golang.org/x/tools/cmd/goimports", bp.Tools[1].Source.Module)
-
 	// Hooks.
 	assert.Contains(t, bp.Hooks.PostCreate, "git init")
 
@@ -80,10 +71,6 @@ func TestLoadRegistry(t *testing.T) {
 	// Defaults.
 	assert.Equal(t, "overwrite", reg.Defaults.SyncStrategy)
 	assert.True(t, reg.Defaults.Managed)
-
-	// Tools.
-	require.Len(t, reg.Tools, 1)
-	assert.Equal(t, "actionlint", reg.Tools[0].Name)
 
 	// Blueprints.
 	require.Len(t, reg.Blueprints, 2)

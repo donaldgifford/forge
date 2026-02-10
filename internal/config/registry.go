@@ -7,7 +7,6 @@ type Registry struct {
 	Description string           `yaml:"description"`
 	Maintainers []Maintainer     `yaml:"maintainers"`
 	Defaults    RegistryDefaults `yaml:"defaults"`
-	Tools       []Tool           `yaml:"tools"`
 	Blueprints  []BlueprintEntry `yaml:"blueprints"`
 }
 

@@ -7,7 +7,6 @@ A CLI tool that scaffolds projects from **blueprints** -- project templates stor
 - **Blueprint scaffolding** -- Create projects from templates with variable substitution via Go `text/template`
 - **Layered defaults** -- Inherit config files through `_defaults/` directories (registry-wide, category, blueprint)
 - **Managed file sync** -- Keep files aligned with upstream blueprints using overwrite or three-way merge strategies
-- **Remote tool resolution** -- Declare CLI tools in blueprints with platform-aware download and caching
 - **Registry browsing** -- List, search, and inspect blueprints from Git-based registries
 
 ## Installation
@@ -56,10 +55,6 @@ forge sync
 # Initialize a new blueprint registry
 forge registry init my-registry --name "My Blueprints" --category go --category python
 
-# Manage tools declared in the blueprint
-forge tools list
-forge tools install
-
 # Clean cached data
 forge cache clean
 ```
@@ -74,17 +69,14 @@ forge cache clean
 | `forge info <blueprint.yaml>` | Show detailed blueprint information |
 | `forge check` | Check project for drift against the source blueprint |
 | `forge sync` | Sync project files with the latest blueprint version |
-| `forge tools list` | List tools declared in the blueprint |
-| `forge tools install` | Install tools declared in the blueprint |
 | `forge init` | Initialize a new blueprint |
 | `forge registry init <path>` | Scaffold a new blueprint registry |
-| `forge cache clean` | Clear cached registries and tools |
+| `forge cache clean` | Clear cached registries |
 
 ## Documentation
 
 - [Blueprint Authoring Guide](docs/BLUEPRINT_AUTHORING.md) -- How to create blueprints
 - [Registry Setup Guide](docs/REGISTRY_SETUP.md) -- How to set up a blueprint registry
-- [Tools Guide](docs/TOOLS_GUIDE.md) -- Tool manifest format and source types
 
 ## Development
 

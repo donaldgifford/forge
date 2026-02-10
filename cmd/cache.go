@@ -15,7 +15,6 @@ import (
 
 var (
 	cacheCleanRegistries bool
-	cacheCleanTools      bool
 	cacheCleanAll        bool
 )
 
@@ -26,15 +25,13 @@ var cacheCmd = &cobra.Command{
 
 var cacheCleanCmd = &cobra.Command{
 	Use:   "clean",
-	Short: "Clear cached registries and tools",
-	Long: `Remove cached data to free disk space. By default, cleans everything.
-Use --registries or --tools to selectively clean.`,
-	RunE: runCacheClean,
+	Short: "Clear cached registries",
+	Long:  `Remove cached data to free disk space. By default, cleans all caches.`,
+	RunE:  runCacheClean,
 }
 
 func init() {
 	cacheCleanCmd.Flags().BoolVar(&cacheCleanRegistries, "registries", false, "clean only registry cache")
-	cacheCleanCmd.Flags().BoolVar(&cacheCleanTools, "tools", false, "clean only tool cache")
 	cacheCleanCmd.Flags().BoolVar(&cacheCleanAll, "all", false, "clean all caches (default)")
 	cacheCmd.AddCommand(cacheCleanCmd)
 	rootCmd.AddCommand(cacheCmd)
@@ -46,44 +43,15 @@ func runCacheClean(_ *cobra.Command, _ []string) error {
 
 	baseDir := registry.DefaultCacheDir()
 
-	// If no specific flag set, clean everything.
-	cleanRegistries := cacheCleanRegistries || cacheCleanAll || (!cacheCleanRegistries && !cacheCleanTools)
-	cleanTools := cacheCleanTools || cacheCleanAll || (!cacheCleanRegistries && !cacheCleanTools)
-
-	var totalFreed int64
-
-	if cleanRegistries {
-		freed, err := cleanDir(filepath.Join(baseDir, "registries"), logger)
-		if err != nil {
-			return fmt.Errorf("cleaning registry cache: %w", err)
-		}
-
-		totalFreed += freed
-
-		if freed > 0 {
-			w.Successf("Cleaned registry cache (%s)", formatBytes(freed))
-		} else {
-			w.Info("Registry cache already clean")
-		}
+	freed, err := cleanDir(filepath.Join(baseDir, "registries"), logger)
+	if err != nil {
+		return fmt.Errorf("cleaning registry cache: %w", err)
 	}
 
-	if cleanTools {
-		freed, err := cleanDir(filepath.Join(baseDir, "tools"), logger)
-		if err != nil {
-			return fmt.Errorf("cleaning tool cache: %w", err)
-		}
-
-		totalFreed += freed
-
-		if freed > 0 {
-			w.Successf("Cleaned tool cache (%s)", formatBytes(freed))
-		} else {
-			w.Info("Tool cache already clean")
-		}
-	}
-
-	if totalFreed > 0 {
-		w.Successf("Total freed: %s", formatBytes(totalFreed))
+	if freed > 0 {
+		w.Successf("Cleaned registry cache (%s)", formatBytes(freed))
+	} else {
+		w.Info("Registry cache already clean")
 	}
 
 	return nil

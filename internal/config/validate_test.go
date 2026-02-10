@@ -123,21 +123,6 @@ func TestValidateBlueprint_InvalidManagedFileStrategy(t *testing.T) {
 	assert.Contains(t, err.Error(), "invalid strategy")
 }
 
-func TestValidateBlueprint_InvalidToolSourceType(t *testing.T) {
-	t.Parallel()
-
-	bp := &config.Blueprint{
-		APIVersion: "v1",
-		Name:       "test",
-		Tools: []config.Tool{
-			{Name: "tool", Version: "1.0", Source: config.ToolSource{Type: "invalid"}},
-		},
-	}
-	err := config.ValidateBlueprint(bp)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid source type")
-}
-
 func TestValidateRegistry_Valid(t *testing.T) {
 	t.Parallel()
 

@@ -14,9 +14,8 @@
 | **Registry** | A Git repository containing one or more blueprints, organized by path, with a top-level `registry.yaml` index and a `_defaults/` directory. |
 | **`_defaults/`** | A directory at the registry root containing files that every blueprint inherits automatically. Blueprints override defaults by providing their own version of the same file. |
 | **blueprint.yaml** | The config file in each blueprint that declares variables, defaults, prompts, hooks, sync-trackable files, and default overrides/exclusions. |
-| **registry.yaml** | The index file at the root of a registry repo that catalogs all available blueprints and declares registry-wide defaults and tool manifests. |
-| **Tool Manifest** | A declaration of remote CLI tools/binaries with version pins and download URLs. Tools are fetched at scaffold time — never stored in the registry. |
-| **Scaffolded Project** | The local project generated from a blueprint. Contains a `.forge-lock.yaml` tracking its origin blueprint, tool versions, and state. |
+| **registry.yaml** | The index file at the root of a registry repo that catalogs all available blueprints and declares registry-wide defaults. |
+| **Scaffolded Project** | The local project generated from a blueprint. Contains a `.forge-lock.yaml` tracking its origin blueprint and state. |
 | **Managed Files** | Files declared in a blueprint's sync manifest that can be kept up-to-date with the source blueprint after scaffolding. |
 
 ---
@@ -27,14 +26,14 @@
 ┌──────────────────────────────────────────────────────────────┐
 │                         forge CLI                            │
 │                      (cobra commands)                         │
-├────────┬───────┬───────┬────────┬───────┬────────┬───────────┤
-│ create │  init │  sync │  check │  list │ search │  tools    │
-├────────┴───────┴───────┴────────┴───────┴────────┴───────────┤
+├────────┬───────┬───────┬────────┬───────┬────────────────────┤
+│ create │  init │  sync │  check │  list │ search             │
+├────────┴───────┴───────┴────────┴───────┴────────────────────┤
 │                       Core Engine                            │
-├─────────┬───────────┬─────────┬────────┬──────────┬──────────┤
-│   Git   │ Template  │ Config  │  Sync  │ Registry │  Tools   │
-│  Client │ Renderer  │ Parser  │ Engine │  Index   │ Resolver │
-└─────────┴───────────┴─────────┴────────┴──────────┴──────────┘
+├─────────┬───────────┬─────────┬────────┬─────────────────────┤
+│   Git   │ Template  │ Config  │  Sync  │ Registry            │
+│  Client │ Renderer  │ Parser  │ Engine │  Index              │
+└─────────┴───────────┴─────────┴────────┴─────────────────────┘
 ```
 
 ### Package Layout
@@ -48,8 +47,7 @@ forge/
 │   ├── sync.go                 # Sync managed files from blueprint
 │   ├── check.go                # Check for available blueprint updates
 │   ├── list.go                 # List blueprints in a registry
-│   ├── search.go               # Search across registries
-│   └── tools.go                # Manage remote tools (install, update, list)
+│   └── search.go               # Search across registries
 ├── internal/
 │   ├── config/                 # blueprint.yaml parsing and validation
 │   │   ├── schema.go
@@ -71,11 +69,6 @@ forge/
 │   ├── sync/                   # Sync and check engine
 │   │   ├── engine.go
 │   │   └── diff.go
-│   ├── tools/                  # Remote tool resolution and download
-│   │   ├── manifest.go         # Tool manifest parsing
-│   │   ├── resolver.go         # Platform/arch detection, URL resolution
-│   │   ├── downloader.go       # Download, verify checksum, extract
-│   │   └── cache.go            # Local tool cache (~/.cache/forge/tools/)
 │   └── lockfile/               # .forge-lock.yaml management
 │       └── lock.go
 ├── testdata/                   # Test registries and blueprints
@@ -223,203 +216,7 @@ defaults:
 
 ---
 
-## 4. Remote Tools Manifest
-
-Tools are CLI binaries, linters, formatters, or dev utilities that a blueprint needs but should never be committed to the registry. Instead, they're declared with version pins and download sources, then resolved at scaffold time.
-
-### Tool Declaration
-
-Tools can be declared at three levels, following the same inheritance model:
-
-**Registry-wide** (in `registry.yaml`):
-
-```yaml
-# registry.yaml (excerpt)
-tools:
-  - name: pre-commit
-    version: "3.7.0"
-    description: "Git pre-commit hook framework"
-    source:
-      type: github-release
-      repo: "pre-commit/pre-commit"
-      asset_pattern: "pre-commit-{{version}}-{{os}}-{{arch}}"
-    install_path: ".forge/tools/pre-commit"
-
-  - name: actionlint
-    version: "1.7.7"
-    description: "GitHub Actions workflow linter"
-    source:
-      type: github-release
-      repo: "rhysd/actionlint"
-      asset_pattern: "actionlint_{{version}}_{{os}}_{{arch}}.tar.gz"
-    install_path: ".forge/tools/actionlint"
-```
-
-**Category-level** (in a category `_defaults/tools.yaml`):
-
-```yaml
-# go/_defaults/tools.yaml
-tools:
-  - name: golangci-lint
-    version: "1.62.2"
-    description: "Go linters aggregator"
-    source:
-      type: github-release
-      repo: "golangci/golangci-lint"
-      asset_pattern: "golangci-lint-{{version}}-{{os}}-{{arch}}.tar.gz"
-    install_path: ".forge/tools/golangci-lint"
-
-  - name: goreleaser
-    version: "2.6.1"
-    source:
-      type: github-release
-      repo: "goreleaser/goreleaser"
-      asset_pattern: "goreleaser_{{goos}}_{{goarch}}.tar.gz"
-    install_path: ".forge/tools/goreleaser"
-```
-
-**Blueprint-level** (in `blueprint.yaml`):
-
-```yaml
-# blueprint.yaml (excerpt)
-tools:
-  - name: buf
-    version: "1.50.0"
-    description: "Protobuf tooling"
-    source:
-      type: github-release
-      repo: "bufbuild/buf"
-      asset_pattern: "buf-{{os}}-{{arch}}"
-    install_path: ".forge/tools/buf"
-    # Only included when gRPC is enabled
-    condition: "{{ .use_grpc }}"
-
-  # Override the registry-wide version of a tool
-  - name: golangci-lint
-    version: "1.63.0"             # Pin a newer version for this blueprint
-```
-
-### Tool Source Types
-
-```yaml
-# GitHub Release — most common
-source:
-  type: github-release
-  repo: "owner/repo"
-  asset_pattern: "tool-{{version}}-{{os}}-{{arch}}.tar.gz"
-
-# Direct URL
-source:
-  type: url
-  url: "https://example.com/tools/mytool-{{version}}-{{os}}-{{arch}}.tar.gz"
-
-# Go install
-source:
-  type: go-install
-  module: "github.com/owner/tool"        # Uses `go install module@version`
-
-# npm global
-source:
-  type: npm
-  package: "@owner/tool"                  # Uses `npm install -g package@version`
-
-# Cargo install
-source:
-  type: cargo-install
-  crate: "tool-name"                      # Uses `cargo install crate@version`
-
-# Script — run an install script
-source:
-  type: script
-  url: "https://example.com/install.sh"   # Piped to sh with VERSION env var
-```
-
-### Platform Resolution Variables
-
-Tool asset patterns support these variables for cross-platform resolution:
-
-| Variable | macOS (ARM) | macOS (Intel) | Linux (x86_64) | Linux (ARM) |
-|----------|-------------|---------------|-----------------|-------------|
-| `{{os}}` | `darwin` | `darwin` | `linux` | `linux` |
-| `{{arch}}` | `arm64` | `amd64` | `amd64` | `arm64` |
-| `{{goos}}` | `Darwin` | `Darwin` | `Linux` | `Linux` |
-| `{{goarch}}` | `arm64` | `x86_64` | `x86_64` | `arm64` |
-| `{{version}}` | (value from `version` field) | | | |
-
-### Tool Lifecycle
-
-```
-forge create go/api
-  │
-  ├─ 1. Resolve inherited + blueprint-specific tools
-  ├─ 2. Check local cache (~/.cache/forge/tools/<name>/<version>/)
-  ├─ 3. Download missing tools (verify checksums if provided)
-  ├─ 4. Place tools in .forge/tools/ within the scaffolded project
-  ├─ 5. Add .forge/tools/ to .gitignore
-  └─ 6. Record tool versions in .forge-lock.yaml
-
-forge sync (or forge tools update)
-  │
-  ├─ 1. Read .forge-lock.yaml for current tool versions
-  ├─ 2. Fetch latest blueprint tool declarations
-  ├─ 3. Compare versions → report updates available
-  └─ 4. Download and replace updated tools
-
-forge tools install
-  │
-  └─ Re-download all declared tools (e.g., after clone, new machine)
-```
-
-### `forge tools` Command
-
-```bash
-# Install/reinstall all tools declared for this project
-forge tools install
-
-# Check for tool version updates from the source blueprint
-forge tools check
-
-# Update all tools to blueprint-declared versions
-forge tools update
-
-# Update a specific tool
-forge tools update golangci-lint
-
-# List tools and their status
-forge tools list
-
-# Output:
-#   TOOL              VERSION   STATUS      SOURCE
-#   pre-commit        3.7.0     installed   github:pre-commit/pre-commit
-#   golangci-lint     1.62.2    update →    github:golangci/golangci-lint (1.63.0 available)
-#   actionlint        1.7.7     installed   github:rhysd/actionlint
-#   buf               1.50.0    installed   github:bufbuild/buf
-```
-
-### Tool References in Scripts and Configs
-
-Blueprints can reference tool paths in their templates:
-
-```yaml
-# In a Makefile.tmpl
-lint:
- .forge/tools/golangci-lint run ./...
-
-# In a CI workflow template
-- run: .forge/tools/actionlint
-```
-
-Or via a generated wrapper that `forge create` places in the project:
-
-```bash
-# .forge/bin/golangci-lint (auto-generated, added to PATH in scripts)
-#!/bin/sh
-exec "$(dirname "$0")/../tools/golangci-lint" "$@"
-```
-
----
-
-## 5. `registry.yaml` — Full Schema
+## 4. `registry.yaml` — Full Schema
 
 ```yaml
 # registry.yaml — Blueprint registry index
@@ -434,29 +231,6 @@ maintainers:
 defaults:
   sync_strategy: overwrite          # Default sync strategy for inherited files
   managed: true                     # All default files are managed by default
-
-# Registry-wide tool declarations
-tools:
-  - name: pre-commit
-    version: "3.7.0"
-    source:
-      type: github-release
-      repo: "pre-commit/pre-commit"
-      asset_pattern: "pre-commit-{{version}}-{{os}}-{{arch}}"
-    install_path: ".forge/tools/pre-commit"
-    checksum:
-      sha256:
-        darwin-arm64: "abc123..."
-        darwin-amd64: "def456..."
-        linux-amd64: "789ghi..."
-
-  - name: actionlint
-    version: "1.7.7"
-    source:
-      type: github-release
-      repo: "rhysd/actionlint"
-      asset_pattern: "actionlint_{{version}}_{{os}}_{{arch}}.tar.gz"
-    install_path: ".forge/tools/actionlint"
 
 # Blueprint catalog
 blueprints:
@@ -592,23 +366,11 @@ conditions:
       - ".github/"
       - ".gitlab-ci.yml"
 
-# Blueprint-specific tools (adds to or overrides inherited tools)
-tools:
-  - name: buf
-    version: "1.50.0"
-    source:
-      type: github-release
-      repo: "bufbuild/buf"
-      asset_pattern: "buf-{{os}}-{{arch}}"
-    install_path: ".forge/tools/buf"
-    condition: "{{ .use_grpc }}"
-
 # Hooks — run commands before/after scaffolding
 hooks:
   post_create:
     - "git init"
     - "go mod tidy"
-    - "forge tools install"             # Install declared tools
 
 # Sync-managed files (beyond auto-managed defaults)
 sync:
@@ -654,7 +416,7 @@ _defaults/
 ├── LICENSE.tmpl                        # Rendered with license type variable
 ├── SECURITY.md                         # Security policy
 └── .forge/
-    └── .gitignore                      # Ensures .forge/tools/ is git-ignored
+    └── .gitignore                      # Ensures .forge/ is git-ignored
 ```
 
 **Language category `_defaults/` examples:**
@@ -713,9 +475,6 @@ forge create https://github.com/acme/forge-blueprints//go/api
 # Non-interactive (all defaults)
 forge create go/api --defaults
 
-# Skip tool installation
-forge create go/api --no-tools
-
 # Direct standalone repo (no registry)
 forge create git@github.com:someone/standalone-blueprint.git
 ```
@@ -731,9 +490,8 @@ forge create git@github.com:someone/standalone-blueprint.git
 7. Evaluate conditions → build final file inclusion/exclusion list.
 8. Render all `.tmpl` files through Go's `text/template` engine.
 9. Write rendered files to the output directory.
-10. **Resolve tools:** merge inherited + blueprint tools, evaluate conditions, download and install.
-11. Write `.forge-lock.yaml` (including tool versions and default file provenance).
-12. Execute `post_create` hooks.
+10. Write `.forge-lock.yaml` (including default file provenance).
+11. Execute `post_create` hooks.
 
 ### 8.2 `forge init`
 
@@ -754,12 +512,11 @@ forge sync                          # Sync all managed files + defaults
 forge sync --file .golangci.yml     # Sync a specific file
 forge sync --dry-run                # Preview changes
 forge sync --force                  # Skip confirmation
-forge sync --include-tools          # Also update tools
 ```
 
 ### 8.4 `forge check`
 
-Check if the source blueprint has updates for managed files, defaults, or tools.
+Check if the source blueprint has updates for managed files and defaults.
 
 ```bash
 forge check
@@ -782,34 +539,16 @@ Managed files with updates:
   ✱ .github/workflows/ci.yml        (modified 2025-01-28)
   ✓ Makefile                        (up to date)
 
-Tools with updates:
-  ✱ golangci-lint                   1.62.2 → 1.63.0
-  ✓ pre-commit                     3.7.0 (up to date)
-  ✓ buf                            1.50.0 (up to date)
-
 Run `forge sync` to apply file updates.
-Run `forge tools update` to update tools.
 ```
 
-### 8.5 `forge tools`
-
-Manage remote tools for the current project.
-
-```bash
-forge tools install                 # Install all declared tools
-forge tools update                  # Update to blueprint-declared versions
-forge tools update golangci-lint    # Update specific tool
-forge tools check                   # Check for updates
-forge tools list                    # List tools and status
-```
-
-### 8.6 `forge list` / `forge search` / `forge info`
+### 8.5 `forge list` / `forge search` / `forge info`
 
 ```bash
 forge list                          # List all blueprints
 forge list --tag go                 # Filter by tag
 forge search "api"                  # Search across registries
-forge info go/api                   # Show blueprint details + inherited defaults + tools
+forge info go/api                   # Show blueprint details + inherited defaults
 ```
 
 ---
@@ -859,16 +598,6 @@ managed_files:
     strategy: merge
     synced_commit: "abc123def456"
 
-tools:
-  - name: pre-commit
-    version: "3.7.0"
-    source: "registry"
-  - name: golangci-lint
-    version: "1.62.2"
-    source: "go/_defaults"
-  - name: buf
-    version: "1.50.0"
-    source: "blueprint"
 ```
 
 ---
@@ -920,7 +649,6 @@ Files ending in `.tmpl` are rendered and have the extension stripped. Files with
 
 1. **Inherited default files** — automatically managed, synced from their source layer (`_defaults/`, category `_defaults/`, or blueprint).
 2. **Blueprint-declared managed files** — explicitly declared in `blueprint.yaml` `sync.managed_files`.
-3. **Tools** — version-pinned remote tools (via `forge tools update` or `forge sync --include-tools`).
 
 ### CI Integration
 
@@ -962,29 +690,23 @@ jobs:
 
 **Milestone:** `forge create go/api` resolves from a registry, inherits defaults, and produces a working project.
 
-### Phase 2: Registry, Authoring & Tools (Weeks 4–6)
+### Phase 2: Registry & Authoring (Weeks 4–6)
 
-**Goal:** Full registry workflow, blueprint authoring, and remote tool management.
+**Goal:** Full registry workflow and blueprint authoring.
 
 | Task | Est. | Priority |
 |------|------|----------|
 | `forge list` — list blueprints from registry index | 2d | P0 |
 | `forge search` — search by name and tags | 1d | P0 |
-| `forge info` — show blueprint details + inherited defaults + tools | 1d | P1 |
+| `forge info` — show blueprint details + inherited defaults | 1d | P1 |
 | Global config and multi-registry support | 2d | P0 |
 | Registry caching with configurable TTL | 2d | P0 |
 | `forge init` — generate blueprint + update registry index | 2d | P0 |
 | `forge validate` — lint blueprint config | 2d | P1 |
 | Conditional file inclusion/exclusion | 2d | P0 |
 | Post-create hooks | 1d | P1 |
-| Tool manifest parser and inheritance resolution | 2d | P0 |
-| Tool downloader — GitHub releases, go install, npm, cargo, URL, script | 3d | P0 |
-| Platform/arch detection and asset pattern resolution | 1d | P0 |
-| Tool caching (`~/.cache/forge/tools/`) | 1d | P0 |
-| `forge tools install/list/check/update` commands | 2d | P0 |
-| Checksum verification for downloaded tools | 1d | P1 |
 
-**Milestone:** Full blueprint authoring, registry browsing, and tool management working.
+**Milestone:** Full blueprint authoring and registry browsing working.
 
 ### Phase 3: Sync Engine (Weeks 7–9)
 
@@ -993,15 +715,15 @@ jobs:
 | Task | Est. | Priority |
 |------|------|----------|
 | Sync manifest handling (defaults auto-managed + explicit managed files) | 2d | P0 |
-| `forge check` — diff defaults, managed files, and tools against source | 3d | P0 |
+| `forge check` — diff defaults and managed files against source | 3d | P0 |
 | `forge sync` with overwrite strategy | 2d | P0 |
 | `forge sync` with 3-way merge strategy | 4d | P0 |
 | Defaults sync — track provenance layer, detect upstream changes | 2d | P0 |
 | `--dry-run` and `--force` flags | 1d | P0 |
 | Conflict resolution UX (markers + interactive prompts) | 3d | P1 |
-| `.forge-lock.yaml` update on sync (defaults + tools + managed files) | 1d | P0 |
+| `.forge-lock.yaml` update on sync (defaults + managed files) | 1d | P0 |
 
-**Milestone:** Full sync lifecycle — check → sync → resolve, including defaults and tools.
+**Milestone:** Full sync lifecycle — check → sync → resolve, including defaults.
 
 ### Phase 4: Polish & Release (Weeks 10–11)
 
@@ -1011,7 +733,7 @@ jobs:
 |------|------|----------|
 | Comprehensive test suite (unit + integration with test registry) | 4d | P0 |
 | Error handling, UX messaging, colored output | 2d | P1 |
-| Docs — README, blueprint authoring guide, registry setup guide, tools guide | 3d | P0 |
+| Docs — README, blueprint authoring guide, registry setup guide | 3d | P0 |
 | Homebrew formula / goreleaser setup | 1d | P1 |
 | `forge cache clean` command | 1d | P1 |
 | Reference registry repo with all starter blueprints and defaults | 3d | P0 |
@@ -1043,8 +765,7 @@ jobs:
 |------|--------|-----------|
 | Defaults inheritance complexity (3 layers) | High | Strict "last wins" rule. `forge info` shows full resolution for debugging. Extensive tests for edge cases. |
 | 3-way merge complexity for diverse file types | High | Start with overwrite-only; add merge incrementally. |
-| Tool download reliability across platforms | Medium | Cache aggressively. Support multiple source types. Checksum verification. Graceful fallback with clear error messages. |
-| Sparse checkout performance on large registries | Medium | Cache index and tool manifests. Only checkout blueprint path + relevant `_defaults/`. |
+| Sparse checkout performance on large registries | Medium | Cache index. Only checkout blueprint path + relevant `_defaults/`. |
 | Private repo authentication | Medium | Lean on system git credential helpers. Don't reinvent auth. |
 | Template rendering breaking non-text files | Medium | Only render `.tmpl` files; copy everything else verbatim. |
 | Registry index drift | Low | Provide `forge registry update` or CI action that regenerates the index. |
@@ -1058,11 +779,9 @@ jobs:
 1. `forge create go/api` resolves from a registry, inherits all default files, and produces a working project.
 2. Default files from `_defaults/` and `go/_defaults/` are correctly merged with blueprint-level overrides winning.
 3. Blueprints can exclude specific defaults via `defaults.exclude`.
-4. `forge tools install` downloads the correct platform-specific binaries for all declared tools.
-5. `forge check` detects updates to defaults, managed files, and tool versions.
-6. `forge sync` updates managed files and defaults with overwrite and merge strategies.
-7. `forge tools update` upgrades tools to blueprint-declared versions.
-8. End-to-end test suite passes with the reference registry.
+4. `forge check` detects updates to defaults and managed files.
+5. `forge sync` updates managed files and defaults with overwrite and merge strategies.
+6. End-to-end test suite passes with the reference registry.
 
 ---
 
@@ -1075,4 +794,3 @@ jobs:
 - **Semver constraints** — `forge create go/api@^2.0.0`.
 - **Registry CI automation** — GitHub Action to auto-generate `registry.yaml` and validate all blueprints on PR.
 - **`forge diff`** — show what would change if re-scaffolded from scratch.
-- **Tool auto-update bot** — PR automation that bumps tool versions in the registry when new releases are detected.

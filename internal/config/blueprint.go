@@ -11,7 +11,6 @@ type Blueprint struct {
 	Defaults    Defaults          `yaml:"defaults"`
 	Variables   []Variable        `yaml:"variables"`
 	Conditions  []Condition       `yaml:"conditions"`
-	Tools       []Tool            `yaml:"tools"`
 	Hooks       Hooks             `yaml:"hooks"`
 	Sync        SyncConfig        `yaml:"sync"`
 	Rename      map[string]string `yaml:"rename"`
@@ -38,33 +37,6 @@ type Variable struct {
 type Condition struct {
 	When    string   `yaml:"when"`
 	Exclude []string `yaml:"exclude"`
-}
-
-// Tool declares a remote CLI tool with version pin and download source.
-type Tool struct {
-	Name        string     `yaml:"name"`
-	Version     string     `yaml:"version"`
-	Description string     `yaml:"description"`
-	Source      ToolSource `yaml:"source"`
-	InstallPath string     `yaml:"install_path"`
-	Checksum    Checksum   `yaml:"checksum"`
-	Condition   string     `yaml:"condition"`
-}
-
-// ToolSource describes how to obtain a tool binary.
-type ToolSource struct {
-	Type         string `yaml:"type"`
-	Repo         string `yaml:"repo"`
-	AssetPattern string `yaml:"asset_pattern"`
-	URL          string `yaml:"url"`
-	Module       string `yaml:"module"`
-	Package      string `yaml:"package"`
-	Crate        string `yaml:"crate"`
-}
-
-// Checksum holds platform-specific SHA256 checksums for tool verification.
-type Checksum struct {
-	SHA256 map[string]string `yaml:"sha256"`
 }
 
 // Hooks defines lifecycle hooks for blueprint operations.

@@ -9,16 +9,6 @@ defaults:
   sync_strategy: overwrite
   managed: true
 
-tools:
-  - name: actionlint
-    version: "1.7.7"
-    description: "GitHub Actions workflow linter"
-    source:
-      type: github-release
-      repo: "rhysd/actionlint"
-      asset_pattern: "actionlint_{{version}}_{{os}}_{{arch}}.tar.gz"
-    install_path: ".forge/tools/actionlint"
-
 blueprints:
   - name: go/api
     path: go/api

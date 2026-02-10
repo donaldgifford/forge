@@ -152,8 +152,6 @@ func TestRun_LockfileGenerated(t *testing.T) {
 	assert.NotEmpty(t, lock.Defaults)
 	assert.Len(t, lock.ManagedFiles, 1)
 	assert.Equal(t, "Makefile", lock.ManagedFiles[0].Path)
-	assert.NotEmpty(t, lock.Tools, "tools from registry should be recorded")
-	assert.Equal(t, "actionlint", lock.Tools[0].Name)
 }
 
 func TestRun_TmplExtensionsStripped(t *testing.T) {
