@@ -8,7 +8,7 @@ This document breaks the PROJECT_PLAN.md into concrete, ordered implementation s
 
 **Goal:** `forge create go/api` resolves from a local or remote registry, inherits defaults, prompts for variables, renders templates, and writes a working project.
 
-### 1.1 — Project Skeleton and Entry Point
+### 1.1 — Project Skeleton and Entry Point [DONE]
 
 Set up the Cobra CLI scaffold with a root command, version flag, and global config structure.
 
@@ -28,7 +28,7 @@ Set up the Cobra CLI scaffold with a root command, version flag, and global conf
 
 ---
 
-### 1.2 — YAML Schema Types and Config Loader
+### 1.2 — YAML Schema Types and Config Loader [DONE]
 
 Define Go structs for `blueprint.yaml` and `registry.yaml`, plus a loader that reads, unmarshals, and validates them.
 
@@ -54,7 +54,7 @@ Define Go structs for `blueprint.yaml` and `registry.yaml`, plus a loader that r
 
 ---
 
-### 1.3 — Test Fixtures
+### 1.3 — Test Fixtures [DONE]
 
 Create a minimal test registry on disk that all subsequent tests can use.
 
@@ -81,7 +81,7 @@ Create a minimal test registry on disk that all subsequent tests can use.
 
 ---
 
-### 1.4 — Source Fetcher (go-getter)
+### 1.4 — Source Fetcher (go-getter) [DONE]
 
 Wrap `hashicorp/go-getter` to fetch registries and (later) tool binaries from any supported source.
 
@@ -111,7 +111,7 @@ go-getter replaces both a dedicated git client and a custom HTTP downloader. It 
 
 ---
 
-### 1.5 — Registry Resolver
+### 1.5 — Registry Resolver [DONE]
 
 Given a user input like `go/api`, `go/api@v2.1.0`, or a full URL, resolve it to a concrete registry URL + blueprint path + ref.
 
@@ -139,7 +139,7 @@ Given a user input like `go/api`, `go/api@v2.1.0`, or a full URL, resolve it to 
 
 ---
 
-### 1.6 — Defaults Inheritance Resolver
+### 1.6 — Defaults Inheritance Resolver [DONE]
 
 Walk the registry directory tree and merge the layered `_defaults/` directories with the blueprint's own files, applying exclusions.
 
@@ -169,7 +169,7 @@ Walk the registry directory tree and merge the layered `_defaults/` directories 
 
 ---
 
-### 1.7 — Template Rendering Engine
+### 1.7 — Template Rendering Engine [DONE]
 
 Render `.tmpl` files using Go's `text/template` with a custom function map. Also handle directory name templating.
 
@@ -199,7 +199,7 @@ Render `.tmpl` files using Go's `text/template` with a custom function map. Also
 
 ---
 
-### 1.8 — Interactive Prompt Engine
+### 1.8 — Interactive Prompt Engine [DONE]
 
 Prompt the user for blueprint variables, using declared types, defaults, and validation.
 
@@ -225,7 +225,7 @@ Prompt the user for blueprint variables, using declared types, defaults, and val
 
 ---
 
-### 1.9 — Lockfile Manager
+### 1.9 — Lockfile Manager [DONE]
 
 Generate and read `.forge-lock.yaml` to track blueprint provenance, variable values, default file sources, and tool versions.
 
@@ -253,7 +253,7 @@ Generate and read `.forge-lock.yaml` to track blueprint provenance, variable val
 
 ---
 
-### 1.10 — `forge create` Command — Full End-to-End Flow
+### 1.10 — `forge create` Command — Full End-to-End Flow [DONE]
 
 Wire all the pieces together into the `forge create` command.
 
@@ -303,7 +303,7 @@ Do not implement hooks or tools yet — log a message like `"skipping hooks (not
 
 ---
 
-### 1.11 — Registry Cache
+### 1.11 — Registry Cache [DONE]
 
 Cache fetched registries locally to avoid re-downloading on every command.
 
@@ -331,7 +331,7 @@ Cache fetched registries locally to avoid re-downloading on every command.
 
 **Goal:** Users can browse registries, author new blueprints, and manage remote tools.
 
-### 2.1 — `forge list` Command
+### 2.1 — `forge list` Command [DONE]
 
 List blueprints from one or more registries.
 
@@ -350,7 +350,7 @@ List blueprints from one or more registries.
 
 ---
 
-### 2.2 — `forge search` Command
+### 2.2 — `forge search` Command [DONE]
 
 Search across registries by name, description, or tags.
 
@@ -369,7 +369,7 @@ Search across registries by name, description, or tags.
 
 ---
 
-### 2.3 — Global Config and Multi-Registry Support
+### 2.3 — Global Config and Multi-Registry Support [DONE]
 
 Allow users to configure default registries and preferences.
 
@@ -392,7 +392,7 @@ Allow users to configure default registries and preferences.
 
 ---
 
-### 2.4 — Conditional File Inclusion
+### 2.4 — Conditional File Inclusion [DONE]
 
 Evaluate `conditions` from `blueprint.yaml` to exclude files based on template expressions.
 
@@ -412,7 +412,7 @@ Evaluate `conditions` from `blueprint.yaml` to exclude files based on template e
 
 ---
 
-### 2.5 — Post-Create Hooks
+### 2.5 — Post-Create Hooks [DONE]
 
 Execute shell commands after scaffolding.
 
@@ -432,7 +432,7 @@ Execute shell commands after scaffolding.
 
 ---
 
-### 2.6 — `forge init` Command
+### 2.6 — `forge init` Command [DONE]
 
 Scaffold a new blueprint directory with a starter `blueprint.yaml`.
 
@@ -451,7 +451,7 @@ Scaffold a new blueprint directory with a starter `blueprint.yaml`.
 
 ---
 
-### 2.7 — Tool Manifest Parser and Inheritance
+### 2.7 — Tool Manifest Parser and Inheritance [DONE]
 
 Parse tool declarations from `registry.yaml`, category `_defaults/tools.yaml`, and `blueprint.yaml`, then merge them with the same layered-inheritance logic.
 
@@ -471,7 +471,7 @@ Parse tool declarations from `registry.yaml`, category `_defaults/tools.yaml`, a
 
 ---
 
-### 2.8 — Platform Resolver and Tool Downloader
+### 2.8 — Platform Resolver and Tool Downloader [DONE]
 
 Download tools from various sources using go-getter for download-based sources and exec for package-manager sources.
 
@@ -502,7 +502,7 @@ Download tools from various sources using go-getter for download-based sources a
 
 ---
 
-### 2.9 — `forge tools` Commands
+### 2.9 — `forge tools` Commands [DONE]
 
 Wire tool management into CLI subcommands.
 
@@ -526,7 +526,7 @@ Wire tool management into CLI subcommands.
 
 ---
 
-### 2.10 — Wire Tools into `forge create`
+### 2.10 — Wire Tools into `forge create` [DONE]
 
 Update the create flow to resolve, download, and install tools after file generation.
 
@@ -551,7 +551,7 @@ Update the create flow to resolve, download, and install tools after file genera
 
 **Goal:** `forge check` detects drift. `forge sync` updates managed files and defaults using overwrite or three-way merge.
 
-### 3.1 — `forge check` Command
+### 3.1 — `forge check` Command [DONE]
 
 Compare local project state against the source blueprint for defaults, managed files, and tools.
 
@@ -582,7 +582,7 @@ Compare local project state against the source blueprint for defaults, managed f
 
 ---
 
-### 3.2 — Sync Engine — Overwrite Strategy
+### 3.2 — Sync Engine — Overwrite Strategy [DONE]
 
 Replace local files with the latest version from the blueprint/defaults.
 
@@ -609,7 +609,7 @@ Replace local files with the latest version from the blueprint/defaults.
 
 ---
 
-### 3.3 — Sync Engine — Three-Way Merge Strategy
+### 3.3 — Sync Engine — Three-Way Merge Strategy [DONE]
 
 For `strategy: merge` files, compute a three-way merge using the last-synced version as the common ancestor.
 
@@ -641,7 +641,7 @@ For `strategy: merge` files, compute a three-way merge using the last-synced ver
 
 ---
 
-### 3.4 — `forge sync` Command
+### 3.4 — `forge sync` Command [DONE]
 
 Wire the sync engine into a CLI command.
 
@@ -664,7 +664,7 @@ Wire the sync engine into a CLI command.
 
 ---
 
-### 3.5 — Conflict Resolution UX
+### 3.5 — Conflict Resolution UX [DONE]
 
 When three-way merge produces conflicts, provide a usable resolution workflow.
 
@@ -688,7 +688,7 @@ When three-way merge produces conflicts, provide a usable resolution workflow.
 
 **Goal:** Production-ready v0.1.0 with comprehensive tests, good error UX, and documentation.
 
-### 4.1 — Error Handling and UX
+### 4.1 — Error Handling and UX [DONE]
 
 Audit all error paths and add user-friendly messaging with colored output.
 
@@ -709,7 +709,7 @@ Audit all error paths and add user-friendly messaging with colored output.
 
 ---
 
-### 4.2 — `forge info` Command
+### 4.2 — `forge info` Command [DONE]
 
 Show detailed blueprint information including inherited defaults, tools, and variable schema.
 
@@ -726,7 +726,7 @@ Show detailed blueprint information including inherited defaults, tools, and var
 
 ---
 
-### 4.3 — `forge cache clean` Command
+### 4.3 — `forge cache clean` Command [DONE]
 
 Clear cached registries and/or tools.
 
@@ -743,7 +743,7 @@ Clear cached registries and/or tools.
 
 ---
 
-### 4.4 — Comprehensive Test Suite
+### 4.4 — Comprehensive Test Suite [DONE]
 
 Fill in coverage gaps with integration tests that exercise the full flow.
 
@@ -762,7 +762,7 @@ Fill in coverage gaps with integration tests that exercise the full flow.
 
 ---
 
-### 4.5 — Documentation
+### 4.5 — Documentation [DONE]
 
 Write user-facing docs.
 
@@ -775,7 +775,7 @@ Write user-facing docs.
 
 ---
 
-### 4.6 — Reference Registry
+### 4.6 — Reference Registry [DONE]
 
 Create a companion repository with starter blueprints demonstrating all features.
 
@@ -831,7 +831,7 @@ All of Phase 1 ──► 1.10 (forge create)
 
 **Goal:** Post-release housekeeping — CI hardening, compliance automation, and operational improvements.
 
-### 5.1 — License Compliance CI Job
+### 5.1 — License Compliance CI Job [DONE]
 
 Add a GitHub Actions workflow that checks all Go module dependencies for license compatibility with Apache-2.0.
 
@@ -892,7 +892,7 @@ Add a GitHub Actions workflow that checks all Go module dependencies for license
 
 ---
 
-### 5.2 — Add `go-licenses` to Makefile and mise.toml
+### 5.2 — Add `go-licenses` to Makefile and mise.toml [DONE]
 
 Make license checking available locally, not just in CI.
 

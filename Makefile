@@ -49,7 +49,7 @@ build: build-core ## Build everything (core)
 build-core: ## Build core binary
 	@ $(MAKE) --no-print-directory log-$@
 	@mkdir -p $(BIN_DIR)
-	@go build -o $(BIN_DIR)/$(PROJECT_NAME) ./cmd/$(PROJECT_NAME)
+	@go build -ldflags "-X main.version=$(VERSION) -X main.commit=$(COMMIT_HASH)" -o $(BIN_DIR)/$(PROJECT_NAME) ./cmd/$(PROJECT_NAME)
 	@echo "✓ Core binaries built"
 
 ## Testing
@@ -88,7 +88,6 @@ fmt: ## Format code with gofmt and goimports
 	@ $(MAKE) --no-print-directory log-$@
 	@gofmt -s -w .
 	@goimports -w $(GOIMPORTS_LOCAL_ARG) .
-	@goimports -w $(GOIMPORTS_LOCAL_ARG)  cmd/ pkg/
 
 clean: ## Remove build artifacts
 	@ $(MAKE) --no-print-directory log-$@
@@ -108,9 +107,19 @@ run-local: build ## Run exporter with local config
 	@ $(MAKE) --no-print-directory log-$@
 	@$(BIN_DIR)/$(PROJECT_NAME)
 
+## License Compliance
+
+license-check: ## Check dependency licenses against allowed list
+	@ $(MAKE) --no-print-directory log-$@
+	@go-licenses check ./... --allowed_licenses=Apache-2.0,MIT,BSD-2-Clause,BSD-3-Clause,ISC,MPL-2.0
+
+license-report: ## Generate CSV report of all dependency licenses
+	@ $(MAKE) --no-print-directory log-$@
+	@go-licenses report ./... --template=.github/licenses-csv.tpl
+
 ## CI/CD
 
-ci: lint test build ## Run CI pipeline (lint + test + build)
+ci: lint test build license-check ## Run CI pipeline (lint + test + build + license check)
 	@ $(MAKE) --no-print-directory log-$@
 	@echo "✓ CI pipeline complete"
 
