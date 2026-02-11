@@ -39,7 +39,7 @@ packages:
 
 - **cmd/forge/** — Entry point (`main.go`)
 - **cmd/** — Cobra command definitions (create, init, sync, check, list, search,
-  info, registry, cache)
+  info, registry init/blueprint/update, cache)
 - **internal/config/** — `blueprint.yaml` and `registry.yaml` parsing, validation,
   global config with multi-registry support
 - **internal/registry/** — Registry index (`registry.yaml`), blueprint
@@ -62,7 +62,9 @@ packages:
 - **internal/search/** — Blueprint search across name, description, tags
 - **internal/info/** — Blueprint inspection with text/JSON output
 - **internal/initcmd/** — Blueprint scaffolding (`init` is Go reserved keyword)
-- **internal/registrycmd/** — Registry scaffolding (`forge registry init`)
+- **internal/registrycmd/** — Registry scaffolding (`forge registry init`),
+  blueprint scaffolding (`forge registry blueprint`), and registry metadata
+  update (`forge registry update`)
 - **internal/ui/** — Styled CLI output (Success, Warning, Error, Info) respecting
   NO_COLOR
 

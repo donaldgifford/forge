@@ -110,6 +110,71 @@ defaults:
     - "scripts/deploy.sh"
 ```
 
+## Adding Blueprints
+
+Use `forge registry blueprint` to scaffold a new blueprint inside a registry:
+
+```bash
+# Positional form (category/name)
+forge registry blueprint go/grpc-service \
+  --description "gRPC service with protobuf" \
+  --tags go,grpc,api \
+  --registry-dir ./my-registry
+
+# Flag form
+forge registry blueprint \
+  --category python --name fastapi \
+  --registry-dir ./my-registry
+```
+
+This creates:
+
+- `<category>/<name>/blueprint.yaml` -- A rich starter config with variables,
+  hooks, sync, and rename sections.
+- `<category>/<name>/{{project_name}}/README.md.tmpl` -- A starter template.
+- `<category>/_defaults/.gitkeep` -- Category defaults directory (if it doesn't
+  already exist).
+- An entry appended to `registry.yaml`.
+
+Edit `blueprint.yaml` to customize variables, add template files, and configure
+sync behavior.
+
+## Keeping Metadata in Sync
+
+When you modify a blueprint (change its version, update template files, etc.),
+the `registry.yaml` index can become stale. Use `forge registry update` to
+reconcile it:
+
+```bash
+# Update stale entries in registry.yaml
+forge registry update --registry-dir ./my-registry
+
+# Check-only mode (for CI): exits non-zero if stale
+forge registry update --check --registry-dir ./my-registry
+```
+
+The update command compares each blueprint's `version` from `blueprint.yaml`
+and the latest git commit hash against the values in `registry.yaml`. It
+reports one of five statuses for each entry:
+
+| Status | Meaning |
+|--------|---------|
+| `up-to-date` | Registry entry matches blueprint and git state |
+| `version-changed` | `blueprint.yaml` version differs from `registry.yaml` |
+| `files-changed` | Git commit differs but version is unchanged |
+| `both-changed` | Both version and git commit differ |
+| `missing` | Blueprint path does not exist on disk (skipped) |
+
+### CI Integration
+
+Add a check step to your CI pipeline to catch stale metadata:
+
+```yaml
+# GitHub Actions example
+- name: Check registry metadata
+  run: forge registry update --check
+```
+
 ## Hosting
 
 Registries are standard Git repositories. Host them on:
@@ -120,9 +185,3 @@ Registries are standard Git repositories. Host them on:
 - Any Git server
 
 Forge uses [go-getter](https://github.com/hashicorp/go-getter) for fetching, supporting Git, HTTP, and other protocols.
-
-## Tool Declarations
-
-Registries can declare tools at the registry level using a `_tools.yaml` file or per-category in category `_defaults/`. These tools are inherited by blueprints in the same way as default files.
-
-See [Tools Guide](TOOLS_GUIDE.md) for details.
