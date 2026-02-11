@@ -243,7 +243,7 @@ awareness, a rich starter `blueprint.yaml`, template files, and automatic
        - `Infof("Edit %s to customize your blueprint", result.BlueprintYAML)`
        - `Infof("Run: forge registry update --registry-dir %s", registryDir)`
 
-- [ ] **1.10 Manual verification**
+- [x] **1.10 Manual verification**
   - Run the following and verify expected output:
     ```bash
     make build
