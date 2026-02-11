@@ -211,7 +211,7 @@ awareness, a rich starter `blueprint.yaml`, template files, and automatic
   - Each test creates a fresh temp dir and uses `registrycmd.Run()` to
     bootstrap a minimal registry first (matches existing test patterns).
 
-- [ ] **1.9 Create Cobra command wiring**
+- [x] **1.9 Create Cobra command wiring**
   - File: `cmd/registry_blueprint.go`
   - Define package-level flag variables:
     ```go
