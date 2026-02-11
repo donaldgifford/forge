@@ -491,7 +491,7 @@ git commits against `registry.yaml` entries, and update stale metadata.
          from `RunE` — Cobra will print it and exit 1.
        - If stale == 0: `Successf("All blueprints up to date")`.
 
-- [ ] **2.8 Manual verification**
+- [x] **2.8 Manual verification**
   - Run the following and verify expected output:
     ```bash
     make build
