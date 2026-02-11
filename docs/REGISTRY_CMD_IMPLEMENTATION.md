@@ -179,7 +179,7 @@ awareness, a rich starter `blueprint.yaml`, template files, and automatic
     6. `appendBlueprint()`.
     7. Return `BlueprintResult` with absolute paths.
 
-- [ ] **1.8 Write unit tests for blueprint scaffolding**
+- [x] **1.8 Write unit tests for blueprint scaffolding**
   - File: `internal/registrycmd/blueprint_test.go`
   - Tests to write (all `t.Parallel()`):
     1. **`TestRunBlueprint_BasicScaffold`** — scaffold `go/grpc-service`
