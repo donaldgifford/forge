@@ -38,7 +38,7 @@ awareness, a rich starter `blueprint.yaml`, template files, and automatic
   - Add a `RunBlueprint(opts *BlueprintOpts) (*BlueprintResult, error)`
     function stub that returns `nil, nil`.
 
-- [ ] **1.2 Implement path parsing and validation**
+- [x] **1.2 Implement path parsing and validation**
   - File: `internal/registrycmd/blueprint.go`
   - In `RunBlueprint()`, implement:
     1. Validate `RegistryDir` is non-empty.
@@ -56,7 +56,7 @@ awareness, a rich starter `blueprint.yaml`, template files, and automatic
     helper that splits a `category/name` positional arg. Expects exactly
     one `/` separator. Returns error if the format is invalid.
 
-- [ ] **1.3 Implement blueprint.yaml generation**
+- [x] **1.3 Implement blueprint.yaml generation**
   - File: `internal/registrycmd/blueprint.go`
   - Define a `blueprintScaffoldTemplate` const with a rich YAML template.
     Use `fmt.Sprintf` with the following placeholders: name (hyphenated,
@@ -111,7 +111,7 @@ awareness, a rich starter `blueprint.yaml`, template files, and automatic
   - Default `description` to `"TODO: Add a description for this blueprint"`
     if opts.Description is empty.
 
-- [ ] **1.4 Implement starter template file creation**
+- [x] **1.4 Implement starter template file creation**
   - File: `internal/registrycmd/blueprint.go`
   - Create a `createStarterTemplate(blueprintDir string) error` function
     that:
@@ -130,7 +130,7 @@ awareness, a rich starter `blueprint.yaml`, template files, and automatic
        ```
     3. Uses `0o750` for directories, `0o644` for files.
 
-- [ ] **1.5 Implement category defaults directory creation**
+- [x] **1.5 Implement category defaults directory creation**
   - File: `internal/registrycmd/blueprint.go`
   - Create an `ensureCategoryDefaults(registryDir, category string) error`
     function that:
@@ -141,7 +141,7 @@ awareness, a rich starter `blueprint.yaml`, template files, and automatic
     4. This matches the existing `createCategory()` pattern in
        `registrycmd.go`.
 
-- [ ] **1.6 Implement registry.yaml update**
+- [x] **1.6 Implement registry.yaml update**
   - File: `internal/registrycmd/blueprint.go`
   - Create an `appendBlueprint(registryDir string, opts *BlueprintOpts) error`
     function that:
@@ -168,7 +168,7 @@ awareness, a rich starter `blueprint.yaml`, template files, and automatic
     instead of raw YAML unmarshal since we know the file exists (validated
     in step 1.2).
 
-- [ ] **1.7 Wire up `RunBlueprint()` orchestration**
+- [x] **1.7 Wire up `RunBlueprint()` orchestration**
   - File: `internal/registrycmd/blueprint.go`
   - Assemble `RunBlueprint()` to call the functions from 1.2–1.6 in order:
     1. Parse/validate inputs.
