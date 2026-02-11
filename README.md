@@ -55,6 +55,12 @@ forge sync
 # Initialize a new blueprint registry
 forge registry init my-registry --name "My Blueprints" --category go --category python
 
+# Add a blueprint to a registry
+forge registry blueprint go/grpc-service --registry-dir ./my-registry
+
+# Update registry metadata after blueprint changes
+forge registry update --registry-dir ./my-registry
+
 # Clean cached data
 forge cache clean
 ```
@@ -71,6 +77,8 @@ forge cache clean
 | `forge sync` | Sync project files with the latest blueprint version |
 | `forge init` | Initialize a new blueprint |
 | `forge registry init <path>` | Scaffold a new blueprint registry |
+| `forge registry blueprint` | Scaffold a new blueprint in a registry |
+| `forge registry update` | Sync blueprint metadata in registry.yaml |
 | `forge cache clean` | Clear cached registries |
 
 ## Documentation

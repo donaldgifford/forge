@@ -563,7 +563,7 @@ across all docs.
 
 ### Tasks
 
-- [ ] **3.1 Update `CLAUDE.md`**
+- [x] **3.1 Update `CLAUDE.md`**
   - File: `CLAUDE.md`
   - In the Architecture section, add to the `internal/registrycmd/`
     bullet:
@@ -575,7 +575,7 @@ across all docs.
   - In the `cmd/` bullet, add `registry blueprint` and `registry update`
     to the command list.
 
-- [ ] **3.2 Update `README.md`**
+- [x] **3.2 Update `README.md`**
   - File: `README.md`
   - Add to Quick Start section after the registry init example:
     ```bash
@@ -591,7 +591,7 @@ across all docs.
     | `forge registry update`    | Sync blueprint metadata in registry.yaml |
     ```
 
-- [ ] **3.3 Update `docs/REGISTRY_SETUP.md`**
+- [x] **3.3 Update `docs/REGISTRY_SETUP.md`**
   - File: `docs/REGISTRY_SETUP.md`
   - Add a section on "Adding Blueprints" that shows the
     `forge registry blueprint` workflow.
@@ -604,7 +604,7 @@ across all docs.
         run: forge registry update --check
       ```
 
-- [ ] **3.4 Run full CI check**
+- [x] **3.4 Run full CI check**
   - Run `make check` (lint + test).
   - Run `make build`.
   - Run `make ci` if available for the full pipeline.
