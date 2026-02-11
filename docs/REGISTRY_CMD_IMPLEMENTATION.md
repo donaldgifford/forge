@@ -452,7 +452,7 @@ git commits against `registry.yaml` entries, and update stale metadata.
     9. **`TestRunUpdate_MissingRegistryYAML`** — point at empty dir.
        Assert error contains `"registry.yaml not found"`.
 
-- [ ] **2.7 Create Cobra command wiring**
+- [x] **2.7 Create Cobra command wiring**
   - File: `cmd/registry_update.go`
   - Define package-level flag variables:
     ```go
