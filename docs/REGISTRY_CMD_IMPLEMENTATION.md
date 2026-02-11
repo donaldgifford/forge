@@ -416,7 +416,7 @@ git commits against `registry.yaml` entries, and update stale metadata.
        - Call `writeRegistry()`.
     8. Return `UpdateResult` with reports, updated count, and stale count.
 
-- [ ] **2.6 Write unit tests for update logic**
+- [x] **2.6 Write unit tests for update logic**
   - File: `internal/registrycmd/update_test.go`
   - **Test helper**: `setupGitRegistry(t *testing.T) string` — creates a
     temp dir, runs `registrycmd.Run()` to scaffold a registry, runs
