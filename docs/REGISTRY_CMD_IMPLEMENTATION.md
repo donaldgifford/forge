@@ -310,7 +310,7 @@ git commits against `registry.yaml` entries, and update stale metadata.
 
 ### Tasks
 
-- [ ] **2.1 Define `UpdateOpts`, `UpdateResult`, and status types**
+- [x] **2.1 Define `UpdateOpts`, `UpdateResult`, and status types**
   - File: `internal/registrycmd/update.go`
   - Define status constants:
     ```go
@@ -351,7 +351,7 @@ git commits against `registry.yaml` entries, and update stale metadata.
     }
     ```
 
-- [ ] **2.2 Implement git commit resolution**
+- [x] **2.2 Implement git commit resolution**
   - File: `internal/registrycmd/update.go`
   - Create `latestCommitForPath(registryDir, bpPath string) (string, error)`:
     1. Run `git -C <registryDir> log -1 --format=%H -- <bpPath>/`.
@@ -367,7 +367,7 @@ git commits against `registry.yaml` entries, and update stale metadata.
   - Use `os/exec.CommandContext` with `context.Background()` matching the
     existing pattern in `registrycmd.gitInit()`.
 
-- [ ] **2.3 Implement blueprint status detection**
+- [x] **2.3 Implement blueprint status detection**
   - File: `internal/registrycmd/update.go`
   - Create `detectStatus(registryDir string, entry config.BlueprintEntry) BlueprintReport`:
     1. Construct `blueprint.yaml` path:
@@ -386,7 +386,7 @@ git commits against `registry.yaml` entries, and update stale metadata.
        - Both differ → `StatusBothChanged`
     7. Populate and return `BlueprintReport`.
 
-- [ ] **2.4 Implement registry.yaml update logic**
+- [x] **2.4 Implement registry.yaml update logic**
   - File: `internal/registrycmd/update.go`
   - Create `updateRegistryEntries(registryDir string, reg *config.Registry, reports []BlueprintReport) int`:
     1. Iterate over `reports`.
@@ -399,7 +399,7 @@ git commits against `registry.yaml` entries, and update stale metadata.
     1. Marshal `reg` via `yaml.Marshal()`.
     2. Write to `filepath.Join(registryDir, "registry.yaml")` with `0o644`.
 
-- [ ] **2.5 Wire up `RunUpdate()` orchestration**
+- [x] **2.5 Wire up `RunUpdate()` orchestration**
   - File: `internal/registrycmd/update.go`
   - Implement `RunUpdate(opts *UpdateOpts) (*UpdateResult, error)`:
     1. Validate `RegistryDir` is non-empty, resolve to absolute path.
