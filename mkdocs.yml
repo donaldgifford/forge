@@ -1,0 +1,28 @@
+markdown_extensions:
+    - admonition
+    - tables
+nav:
+    - Home: index.md
+    - ADRs:
+        - Overview: adr/README.md
+    - Blueprint Authoring Guide: BLUEPRINT_AUTHORING.md
+    - Design:
+        - Overview: design/README.md
+    - 'Implementation Plan: `forge`': IMPLEMENTATION_PLAN.md
+    - Implementation Plans:
+        - Overview: impl/README.md
+    - Investigations:
+        - Overview: investigation/README.md
+    - MVP Gap Implementation Plan: gaps_implementation.md
+    - 'Plan: Registry Blueprint & Registry Update Commands': REGISTRY_COMMANDS_PLAN.md
+    - Plans:
+        - Overview: plan/README.md
+    - 'Project Plan: `forge` — A Go CLI Project Scaffolding Tool': PROJECT_PLAN.md
+    - RFCs:
+        - Overview: rfc/README.md
+    - Registry Commands — Implementation Guide: REGISTRY_CMD_IMPLEMENTATION.md
+    - Registry Setup Guide: REGISTRY_SETUP.md
+plugins:
+    - techdocs-core
+site_description: Documentation for forge
+site_name: forge
