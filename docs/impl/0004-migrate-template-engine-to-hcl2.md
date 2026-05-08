@@ -111,12 +111,21 @@ working during development.
 
 #### Tasks
 
-- [ ] **A.1 Add HCL2 dependencies.**
+- [x] **A.1 Add HCL2 dependencies.**
   - `go get github.com/hashicorp/hcl/v2`
   - `go get github.com/zclconf/go-cty`
   - Run `make license-check` — confirm MPL-2.0 (HCL) and MIT (cty)
     pass the existing allowlist.
   - Update `go.mod` / `go.sum`; commit the lockfile changes.
+  - Note: `make license-check` and `make lint` had pre-existing
+    Go 1.26.2 toolchain incompatibilities (resolved by pinning
+    `golangci-lint = "2.11.4"` in `mise.toml`; `make license-check`
+    still flags stdlib package detection issues unrelated to the
+    new deps). Manual verification of new licences: HCL2 MPL-2.0,
+    go-cty MIT, levenshtein Apache-2.0, go-textseg/wordwrap MIT —
+    all allowlist-compatible. Five pre-existing gosec warnings in
+    `internal/{create,hooks,registrycmd,sync}` are baseline; new
+    deps add none.
 
 - [ ] **A.2 Define a `Renderer` interface and the v2 implementation.**
   - File: `internal/template/renderer.go` — extract the existing
