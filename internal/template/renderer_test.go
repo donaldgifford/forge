@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/zclconf/go-cty/cty"
 
 	tmpl "github.com/donaldgifford/forge/internal/template"
 )
@@ -16,7 +17,9 @@ func TestRenderString(t *testing.T) {
 
 	r := tmpl.NewRenderer()
 
-	result, err := r.RenderString("Hello {{ .name }}", map[string]any{"name": "world"})
+	result, err := r.RenderString("Hello {{ .name }}", map[string]cty.Value{
+		"name": cty.StringVal("world"),
+	})
 	require.NoError(t, err)
 	assert.Equal(t, "Hello world", result)
 }
@@ -26,7 +29,7 @@ func TestRenderString_MissingKey(t *testing.T) {
 
 	r := tmpl.NewRenderer()
 
-	_, err := r.RenderString("Hello {{ .missing }}", map[string]any{})
+	_, err := r.RenderString("Hello {{ .missing }}", map[string]cty.Value{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "executing template")
 }
@@ -50,7 +53,9 @@ func TestRenderFile(t *testing.T) {
 
 	r := tmpl.NewRenderer()
 
-	result, err := r.RenderFile(tmplPath, map[string]any{"project_name": "my-api"})
+	result, err := r.RenderFile(tmplPath, map[string]cty.Value{
+		"project_name": cty.StringVal("my-api"),
+	})
 	require.NoError(t, err)
 	assert.Equal(t, "Project: my-api", string(result))
 }
@@ -73,7 +78,7 @@ func TestRenderPath(t *testing.T) {
 	tests := []struct {
 		name     string
 		path     string
-		vars     map[string]any
+		vars     map[string]cty.Value
 		expected string
 	}{
 		{
@@ -85,25 +90,31 @@ func TestRenderPath(t *testing.T) {
 		{
 			name:     "project name in path",
 			path:     "{{.project_name}}/cmd/main.go",
-			vars:     map[string]any{"project_name": "my-api"},
+			vars:     map[string]cty.Value{"project_name": cty.StringVal("my-api")},
 			expected: "my-api/cmd/main.go",
 		},
 		{
-			name:     "multiple expressions",
-			path:     "{{.project_name}}/{{.module}}/main.go",
-			vars:     map[string]any{"project_name": "my-api", "module": "cmd"},
+			name: "multiple expressions",
+			path: "{{.project_name}}/{{.module}}/main.go",
+			vars: map[string]cty.Value{
+				"project_name": cty.StringVal("my-api"),
+				"module":       cty.StringVal("cmd"),
+			},
 			expected: "my-api/cmd/main.go",
 		},
 		{
 			name:     "shorthand without dot",
 			path:     "{{project_name}}/cmd/main.go",
-			vars:     map[string]any{"project_name": "my-api"},
+			vars:     map[string]cty.Value{"project_name": cty.StringVal("my-api")},
 			expected: "my-api/cmd/main.go",
 		},
 		{
-			name:     "mixed shorthand and dot notation",
-			path:     "{{project_name}}/{{.module}}/main.go",
-			vars:     map[string]any{"project_name": "my-api", "module": "cmd"},
+			name: "mixed shorthand and dot notation",
+			path: "{{project_name}}/{{.module}}/main.go",
+			vars: map[string]cty.Value{
+				"project_name": cty.StringVal("my-api"),
+				"module":       cty.StringVal("cmd"),
+			},
 			expected: "my-api/cmd/main.go",
 		},
 	}

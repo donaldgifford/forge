@@ -125,11 +125,17 @@ func TestFuncMap_Default(t *testing.T) {
 
 	r := tmpl.NewRenderer()
 
-	result, err := r.RenderString(`{{ .desc | default "fallback" }}`, map[string]any{"desc": ""})
+	emptyVars, err := tmpl.ToCtyValues(map[string]any{"desc": ""})
+	require.NoError(t, err)
+
+	result, err := r.RenderString(`{{ .desc | default "fallback" }}`, emptyVars)
 	require.NoError(t, err)
 	assert.Equal(t, "fallback", result)
 
-	result, err = r.RenderString(`{{ .desc | default "fallback" }}`, map[string]any{"desc": "actual"})
+	actualVars, err := tmpl.ToCtyValues(map[string]any{"desc": "actual"})
+	require.NoError(t, err)
+
+	result, err = r.RenderString(`{{ .desc | default "fallback" }}`, actualVars)
 	require.NoError(t, err)
 	assert.Equal(t, "actual", result)
 }

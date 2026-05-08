@@ -1,8 +1,11 @@
 package create
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
+
+	"github.com/zclconf/go-cty/cty"
 
 	"github.com/donaldgifford/forge/internal/config"
 	"github.com/donaldgifford/forge/internal/defaults"
@@ -18,10 +21,15 @@ func EvaluateConditions(conditions []config.Condition, vars map[string]any, file
 		return nil
 	}
 
+	ctyVars, err := tmpl.ToCtyValues(vars)
+	if err != nil {
+		return fmt.Errorf("converting vars to cty: %w", err)
+	}
+
 	renderer := tmpl.NewRenderer()
 
 	for i := range conditions {
-		if err := evaluateCondition(renderer, &conditions[i], vars, fileSet); err != nil {
+		if err := evaluateCondition(renderer, &conditions[i], ctyVars, fileSet); err != nil {
 			return err
 		}
 	}
@@ -30,22 +38,20 @@ func EvaluateConditions(conditions []config.Condition, vars map[string]any, file
 }
 
 func evaluateCondition(
-	renderer *tmpl.Renderer,
+	renderer tmpl.Renderer,
 	cond *config.Condition,
-	vars map[string]any,
+	vars map[string]cty.Value,
 	fileSet *defaults.FileSet,
 ) error {
-	result, err := renderer.RenderString(cond.When, vars)
+	active, err := renderer.EvaluateBool(cond.When, vars)
 	if err != nil {
 		return err
 	}
 
-	// Condition is active when the rendered result is "true".
-	if strings.TrimSpace(result) != "true" {
+	if !active {
 		return nil
 	}
 
-	// Remove files matching the exclude patterns.
 	for _, entry := range fileSet.Entries() {
 		if matchesAnyPattern(entry.RelPath, cond.Exclude) {
 			fileSet.Remove(entry.RelPath)

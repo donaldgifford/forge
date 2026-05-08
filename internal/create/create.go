@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/zclconf/go-cty/cty"
+
 	"github.com/donaldgifford/forge/internal/config"
 	"github.com/donaldgifford/forge/internal/defaults"
 	"github.com/donaldgifford/forge/internal/lockfile"
@@ -227,10 +229,16 @@ func resolveOutputDir(explicit string, vars map[string]any, bpName string) strin
 // renderFiles renders all files from the FileSet to the output directory.
 func renderFiles(fileSet *defaults.FileSet, vars map[string]any, outputDir string, rename map[string]string) (int, error) {
 	renderer := tmpl.NewRenderer()
+
+	ctyVars, err := tmpl.ToCtyValues(vars)
+	if err != nil {
+		return 0, fmt.Errorf("converting vars to cty: %w", err)
+	}
+
 	filesCreated := 0
 
 	for _, entry := range fileSet.Entries() {
-		if err := writeFile(renderer, entry, vars, outputDir, rename); err != nil {
+		if err := writeFile(renderer, entry, ctyVars, vars, outputDir, rename); err != nil {
 			return 0, fmt.Errorf("writing file %s: %w", entry.RelPath, err)
 		}
 
@@ -242,14 +250,15 @@ func renderFiles(fileSet *defaults.FileSet, vars map[string]any, outputDir strin
 
 // writeFile renders a single file and writes it to the output directory.
 func writeFile(
-	renderer *tmpl.Renderer,
+	renderer tmpl.Renderer,
 	entry *defaults.FileEntry,
+	ctyVars map[string]cty.Value,
 	vars map[string]any,
 	outputDir string,
 	rename map[string]string,
 ) error {
 	// Render path templates (e.g., {{project_name}}/cmd/main.go).
-	renderedPath, err := renderer.RenderPath(entry.RelPath, vars)
+	renderedPath, err := renderer.RenderPath(entry.RelPath, ctyVars)
 	if err != nil {
 		return fmt.Errorf("rendering path %q: %w", entry.RelPath, err)
 	}
@@ -269,7 +278,7 @@ func writeFile(
 
 	if entry.IsTemplate {
 		// Render template content.
-		content, err := renderer.RenderFile(entry.AbsPath, vars)
+		content, err := renderer.RenderFile(entry.AbsPath, ctyVars)
 		if err != nil {
 			return fmt.Errorf("rendering template %s: %w", entry.AbsPath, err)
 		}
@@ -295,16 +304,21 @@ func applyRename(path string, rename map[string]string, vars map[string]any) str
 
 	renderer := tmpl.NewRenderer()
 
+	ctyVars, err := tmpl.ToCtyValues(vars)
+	if err != nil {
+		return path
+	}
+
 	for pattern, replacement := range rename {
 		// Render the pattern with variables using RenderPath to support
 		// shorthand {{varname}} syntax (without dot prefix).
-		renderedPattern, err := renderer.RenderPath(pattern, vars)
+		renderedPattern, err := renderer.RenderPath(pattern, ctyVars)
 		if err != nil {
 			continue
 		}
 
 		// Render the replacement with variables.
-		renderedReplacement, err := renderer.RenderString(replacement, vars)
+		renderedReplacement, err := renderer.RenderString(replacement, ctyVars)
 		if err != nil {
 			continue
 		}

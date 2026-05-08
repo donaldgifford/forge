@@ -127,7 +127,7 @@ working during development.
     `internal/{create,hooks,registrycmd,sync}` are baseline; new
     deps add none.
 
-- [ ] **A.2 Define a `Renderer` interface and the v2 implementation.**
+- [x] **A.2 Define a `Renderer` interface and the v2 implementation.**
   - File: `internal/template/renderer.go` — extract the existing
     concrete `Renderer` struct's methods into a new `Renderer`
     interface in the same file; rename the existing struct to
