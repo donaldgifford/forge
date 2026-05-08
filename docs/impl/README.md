@@ -28,4 +28,12 @@ docz create impl "Your Implementation Title"
 - **Cancelled**: Plan was abandoned
 
 <!-- BEGIN DOCZ AUTO-GENERATED -->
+## All IMPLs
+
+| ID | Title | Status | Date | Author | Link |
+|----|-------|--------|------|--------|------|
+| IMPL-0001 | Forge Phased Build Plan | Completed | 2026-05-07 | Donald Gifford | [0001-forge-phased-build-plan.md](0001-forge-phased-build-plan.md) |
+| IMPL-0002 | MVP CLI Gap Closure | Completed | 2026-05-07 | Donald Gifford | [0002-mvp-cli-gap-closure.md](0002-mvp-cli-gap-closure.md) |
+| IMPL-0003 | Registry Commands | Completed | 2026-05-07 | Donald Gifford | [0003-registry-commands.md](0003-registry-commands.md) |
+| IMPL-0004 | Migrate Template Engine to HCL2 | Draft | 2026-05-07 | Donald Gifford | [0004-migrate-template-engine-to-hcl2.md](0004-migrate-template-engine-to-hcl2.md) |
 <!-- END DOCZ AUTO-GENERATED -->

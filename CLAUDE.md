@@ -9,7 +9,7 @@ Forge is a Go CLI tool (Go 1.25.4, Cobra CLI) that scaffolds projects from
 **blueprints** — project templates in a Git-based **registry**. Inspired by
 Python's cookiecutter but with layered defaults inheritance, managed file sync,
 and registry-based browsing. The full specification lives in
-`docs/PROJECT_PLAN.md`.
+`docs/rfc/0001-forge-project-scaffolding-cli.md`.
 
 ## Build & Development Commands
 
@@ -82,7 +82,7 @@ packages:
 
 ### CLI Design Decisions
 
-See `docs/gaps_implementation.md` for the full history and rationale.
+See `docs/impl/0002-mvp-cli-gap-closure.md` for the full history and rationale.
 
 - **`--registry-dir`** is a unified flag on `create`, `sync`, and `check`:
   accepts local paths AND go-getter URLs (auto-detected via `os.Stat`)

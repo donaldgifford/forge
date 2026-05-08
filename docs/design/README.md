@@ -28,4 +28,11 @@ docz create design "Your Design Title"
 - **Abandoned**: Design was not pursued
 
 <!-- BEGIN DOCZ AUTO-GENERATED -->
+## All DESIGNs
+
+| ID | Title | Status | Date | Author | Link |
+|----|-------|--------|------|--------|------|
+| DESIGN-0001 | Blueprint Authoring | Implemented | 2026-05-07 | Donald Gifford | [0001-blueprint-authoring.md](0001-blueprint-authoring.md) |
+| DESIGN-0002 | Registry Layout and Defaults Inheritance | Implemented | 2026-05-07 | Donald Gifford | [0002-registry-layout-and-defaults-inheritance.md](0002-registry-layout-and-defaults-inheritance.md) |
+| DESIGN-0003 | Migrate Template Engine to HCL2 | Draft | 2026-05-07 | Donald Gifford | [0003-migrate-template-engine-to-hcl2.md](0003-migrate-template-engine-to-hcl2.md) |
 <!-- END DOCZ AUTO-GENERATED -->

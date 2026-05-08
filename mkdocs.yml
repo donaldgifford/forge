@@ -5,23 +5,27 @@ nav:
     - Home: index.md
     - ADRs:
         - Overview: adr/README.md
-    - Blueprint Authoring Guide: BLUEPRINT_AUTHORING.md
+        - 'ADR-0001: Use HCL2 as the Template Engine': adr/0001-use-hcl2-as-the-template-engine.md
     - Design:
         - Overview: design/README.md
-    - 'Implementation Plan: `forge`': IMPLEMENTATION_PLAN.md
+        - 'DESIGN-0001: Blueprint Authoring': design/0001-blueprint-authoring.md
+        - 'DESIGN-0002: Registry Layout and Defaults Inheritance': design/0002-registry-layout-and-defaults-inheritance.md
+        - 'DESIGN-0003: Migrate Template Engine to HCL2': design/0003-migrate-template-engine-to-hcl2.md
     - Implementation Plans:
         - Overview: impl/README.md
+        - 'IMPL-0001: Forge Phased Build Plan': impl/0001-forge-phased-build-plan.md
+        - 'IMPL-0002: MVP CLI Gap Closure': impl/0002-mvp-cli-gap-closure.md
+        - 'IMPL-0003: Registry Commands': impl/0003-registry-commands.md
+        - 'IMPL-0004: Migrate Template Engine to HCL2': impl/0004-migrate-template-engine-to-hcl2.md
     - Investigations:
         - Overview: investigation/README.md
-    - MVP Gap Implementation Plan: gaps_implementation.md
-    - 'Plan: Registry Blueprint & Registry Update Commands': REGISTRY_COMMANDS_PLAN.md
+        - 'INV-0001: Templating YAML Files and HCL2 Migration': investigation/0001-templating-yaml-files-and-hcl2-migration.md
     - Plans:
         - Overview: plan/README.md
-    - 'Project Plan: `forge` — A Go CLI Project Scaffolding Tool': PROJECT_PLAN.md
+        - 'PLAN-0001: Registry Blueprint and Update Commands': plan/0001-registry-blueprint-and-update-commands.md
     - RFCs:
         - Overview: rfc/README.md
-    - Registry Commands — Implementation Guide: REGISTRY_CMD_IMPLEMENTATION.md
-    - Registry Setup Guide: REGISTRY_SETUP.md
+        - 'RFC-0001: Forge: Project Scaffolding CLI': rfc/0001-forge-project-scaffolding-cli.md
 plugins:
     - techdocs-core
 site_description: Documentation for forge

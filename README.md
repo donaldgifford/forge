@@ -83,8 +83,9 @@ forge cache clean
 
 ## Documentation
 
-- [Blueprint Authoring Guide](docs/BLUEPRINT_AUTHORING.md) -- How to create blueprints
-- [Registry Setup Guide](docs/REGISTRY_SETUP.md) -- How to set up a blueprint registry
+- [DESIGN-0001 — Blueprint Authoring](docs/design/0001-blueprint-authoring.md) -- How to create blueprints
+- [DESIGN-0002 — Registry Layout & Defaults Inheritance](docs/design/0002-registry-layout-and-defaults-inheritance.md) -- How to set up a blueprint registry
+- [RFC-0001 — Forge: Project Scaffolding CLI](docs/rfc/0001-forge-project-scaffolding-cli.md) -- High-level proposal and architecture
 
 ## Development
 

@@ -27,4 +27,9 @@ docz create adr "Your ADR Title"
 - **Superseded by ADR-XXXX**: Replaced by another ADR
 
 <!-- BEGIN DOCZ AUTO-GENERATED -->
+## All ADRs
+
+| ID | Title | Status | Date | Author | Link |
+|----|-------|--------|------|--------|------|
+| ADR-0001 | Use HCL2 as the Template Engine | Accepted | 2026-05-07 | Donald Gifford | [0001-use-hcl2-as-the-template-engine.md](0001-use-hcl2-as-the-template-engine.md) |
 <!-- END DOCZ AUTO-GENERATED -->

@@ -29,4 +29,9 @@ docz create rfc "Your RFC Title"
 - **Superseded**: Replaced by another RFC
 
 <!-- BEGIN DOCZ AUTO-GENERATED -->
+## All RFCs
+
+| ID | Title | Status | Date | Author | Link |
+|----|-------|--------|------|--------|------|
+| RFC-0001 | Forge: Project Scaffolding CLI | Accepted | 2026-05-07 | Donald Gifford | [0001-forge-project-scaffolding-cli.md](0001-forge-project-scaffolding-cli.md) |
 <!-- END DOCZ AUTO-GENERATED -->
