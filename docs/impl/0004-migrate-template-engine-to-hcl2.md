@@ -163,7 +163,7 @@ working during development.
     `text/template` semantics still work. This is a temporary
     shim Phase C deletes.
 
-- [ ] **A.3 Re-implement the custom function map.**
+- [x] **A.3 Re-implement the custom function map.**
   - File: `internal/template/hcl_funcs.go` (new).
   - Provide `function.Function` definitions for: `snakeCase`,
     `camelCase`, `pascalCase`, `kebabCase`, `title`, `trimPrefix`,
