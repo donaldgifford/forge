@@ -173,7 +173,7 @@ working during development.
   - Drop the v1 `default(val, fallback)` custom function — use HCL
     `coalesce(val, fallback)` directly.
 
-- [ ] **A.4 Unit tests for the renderer.**
+- [x] **A.4 Unit tests for the renderer.**
   - File: `internal/template/hcl_renderer_test.go`.
   - Cover `RenderFile`, `RenderString`, `RenderPath`,
     `EvaluateBool` against table-driven fixtures.

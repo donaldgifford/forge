@@ -1,17 +1,17 @@
 package template
 
 import (
-	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 
+	"github.com/hashicorp/hcl/v2"
+	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/zclconf/go-cty/cty"
+	"github.com/zclconf/go-cty/cty/convert"
 	"github.com/zclconf/go-cty/cty/function"
 )
-
-// errHCLNotImplemented marks HCLRenderer methods that will be filled in by
-// IMPL-0004 task A.4 (renderer impl + unit tests). The skeleton exists in
-// A.2 so the interface, call sites, and CLI flag plumbing can be wired
-// before the engine is real.
-var errHCLNotImplemented = errors.New("HCL2 renderer not implemented yet (IMPL-0004 A.4)")
 
 // HCLRenderer renders forge templates using HashiCorp HCL2
 // (`hashicorp/hcl/v2`) syntax: `${expr}` interpolation and `%{ if … ~}`
@@ -22,49 +22,93 @@ type HCLRenderer struct {
 }
 
 // NewHCLRenderer constructs an HCLRenderer wired with the forge custom
-// function map (`internal/template/hcl_funcs.go`, added in A.3).
+// function map (`internal/template/hcl_funcs.go`).
 func NewHCLRenderer() *HCLRenderer {
 	return &HCLRenderer{funcs: HCLFuncs()}
 }
 
 // RenderFile parses and renders a template file using the HCL2 engine.
-//
-//nolint:revive // receiver referenced once A.4 lands the implementation
 func (r *HCLRenderer) RenderFile(path string, vars map[string]cty.Value) ([]byte, error) {
-	_ = path
-	_ = vars
+	src, err := os.ReadFile(path) //nolint:gosec // template paths are from registry content, not untrusted user input
+	if err != nil {
+		return nil, fmt.Errorf("reading template %s: %w", path, err)
+	}
 
-	return nil, errHCLNotImplemented
+	out, err := r.renderTemplate(filepath.Base(path), src, vars)
+	if err != nil {
+		return nil, err
+	}
+
+	return []byte(out), nil
 }
 
 // RenderString parses and renders an inline template string using the HCL2
 // engine.
-//
-//nolint:revive // receiver referenced once A.4 lands the implementation
 func (r *HCLRenderer) RenderString(tmpl string, vars map[string]cty.Value) (string, error) {
-	_ = tmpl
-	_ = vars
-
-	return "", errHCLNotImplemented
+	return r.renderTemplate("inline", []byte(tmpl), vars)
 }
 
 // RenderPath renders template expressions in file/directory path segments.
-//
-//nolint:revive // receiver referenced once A.4 lands the implementation
+// HCL2 already accepts `${name}` directly, so no normalization is needed —
+// the v1 `{{name}}` shorthand fallback is the migration tool's
+// responsibility (Phase B).
 func (r *HCLRenderer) RenderPath(path string, vars map[string]cty.Value) (string, error) {
-	_ = path
-	_ = vars
+	if !strings.Contains(path, "${") && !strings.Contains(path, "%{") {
+		return path, nil
+	}
 
-	return "", errHCLNotImplemented
+	out, err := r.renderTemplate("path", []byte(path), vars)
+	if err != nil {
+		return "", fmt.Errorf("rendering path %q: %w", path, err)
+	}
+
+	return out, nil
 }
 
 // EvaluateBool parses an HCL2 expression and returns its bool evaluation.
-// Used for `condition.when:` evaluation.
-//
-//nolint:revive // receiver referenced once A.4 lands the implementation
+// Used for `condition.when:` expressions where the source is a bare
+// expression (e.g. `use_grpc == true`) rather than a template.
 func (r *HCLRenderer) EvaluateBool(expr string, vars map[string]cty.Value) (bool, error) {
-	_ = expr
-	_ = vars
+	parsed, diags := hclsyntax.ParseExpression([]byte(expr), "condition", hcl.InitialPos)
+	if diags.HasErrors() {
+		return false, fmt.Errorf("parsing expression %q: %s", expr, diags.Error())
+	}
 
-	return false, errHCLNotImplemented
+	result, diags := parsed.Value(r.evalContext(vars))
+	if diags.HasErrors() {
+		return false, fmt.Errorf("evaluating expression %q: %s", expr, diags.Error())
+	}
+
+	asBool, err := convert.Convert(result, cty.Bool)
+	if err != nil {
+		return false, fmt.Errorf("expression %q is not a bool: %w", expr, err)
+	}
+
+	return asBool.True(), nil
+}
+
+func (r *HCLRenderer) renderTemplate(name string, src []byte, vars map[string]cty.Value) (string, error) {
+	parsed, diags := hclsyntax.ParseTemplate(src, name, hcl.InitialPos)
+	if diags.HasErrors() {
+		return "", fmt.Errorf("parsing template %q: %s", name, diags.Error())
+	}
+
+	result, diags := parsed.Value(r.evalContext(vars))
+	if diags.HasErrors() {
+		return "", fmt.Errorf("rendering template %q: %s", name, diags.Error())
+	}
+
+	asString, err := convert.Convert(result, cty.String)
+	if err != nil {
+		return "", fmt.Errorf("template %q produced non-string value: %w", name, err)
+	}
+
+	return asString.AsString(), nil
+}
+
+func (r *HCLRenderer) evalContext(vars map[string]cty.Value) *hcl.EvalContext {
+	return &hcl.EvalContext{
+		Variables: vars,
+		Functions: r.funcs,
+	}
 }
