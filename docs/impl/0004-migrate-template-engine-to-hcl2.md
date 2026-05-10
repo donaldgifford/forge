@@ -400,7 +400,13 @@ emits v2 blueprints in place.
   - Also runs the v2 renderer against the migrated output to
     confirm the converted templates render correctly.
 
-- [ ] **B.9 Manual verification against forge-registry.**
+- [x] **B.9 Manual verification against forge-registry.**
+
+  Verified: `forge migrate templates --path <forge-registry> --dry-run
+  --strict` produces 5 "would migrate" rows with **zero**
+  `UntranslatedHits`. Strict mode passes. The branch-level migration
+  PR against forge-registry is deferred to D.5 (per IMPL-0004
+  Phase D plan), to be opened once Phase C cuts over.
   - Run `forge migrate templates --dry-run --path
     /path/to/forge-registry` and review the summary table.
   - Iterate on any out-of-scope hits; if a pattern is broadly
