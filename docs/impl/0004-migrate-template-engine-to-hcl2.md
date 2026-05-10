@@ -185,7 +185,7 @@ working during development.
   - Diagnostic-error path: a syntax-broken template returns an
     error referencing the source range (line/col).
 
-- [ ] **A.5 Add `--experimental-hcl2` flag to `forge create`.**
+- [x] **A.5 Add `--experimental-hcl2` flag to `forge create`.**
   - File: `cmd/create.go`.
   - When set, `forge create` constructs an `HCLRenderer` and
     passes it via the `Renderer` interface to `create.Run()`.

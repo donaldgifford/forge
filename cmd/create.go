@@ -14,16 +14,18 @@ import (
 	"github.com/donaldgifford/forge/internal/create"
 	"github.com/donaldgifford/forge/internal/getter"
 	"github.com/donaldgifford/forge/internal/registry"
+	tmpl "github.com/donaldgifford/forge/internal/template"
 	"github.com/donaldgifford/forge/internal/ui"
 )
 
 var (
-	setVars     []string
-	outputDir   string
-	useDefault  bool
-	noHooks     bool
-	registryDir string
-	forceCreate bool
+	setVars         []string
+	outputDir       string
+	useDefault      bool
+	noHooks         bool
+	registryDir     string
+	forceCreate     bool
+	experimentalHCL bool
 )
 
 var createCmd = &cobra.Command{
@@ -46,6 +48,12 @@ func init() {
 	createCmd.Flags().BoolVar(&useDefault, "defaults", false, "use all default values without prompting")
 	createCmd.Flags().BoolVar(&noHooks, "no-hooks", false, "skip post-create hooks")
 	createCmd.Flags().BoolVar(&forceCreate, "force", false, "overwrite existing non-empty output directory")
+	createCmd.Flags().BoolVar(
+		&experimentalHCL,
+		"experimental-hcl2",
+		false,
+		"use the HCL2 template engine (experimental; v2 blueprints only — see IMPL-0004)",
+	)
 	rootCmd.AddCommand(createCmd)
 }
 
@@ -95,6 +103,7 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		NoHooks:            noHooks,
 		ForceCreate:        forceCreate,
 		ForgeVersion:       buildVersion,
+		Renderer:           selectRenderer(experimentalHCL),
 		Logger:             logger,
 	}
 
@@ -202,6 +211,18 @@ func resolveRegistrySource(
 	cleanupFn := func() { cleanupDir(logger, tmpDir) }
 
 	return tmpDir, dir, cleanupFn, nil
+}
+
+// selectRenderer returns the HCLRenderer when --experimental-hcl2 is set,
+// otherwise the v1 TextRenderer. The orchestrator depends on the
+// tmpl.Renderer interface — no useHCL switches inside internal/create.
+// Phase C of IMPL-0004 makes HCL the only path and removes this helper.
+func selectRenderer(useHCL bool) tmpl.Renderer {
+	if useHCL {
+		return tmpl.NewHCLRenderer()
+	}
+
+	return tmpl.NewRenderer()
 }
 
 // parseOverrides converts --set key=value strings to a map.

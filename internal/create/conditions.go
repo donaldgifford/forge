@@ -13,10 +13,15 @@ import (
 )
 
 // EvaluateConditions processes blueprint conditions and removes excluded files
-// from the FileSet. Each condition has a when template expression that is
-// rendered against the variables. If the result is "true", files matching
-// the exclude glob patterns are removed.
-func EvaluateConditions(conditions []config.Condition, vars map[string]any, fileSet *defaults.FileSet) error {
+// from the FileSet. Each condition has a when expression that is evaluated
+// as a bool against the variables; when true, files matching the exclude
+// glob patterns are removed.
+func EvaluateConditions(
+	conditions []config.Condition,
+	vars map[string]any,
+	fileSet *defaults.FileSet,
+	renderer tmpl.Renderer,
+) error {
 	if len(conditions) == 0 {
 		return nil
 	}
@@ -25,8 +30,6 @@ func EvaluateConditions(conditions []config.Condition, vars map[string]any, file
 	if err != nil {
 		return fmt.Errorf("converting vars to cty: %w", err)
 	}
-
-	renderer := tmpl.NewRenderer()
 
 	for i := range conditions {
 		if err := evaluateCondition(renderer, &conditions[i], ctyVars, fileSet); err != nil {

@@ -57,6 +57,12 @@ type Opts struct {
 	// If nil, prompting is skipped (variables must come from overrides or defaults).
 	PromptFn prompt.PromptFn
 
+	// Renderer is the template engine to use. If nil, a TextRenderer
+	// (v1) is constructed; cmd/create.go injects an HCLRenderer when
+	// --experimental-hcl2 is set. Phase C of IMPL-0004 removes the v1
+	// fallback.
+	Renderer tmpl.Renderer
+
 	// Logger for debug output.
 	Logger *slog.Logger
 }
@@ -73,6 +79,11 @@ func Run(opts *Opts) (*Result, error) {
 	logger := opts.Logger
 	if logger == nil {
 		logger = slog.Default()
+	}
+
+	renderer := opts.Renderer
+	if renderer == nil {
+		renderer = tmpl.NewRenderer()
 	}
 
 	// 1-5. Resolve references and load config.
@@ -96,7 +107,7 @@ func Run(opts *Opts) (*Result, error) {
 	}
 
 	// 7b. Evaluate conditions to exclude files.
-	if err := EvaluateConditions(bp.Conditions, vars, fileSet); err != nil {
+	if err := EvaluateConditions(bp.Conditions, vars, fileSet, renderer); err != nil {
 		return nil, fmt.Errorf("evaluating conditions: %w", err)
 	}
 
@@ -117,7 +128,7 @@ func Run(opts *Opts) (*Result, error) {
 	}
 
 	// 9. Render and write files.
-	filesCreated, err := renderFiles(fileSet, vars, outputDir, bp.Rename)
+	filesCreated, err := renderFiles(fileSet, vars, outputDir, bp.Rename, renderer)
 	if err != nil {
 		return nil, err
 	}
@@ -227,9 +238,13 @@ func resolveOutputDir(explicit string, vars map[string]any, bpName string) strin
 }
 
 // renderFiles renders all files from the FileSet to the output directory.
-func renderFiles(fileSet *defaults.FileSet, vars map[string]any, outputDir string, rename map[string]string) (int, error) {
-	renderer := tmpl.NewRenderer()
-
+func renderFiles(
+	fileSet *defaults.FileSet,
+	vars map[string]any,
+	outputDir string,
+	rename map[string]string,
+	renderer tmpl.Renderer,
+) (int, error) {
 	ctyVars, err := tmpl.ToCtyValues(vars)
 	if err != nil {
 		return 0, fmt.Errorf("converting vars to cty: %w", err)
@@ -264,7 +279,7 @@ func writeFile(
 	}
 
 	// Apply rename rules.
-	renderedPath = applyRename(renderedPath, rename, vars)
+	renderedPath = applyRename(renderedPath, rename, vars, renderer)
 
 	// Strip .tmpl extension.
 	renderedPath = tmpl.StripTemplateExtension(renderedPath)
@@ -297,12 +312,10 @@ func writeFile(
 
 // applyRename applies rename rules to a rendered path.
 // Rename rules map template patterns to replacement patterns.
-func applyRename(path string, rename map[string]string, vars map[string]any) string {
+func applyRename(path string, rename map[string]string, vars map[string]any, renderer tmpl.Renderer) string {
 	if len(rename) == 0 {
 		return path
 	}
-
-	renderer := tmpl.NewRenderer()
 
 	ctyVars, err := tmpl.ToCtyValues(vars)
 	if err != nil {

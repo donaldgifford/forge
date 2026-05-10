@@ -9,6 +9,7 @@ import (
 	"github.com/donaldgifford/forge/internal/config"
 	"github.com/donaldgifford/forge/internal/create"
 	"github.com/donaldgifford/forge/internal/defaults"
+	tmpl "github.com/donaldgifford/forge/internal/template"
 )
 
 func buildFileSet(paths ...string) *defaults.FileSet {
@@ -44,7 +45,7 @@ func TestEvaluateConditions_ExcludeWhenTrue(t *testing.T) {
 
 	vars := map[string]any{"use_grpc": "false"}
 
-	err := create.EvaluateConditions(conditions, vars, fs)
+	err := create.EvaluateConditions(conditions, vars, fs, tmpl.NewRenderer())
 	require.NoError(t, err)
 
 	assert.Equal(t, 2, fs.Len())
@@ -72,7 +73,7 @@ func TestEvaluateConditions_KeepWhenFalse(t *testing.T) {
 
 	vars := map[string]any{"use_grpc": "true"}
 
-	err := create.EvaluateConditions(conditions, vars, fs)
+	err := create.EvaluateConditions(conditions, vars, fs, tmpl.NewRenderer())
 	require.NoError(t, err)
 
 	assert.Equal(t, 3, fs.Len())
@@ -96,7 +97,7 @@ func TestEvaluateConditions_DirectoryPrefix(t *testing.T) {
 
 	vars := map[string]any{"include_docs": "false"}
 
-	err := create.EvaluateConditions(conditions, vars, fs)
+	err := create.EvaluateConditions(conditions, vars, fs, tmpl.NewRenderer())
 	require.NoError(t, err)
 
 	assert.Equal(t, 1, fs.Len())
@@ -108,7 +109,7 @@ func TestEvaluateConditions_NoConditions(t *testing.T) {
 
 	fs := buildFileSet("cmd/main.go", "README.md")
 
-	err := create.EvaluateConditions(nil, map[string]any{}, fs)
+	err := create.EvaluateConditions(nil, map[string]any{}, fs, tmpl.NewRenderer())
 	require.NoError(t, err)
 
 	assert.Equal(t, 2, fs.Len())
@@ -140,7 +141,7 @@ func TestEvaluateConditions_MultipleConditions(t *testing.T) {
 		"use_docker": "false",
 	}
 
-	err := create.EvaluateConditions(conditions, vars, fs)
+	err := create.EvaluateConditions(conditions, vars, fs, tmpl.NewRenderer())
 	require.NoError(t, err)
 
 	assert.Equal(t, 2, fs.Len())
@@ -160,6 +161,6 @@ func TestEvaluateConditions_InvalidTemplate(t *testing.T) {
 		},
 	}
 
-	err := create.EvaluateConditions(conditions, map[string]any{}, fs)
+	err := create.EvaluateConditions(conditions, map[string]any{}, fs, tmpl.NewRenderer())
 	require.Error(t, err)
 }
