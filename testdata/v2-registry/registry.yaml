@@ -1,0 +1,30 @@
+# apiVersion stays at "v1" during Phase A so the existing validator
+# accepts the fixture; the templates already use HCL2 syntax to
+# exercise the experimental --experimental-hcl2 path. Phase C of
+# IMPL-0004 bumps both blueprint.yaml and registry.yaml to v2 in
+# lock-step (per OQ-5).
+apiVersion: v1
+name: "test-blueprints-v2"
+description: "Test blueprint registry (HCL2)"
+maintainers:
+  - name: "Test Team"
+    email: "test@example.com"
+
+defaults:
+  sync_strategy: overwrite
+  managed: true
+
+blueprints:
+  - name: go/api
+    path: go/api
+    description: "Go API service with HTTP and optional gRPC (HCL2)"
+    version: "2.0.0"
+    tags: ["go", "api", "grpc"]
+    latest_commit: "v2-fixture"
+
+  - name: helm/chart
+    path: helm/chart
+    description: "Helm chart blueprint demonstrating verbatim {{ }} preservation"
+    version: "2.0.0"
+    tags: ["helm", "k8s"]
+    latest_commit: "v2-fixture"

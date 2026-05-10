@@ -194,7 +194,7 @@ working during development.
     no `useHCL bool` switches inside `internal/create/`.
   - Document the flag as experimental in `--help`.
 
-- [ ] **A.6 Hermetic v2 fixture for end-to-end test.**
+- [x] **A.6 Hermetic v2 fixture for end-to-end test.**
   - Path: `testdata/v2-registry/` (new).
   - Mirror `testdata/registry/` shape but with HCL syntax in
     `blueprint.yaml` (`condition.when`, `variable.default`,
