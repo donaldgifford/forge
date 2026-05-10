@@ -333,7 +333,7 @@ emits v2 blueprints in place.
   - The walker is unit-tested per node kind in B.7. Each
     untranslated kind has a negative test.
 
-- [ ] **B.4 Implement the file walker.**
+- [x] **B.4 Implement the file walker.**
   - File: `internal/migratecmd/walk.go` (new).
   - `walkBlueprints(rootPath) ([]string, error)` — find every
     directory containing a `blueprint.yaml` under root.

@@ -24,9 +24,17 @@ package migratecmd
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"text/template/parse"
 )
+
+// pathShorthandPattern matches the v1 `{{name}}` path shorthand (single
+// identifier, no leading dot, no pipe, no parens). The migrator
+// normalises these to `{{ .name }}` before parsing so the v1 parser
+// doesn't reject them as undefined function references. The walker then
+// emits `${name}` from the resulting FieldNode.
+var pathShorthandPattern = regexp.MustCompile(`\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}`)
 
 // knownFuncs declares the v1 forge custom functions plus stdlib
 // comparators so the parser doesn't reject sources that use them. The
@@ -63,15 +71,97 @@ var knownFuncs = map[string]any{
 //
 // The function is pure: it never touches the filesystem or network.
 func RewriteTemplate(name, src string) (string, []UntranslatedHit, error) {
-	tree, err := parse.New(name).Parse(src, "{{", "}}", map[string]*parse.Tree{}, knownFuncs)
+	normalised := normalisePathShorthand(src)
+
+	tree, err := parse.New(name).Parse(normalised, "{{", "}}", map[string]*parse.Tree{}, knownFuncs)
 	if err != nil {
 		return "", nil, fmt.Errorf("parsing v1 template %q: %w", name, err)
 	}
 
-	w := newWalker(name, src)
+	w := newWalker(name, normalised)
 	w.walkList(tree.Root)
 
 	return w.out.String(), w.hits, nil
+}
+
+// RewriteCondition translates a v1 condition.when expression into the
+// bare HCL bool expression form expected by the v2 renderer's
+// EvaluateBool. Unlike RewriteTemplate, the result is *not* wrapped in
+// ${ … } — `condition.when:` is evaluated as an expression directly,
+// not as a template body.
+//
+// Falls through to RewriteTemplate when the input doesn't look like a
+// single-action expression, so condition.when fields that contain
+// arbitrary template content still migrate.
+func RewriteCondition(name, src string) (string, []UntranslatedHit, error) {
+	trimmed := strings.TrimSpace(src)
+	if trimmed == "" {
+		return "", nil, nil
+	}
+
+	normalised := normalisePathShorthand(trimmed)
+
+	tree, err := parse.New(name).Parse(normalised, "{{", "}}", map[string]*parse.Tree{}, knownFuncs)
+	if err != nil {
+		return "", nil, fmt.Errorf("parsing v1 condition %q: %w", name, err)
+	}
+
+	if tree.Root == nil || len(tree.Root.Nodes) != 1 {
+		return RewriteTemplate(name, src)
+	}
+
+	action, ok := tree.Root.Nodes[0].(*parse.ActionNode)
+	if !ok {
+		return RewriteTemplate(name, src)
+	}
+
+	w := newWalker(name, normalised)
+
+	cond, ok := w.translateCondition(action.Pipe)
+	if !ok {
+		return RewriteTemplate(name, src)
+	}
+
+	return cond, w.hits, nil
+}
+
+// templateKeywords are control-flow words the v1 parser recognises as
+// directives, not identifiers. The path-shorthand normaliser must leave
+// them alone so `{{ end }}`, `{{ else }}` etc. keep their meaning.
+var templateKeywords = map[string]struct{}{
+	"if":       {},
+	"else":     {},
+	"end":      {},
+	"range":    {},
+	"with":     {},
+	"template": {},
+	"block":    {},
+	"define":   {},
+	"break":    {},
+	"continue": {},
+	"true":     {},
+	"false":    {},
+	"nil":      {},
+}
+
+// normalisePathShorthand rewrites `{{name}}` to `{{ .name }}` for any
+// identifier that isn't a known function, comparator, or template
+// keyword. This lets the parser accept the v1 path-templating shorthand
+// that some blueprints use in directory names, rename keys, and the
+// like.
+func normalisePathShorthand(src string) string {
+	return pathShorthandPattern.ReplaceAllStringFunc(src, func(match string) string {
+		ident := strings.TrimSpace(match[2 : len(match)-2])
+		if _, isFunc := knownFuncs[ident]; isFunc {
+			return match
+		}
+
+		if _, isKeyword := templateKeywords[ident]; isKeyword {
+			return match
+		}
+
+		return "{{ ." + ident + " }}"
+	})
 }
 
 type walker struct {

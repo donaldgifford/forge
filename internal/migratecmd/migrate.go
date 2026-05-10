@@ -1,5 +1,7 @@
 package migratecmd
 
+import "fmt"
+
 // MigrateOpts configures a `forge migrate templates` run.
 type MigrateOpts struct {
 	// Path is the blueprint or registry root to migrate. Defaults to ".".
@@ -61,12 +63,13 @@ type UntranslatedHit struct {
 	Reason string
 }
 
-// RunMigrate executes the migration described by opts. The implementation
-// lands in B.4 (file walker) once the AST rewriter (B.3) is in place. For
-// now the function is a stub that returns the zero value so callers can
-// be wired up.
+// RunMigrate executes the migration described by opts. The dirty-worktree
+// guard (B.5) wraps this function; pure rewrite + IO happens in
+// runMigrate.
 func RunMigrate(opts *MigrateOpts) (*MigrateResult, error) {
-	_ = opts
+	if opts == nil {
+		return nil, fmt.Errorf("migrate: opts is nil")
+	}
 
-	return &MigrateResult{}, nil
+	return runMigrate(opts)
 }
