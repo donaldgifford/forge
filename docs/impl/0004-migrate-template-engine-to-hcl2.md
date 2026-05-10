@@ -249,7 +249,7 @@ emits v2 blueprints in place.
   - Decide whether the rule set in DESIGN-0003 needs additional
     rows. Update DESIGN-0003 if so before continuing.
 
-- [ ] **B.2 Define `MigrateOpts` / `MigrateResult` types.**
+- [x] **B.2 Define `MigrateOpts` / `MigrateResult` types.**
   - File: `internal/migratecmd/migrate.go` (new package).
   - Types:
     ```go
