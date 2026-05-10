@@ -391,7 +391,7 @@ emits v2 blueprints in place.
     - Negative cases (out-of-scope inputs surface
       `UntranslatedHit`).
 
-- [ ] **B.8 Integration test against `testdata/v1-registry/`.**
+- [x] **B.8 Integration test against `testdata/v1-registry/`.**
   - File: `internal/migratecmd/integration_test.go` (new).
   - Snapshot `testdata/registry/` into `testdata/v1-registry/`
     (read-only fixture). The integration test copies it to
