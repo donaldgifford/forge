@@ -365,7 +365,7 @@ emits v2 blueprints in place.
     `"refusing to migrate inside a dirty git worktree (use --force
     to override)"`.
 
-- [ ] **B.6 Wire the Cobra command.**
+- [x] **B.6 Wire the Cobra command.**
   - File: `cmd/migrate.go` (new).
   - Define `migrateCmd` (parent) with one subcommand
     `migrateTemplatesCmd`.
