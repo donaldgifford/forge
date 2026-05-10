@@ -236,7 +236,7 @@ emits v2 blueprints in place.
 
 #### Tasks
 
-- [ ] **B.1 Survey forge-registry for translatable patterns.**
+- [x] **B.1 Survey forge-registry for translatable patterns.**
   - Clone `github.com/donaldgifford/forge-registry` into a scratch
     dir.
   - Walk every `.tmpl` file and every `blueprint.yaml` and catalog
