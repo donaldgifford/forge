@@ -357,7 +357,7 @@ emits v2 blueprints in place.
     expression fields, so only the version literal changes.
   - Honour `--dry-run`: collect would-be changes but do not write.
 
-- [ ] **B.5 Implement the dirty-worktree guard.**
+- [x] **B.5 Implement the dirty-worktree guard.**
   - File: `internal/migratecmd/git.go` (new) — small wrapper over
     `git status --porcelain`.
   - When `MigrateOpts.Force` is false and the path lives inside a

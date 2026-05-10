@@ -63,12 +63,23 @@ type UntranslatedHit struct {
 	Reason string
 }
 
-// RunMigrate executes the migration described by opts. The dirty-worktree
-// guard (B.5) wraps this function; pure rewrite + IO happens in
-// runMigrate.
+// RunMigrate executes the migration described by opts. Wraps runMigrate
+// with the dirty-worktree guard: refuses to write into a non-git or
+// dirty git worktree without --force, per OQ-4.
 func RunMigrate(opts *MigrateOpts) (*MigrateResult, error) {
 	if opts == nil {
 		return nil, fmt.Errorf("migrate: opts is nil")
+	}
+
+	if !opts.Force && !opts.DryRun {
+		path := opts.Path
+		if path == "" {
+			path = "."
+		}
+
+		if err := checkCleanWorktree(path); err != nil {
+			return nil, err
+		}
 	}
 
 	return runMigrate(opts)

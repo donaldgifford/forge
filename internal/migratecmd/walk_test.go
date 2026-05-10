@@ -61,7 +61,7 @@ func TestRunMigrate_HappyPath(t *testing.T) {
 	root := t.TempDir()
 	fixtureBlueprintV1(t, root)
 
-	result, err := migratecmd.RunMigrate(&migratecmd.MigrateOpts{Path: root})
+	result, err := migratecmd.RunMigrate(&migratecmd.MigrateOpts{Path: root, Force: true})
 	require.NoError(t, err)
 	require.Len(t, result.Blueprints, 1)
 
@@ -141,7 +141,7 @@ func TestRunMigrate_AlreadyV2Skips(t *testing.T) {
 		0o644,
 	))
 
-	result, err := migratecmd.RunMigrate(&migratecmd.MigrateOpts{Path: root})
+	result, err := migratecmd.RunMigrate(&migratecmd.MigrateOpts{Path: root, Force: true})
 	require.NoError(t, err)
 	require.Len(t, result.Blueprints, 1)
 	assert.True(t, result.Blueprints[0].AlreadyV2)
