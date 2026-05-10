@@ -282,7 +282,7 @@ emits v2 blueprints in place.
   - Stub `RunMigrate(opts *MigrateOpts) (*MigrateResult, error)` that
     returns `nil, nil`.
 
-- [ ] **B.3 Implement the rewrite engine via AST walk.**
+- [x] **B.3 Implement the rewrite engine via AST walk.**
   - File: `internal/migratecmd/rules.go` (new).
   - **Approach: parse the v1 template to an AST, walk it, emit
     HCL.** Use `text/template/parse` (stdlib) — it returns a
@@ -382,7 +382,7 @@ emits v2 blueprints in place.
   - In `--strict`, exit non-zero if any blueprint has
     `len(UntranslatedHits) > 0`.
 
-- [ ] **B.7 Unit tests for every rewrite rule.**
+- [x] **B.7 Unit tests for every rewrite rule.**
   - File: `internal/migratecmd/rules_test.go`.
   - Table-driven test per rewriter from B.3, covering:
     - Happy-path translation.
