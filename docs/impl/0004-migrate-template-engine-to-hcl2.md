@@ -202,7 +202,7 @@ working during development.
     `values.yaml.tmpl` with verbatim `{{ .Values.x }}` content to
     prove the collision is fixed.
 
-- [ ] **A.7 Integration test exercising the experimental flag.**
+- [x] **A.7 Integration test exercising the experimental flag.**
   - File: `internal/create/cli_integration_test_v2.go` (new) or a
     new test func in the existing integration test file.
   - Calls `create.Run()` with the v2 renderer against
