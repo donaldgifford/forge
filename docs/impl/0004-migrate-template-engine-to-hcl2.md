@@ -541,14 +541,14 @@ text/template renderer.
   - Public type alias: `Renderer = HCLRenderer` (or rename the
     struct to `Renderer`).
 
-- [ ] **C.7 Update `internal/prompt/prompt.go renderDefault`.**
+- [x] **C.7 Update `internal/prompt/prompt.go renderDefault`.**
   - The current `renderDefault` uses `text/template` directly
     (line 144). Replace with `template.NewRenderer().RenderString`
     so the v2 engine renders default expressions consistently with
     everything else.
   - Drop the `text/template` import.
 
-- [ ] **C.8 Drop `text/template` imports across the tree.**
+- [x] **C.8 Drop `text/template` imports across the tree.**
   - Run `grep -rn "text/template" .` and remove any remaining
     direct imports outside `internal/template/`. The `migratecmd`
     package may still need them transiently for the rewrite rules
