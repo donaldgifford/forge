@@ -116,6 +116,24 @@ func TestLoadBlueprint_ValidationError(t *testing.T) {
 	assert.Contains(t, err.Error(), "apiVersion")
 }
 
+// TestLoadBlueprint_RejectsV1Fixture is the IMPL-0004 C.10 integration
+// test: loading the real frozen v1 fixture must surface the migration
+// guidance, not silently coerce or fall through.
+func TestLoadBlueprint_RejectsV1Fixture(t *testing.T) {
+	t.Parallel()
+
+	v1Path := filepath.Join("..", "..", "testdata", "v1-registry", "go", "api", "blueprint.yaml")
+
+	_, err := config.LoadBlueprint(v1Path)
+	require.Error(t, err)
+
+	msg := err.Error()
+	assert.Contains(t, msg, "v1")
+	assert.Contains(t, msg, "no longer supported")
+	assert.Contains(t, msg, "forge migrate templates")
+	assert.Contains(t, msg, "docs/MIGRATION.md")
+}
+
 func testdataPath(t *testing.T, relPath string) string {
 	t.Helper()
 

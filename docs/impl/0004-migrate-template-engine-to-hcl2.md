@@ -554,7 +554,7 @@ text/template renderer.
     package may still need them transiently for the rewrite rules
     (it parses v1 templates) — confirm and keep there if so.
 
-- [ ] **C.9 Update integration tests for v2 fixtures.**
+- [x] **C.9 Update integration tests for v2 fixtures.**
   - Files:
     - `internal/create/cli_integration_test.go` — point at the
       migrated `testdata/registry/` (now v2).
@@ -570,7 +570,7 @@ text/template renderer.
     from `text/template`; assertions on rendered file content may
     need small updates).
 
-- [ ] **C.10 Rejection-path integration test.**
+- [x] **C.10 Rejection-path integration test.**
   - File: a new test under `internal/config/` or
     `internal/create/` that runs `LoadBlueprint()` against
     `testdata/v1-registry/go/api/blueprint.yaml` and asserts the
