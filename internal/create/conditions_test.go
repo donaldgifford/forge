@@ -46,7 +46,7 @@ func TestEvaluateConditions_ExcludeWhenTrue(t *testing.T) {
 
 	vars := map[string]cty.Value{"use_grpc": cty.False}
 
-	err := create.EvaluateConditions(conditions, vars, fs, tmpl.NewHCLRenderer())
+	err := create.EvaluateConditions(conditions, vars, fs, tmpl.NewRenderer())
 	require.NoError(t, err)
 
 	assert.Equal(t, 2, fs.Len())
@@ -74,7 +74,7 @@ func TestEvaluateConditions_KeepWhenFalse(t *testing.T) {
 
 	vars := map[string]cty.Value{"use_grpc": cty.True}
 
-	err := create.EvaluateConditions(conditions, vars, fs, tmpl.NewHCLRenderer())
+	err := create.EvaluateConditions(conditions, vars, fs, tmpl.NewRenderer())
 	require.NoError(t, err)
 
 	assert.Equal(t, 3, fs.Len())
@@ -98,7 +98,7 @@ func TestEvaluateConditions_DirectoryPrefix(t *testing.T) {
 
 	vars := map[string]cty.Value{"include_docs": cty.False}
 
-	err := create.EvaluateConditions(conditions, vars, fs, tmpl.NewHCLRenderer())
+	err := create.EvaluateConditions(conditions, vars, fs, tmpl.NewRenderer())
 	require.NoError(t, err)
 
 	assert.Equal(t, 1, fs.Len())
@@ -110,7 +110,7 @@ func TestEvaluateConditions_NoConditions(t *testing.T) {
 
 	fs := buildFileSet("cmd/main.go", "README.md")
 
-	err := create.EvaluateConditions(nil, map[string]cty.Value{}, fs, tmpl.NewHCLRenderer())
+	err := create.EvaluateConditions(nil, map[string]cty.Value{}, fs, tmpl.NewRenderer())
 	require.NoError(t, err)
 
 	assert.Equal(t, 2, fs.Len())
@@ -142,7 +142,7 @@ func TestEvaluateConditions_MultipleConditions(t *testing.T) {
 		"use_docker": cty.False,
 	}
 
-	err := create.EvaluateConditions(conditions, vars, fs, tmpl.NewHCLRenderer())
+	err := create.EvaluateConditions(conditions, vars, fs, tmpl.NewRenderer())
 	require.NoError(t, err)
 
 	assert.Equal(t, 2, fs.Len())
@@ -162,6 +162,6 @@ func TestEvaluateConditions_InvalidTemplate(t *testing.T) {
 		},
 	}
 
-	err := create.EvaluateConditions(conditions, map[string]cty.Value{}, fs, tmpl.NewHCLRenderer())
+	err := create.EvaluateConditions(conditions, map[string]cty.Value{}, fs, tmpl.NewRenderer())
 	require.Error(t, err)
 }

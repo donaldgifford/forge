@@ -92,7 +92,7 @@ func TestRunMigrate_AgainstV1RegistryFixture(t *testing.T) {
 
 	// Render a sample of the migrated tmpl files via the v2 renderer
 	// and check the substitutions resolve cleanly.
-	r := tmpl.NewHCLRenderer()
+	r := tmpl.NewRenderer()
 
 	mainPath := filepath.Join(dst, "go", "api", "${project_name}", "cmd", "main.go.tmpl")
 

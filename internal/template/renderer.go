@@ -1,26 +1,25 @@
+// Package template provides the HCL2 template rendering engine for forge
+// blueprints. The single Renderer interface is implemented by an unexported
+// hclRenderer that uses `hashicorp/hcl/v2` for `${expr}` interpolation and
+// `%{ if … ~}` directives.
 package template
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
-	"text/template"
 
+	"github.com/hashicorp/hcl/v2"
+	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/zclconf/go-cty/cty"
+	"github.com/zclconf/go-cty/cty/convert"
+	"github.com/zclconf/go-cty/cty/function"
 )
 
-// pathVarPattern matches {{varname}} without a leading dot, pipe, or space-prefixed content.
-// It normalizes shorthand path variables to Go template syntax: {{varname}} → {{.varname}}.
-var pathVarPattern = regexp.MustCompile(`\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}`)
-
-// Renderer is the durable abstraction over the forge template engine. The
-// orchestrator (`internal/create`, `internal/sync`, `internal/check`) depends
-// only on this interface. During the v1→v2 transition (IMPL-0004) two
-// implementations exist: TextRenderer (text/template) and HCLRenderer (HCL2).
-// Phase C deletes TextRenderer; the interface stays.
+// Renderer is the abstraction the orchestrator (`internal/create`,
+// `internal/sync`, `internal/check`) depends on. Tests can substitute a
+// fake; production code uses NewRenderer.
 type Renderer interface {
 	RenderFile(path string, vars map[string]cty.Value) ([]byte, error)
 	RenderString(tmpl string, vars map[string]cty.Value) (string, error)
@@ -28,98 +27,100 @@ type Renderer interface {
 	EvaluateBool(expr string, vars map[string]cty.Value) (bool, error)
 }
 
-// TextRenderer renders v1 Go text/template content with the forge custom
-// function map. It satisfies the Renderer interface during the HCL2
-// transition by converting cty.Values back to plain Go values internally.
-// Phase C of IMPL-0004 deletes this type.
-type TextRenderer struct {
-	funcMap template.FuncMap
+// hclRenderer is the production HCL2-backed Renderer.
+type hclRenderer struct {
+	funcs map[string]function.Function
 }
 
-// NewTextRenderer constructs a TextRenderer with the standard forge function
-// map.
-func NewTextRenderer() *TextRenderer {
-	return &TextRenderer{funcMap: FuncMap()}
+// NewRenderer constructs the production HCL2 renderer wired with forge's
+// custom function map (`funcs.go`).
+func NewRenderer() Renderer {
+	return &hclRenderer{funcs: hclFuncs()}
 }
 
-// NewRenderer is retained as a v1-compatibility alias for NewTextRenderer.
-// Phase C of IMPL-0004 removes it.
-func NewRenderer() *TextRenderer {
-	return NewTextRenderer()
-}
-
-// RenderFile reads a template file and renders it with the given variables.
-// File templates use missingkey=zero to allow the default function to work
-// with optional variables.
-func (r *TextRenderer) RenderFile(tmplPath string, vars map[string]cty.Value) ([]byte, error) {
-	data, err := os.ReadFile(tmplPath) //nolint:gosec // template paths are from registry content, not untrusted user input
+// RenderFile parses and renders a template file using the HCL2 engine.
+func (r *hclRenderer) RenderFile(path string, vars map[string]cty.Value) ([]byte, error) {
+	src, err := os.ReadFile(path) //nolint:gosec // template paths are from registry content, not untrusted user input
 	if err != nil {
-		return nil, fmt.Errorf("reading template %s: %w", tmplPath, err)
+		return nil, fmt.Errorf("reading template %s: %w", path, err)
 	}
 
-	name := filepath.Base(tmplPath)
-
-	return r.renderWithOption(name, string(data), FromCtyValues(vars), "missingkey=zero")
-}
-
-// RenderString renders an inline template string with the given variables.
-func (r *TextRenderer) RenderString(tmpl string, vars map[string]cty.Value) (string, error) {
-	result, err := r.render("inline", tmpl, FromCtyValues(vars))
+	out, err := r.renderTemplate(filepath.Base(path), src, vars)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return string(result), nil
+	return []byte(out), nil
+}
+
+// RenderString parses and renders an inline template string using the HCL2
+// engine.
+func (r *hclRenderer) RenderString(tmpl string, vars map[string]cty.Value) (string, error) {
+	return r.renderTemplate("inline", []byte(tmpl), vars)
 }
 
 // RenderPath renders template expressions in file/directory path segments.
-// For example, "{{project_name}}/cmd/main.go" with vars["project_name"]="my-api"
-// becomes "my-api/cmd/main.go".
-//
-// Path templates support shorthand syntax: {{varname}} is normalized to {{.varname}}
-// so that directory names like "{{project_name}}" work without requiring the dot prefix.
-func (r *TextRenderer) RenderPath(path string, vars map[string]cty.Value) (string, error) {
-	if !strings.Contains(path, "{{") {
+// HCL2 already accepts `${name}` directly, so paths without HCL2 markers are
+// returned unchanged.
+func (r *hclRenderer) RenderPath(path string, vars map[string]cty.Value) (string, error) {
+	if !strings.Contains(path, "${") && !strings.Contains(path, "%{") {
 		return path, nil
 	}
 
-	normalized := normalizePathTemplate(path)
-
-	result, err := r.RenderString(normalized, vars)
+	out, err := r.renderTemplate("path", []byte(path), vars)
 	if err != nil {
 		return "", fmt.Errorf("rendering path %q: %w", path, err)
 	}
 
-	return result, nil
+	return out, nil
 }
 
-// EvaluateBool renders an expression as a string and parses it as "true"/false.
-// TextRenderer treats this as a thin wrapper over RenderString to keep parity
-// with v1 condition.when evaluation; HCLRenderer evaluates expressions as
-// cty.Bool natively.
-func (r *TextRenderer) EvaluateBool(expr string, vars map[string]cty.Value) (bool, error) {
-	rendered, err := r.RenderString(expr, vars)
-	if err != nil {
-		return false, err
+// EvaluateBool parses an HCL2 expression and returns its bool evaluation.
+// Used for `condition.when:` expressions where the source is a bare
+// expression (e.g. `use_grpc == true`) rather than a template.
+func (r *hclRenderer) EvaluateBool(expr string, vars map[string]cty.Value) (bool, error) {
+	parsed, diags := hclsyntax.ParseExpression([]byte(expr), "condition", hcl.InitialPos)
+	if diags.HasErrors() {
+		return false, fmt.Errorf("parsing expression %q: %s", expr, diags.Error())
 	}
 
-	return strings.TrimSpace(rendered) == "true", nil
+	result, diags := parsed.Value(r.evalContext(vars))
+	if diags.HasErrors() {
+		return false, fmt.Errorf("evaluating expression %q: %s", expr, diags.Error())
+	}
+
+	asBool, err := convert.Convert(result, cty.Bool)
+	if err != nil {
+		return false, fmt.Errorf("expression %q is not a bool: %w", expr, err)
+	}
+
+	return asBool.True(), nil
 }
 
-// normalizePathTemplate converts shorthand {{varname}} to {{.varname}} in path templates.
-// This allows directory names like "{{project_name}}" to work without requiring the
-// Go template dot prefix. Expressions that already use dot notation (e.g., {{.varname}})
-// or contain function calls/pipes are left unchanged.
-func normalizePathTemplate(path string) string {
-	return pathVarPattern.ReplaceAllStringFunc(path, func(match string) string {
-		inner := strings.TrimSpace(match[2 : len(match)-2])
+func (r *hclRenderer) renderTemplate(name string, src []byte, vars map[string]cty.Value) (string, error) {
+	parsed, diags := hclsyntax.ParseTemplate(src, name, hcl.InitialPos)
+	if diags.HasErrors() {
+		return "", fmt.Errorf("parsing template %q: %s", name, diags.Error())
+	}
 
-		if strings.HasPrefix(inner, ".") {
-			return match
-		}
+	result, diags := parsed.Value(r.evalContext(vars))
+	if diags.HasErrors() {
+		return "", fmt.Errorf("rendering template %q: %s", name, diags.Error())
+	}
 
-		return "{{." + inner + "}}"
-	})
+	asString, err := convert.Convert(result, cty.String)
+	if err != nil {
+		return "", fmt.Errorf("template %q produced non-string value: %w", name, err)
+	}
+
+	return asString.AsString(), nil
+}
+
+func (r *hclRenderer) evalContext(vars map[string]cty.Value) *hcl.EvalContext {
+	return &hcl.EvalContext{
+		Variables: vars,
+		Functions: r.funcs,
+	}
 }
 
 // StripTemplateExtension removes the .tmpl extension from a filename.
@@ -130,25 +131,4 @@ func StripTemplateExtension(path string) string {
 // IsTemplate returns true if the path ends with .tmpl.
 func IsTemplate(path string) bool {
 	return strings.HasSuffix(path, ".tmpl")
-}
-
-func (r *TextRenderer) render(name, text string, vars map[string]any) ([]byte, error) {
-	return r.renderWithOption(name, text, vars, "missingkey=error")
-}
-
-func (r *TextRenderer) renderWithOption(name, text string, vars map[string]any, option string) ([]byte, error) {
-	tmpl, err := template.New(name).
-		Funcs(r.funcMap).
-		Option(option).
-		Parse(text)
-	if err != nil {
-		return nil, fmt.Errorf("parsing template %q: %w", name, err)
-	}
-
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, vars); err != nil {
-		return nil, fmt.Errorf("executing template %q: %w", name, err)
-	}
-
-	return buf.Bytes(), nil
 }

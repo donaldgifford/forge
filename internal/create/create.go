@@ -75,7 +75,7 @@ func Run(opts *Opts) (*Result, error) {
 		logger = slog.Default()
 	}
 
-	renderer := tmpl.NewHCLRenderer()
+	renderer := tmpl.NewRenderer()
 
 	// 1-5. Resolve references and load config.
 	resolved, bp, err := resolveAndLoad(opts)

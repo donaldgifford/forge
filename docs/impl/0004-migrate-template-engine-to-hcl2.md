@@ -526,7 +526,7 @@ text/template renderer.
   - Replace any `if useHCL { … } else { … }` switches in the
     orchestrator with the HCL path only.
 
-- [ ] **C.6 Delete the v1 renderer.**
+- [x] **C.6 Delete the v1 renderer.**
   - Files to delete:
     - `internal/template/renderer.go`
     - `internal/template/renderer_test.go`

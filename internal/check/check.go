@@ -69,7 +69,7 @@ func Run(opts *Opts) (*Result, error) {
 		return nil, fmt.Errorf("reading lockfile: %w (is this a forge project?)", err)
 	}
 
-	renderer := tmpl.NewHCLRenderer()
+	renderer := tmpl.NewRenderer()
 
 	bpVars := loadBlueprintVariables(opts.RegistryDir, lock.Blueprint.Path)
 
