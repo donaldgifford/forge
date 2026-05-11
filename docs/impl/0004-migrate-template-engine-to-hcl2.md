@@ -642,13 +642,16 @@ reflect HCL2 as the contract, and prepare release notes.
 - [x] **D.4 Update DESIGN-0003 status.**
   - Mark DESIGN-0003 status `Implemented` once Phases A–C land.
 
-- [ ] **D.5 Migrate forge-registry on a branch.**
+- [ ] **D.5 Migrate forge-registry on a branch.** *(External follow-up.)*
   - Outside this repo: open a PR against
     `github.com/donaldgifford/forge-registry` running the
     migration tool against the registry. Land it once forge cuts
     a release including Phases A–C.
+  - **Not gated by IMPL-0004 completion.** The release-notes
+    checklist (docs/release-notes/v0.NEXT-hcl2-cutover.md → "Before
+    you cut") tracks this as a pre-release verification step.
 
-- [ ] **D.6 Release notes for the cutover minor.**
+- [x] **D.6 Release notes for the cutover minor.**
   - Per OQ-9: ship as a `0.x` minor release (pre-1.0 minors are
     the right channel for a documented breaking change). Use the
     existing PR-label-driven semver workflow with the `minor`
