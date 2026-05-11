@@ -603,7 +603,7 @@ reflect HCL2 as the contract, and prepare release notes.
 
 #### Tasks
 
-- [ ] **D.1 Author `docs/MIGRATION.md`.**
+- [x] **D.1 Author `docs/MIGRATION.md`.**
   - User-facing v1→v2 migration guide referenced from the
     load-time error string.
   - Sections:
@@ -620,7 +620,7 @@ reflect HCL2 as the contract, and prepare release notes.
     - Rollback note (you can always check out a pre-migration
       commit).
 
-- [ ] **D.2 Rewrite DESIGN-0001 (Blueprint Authoring) for HCL2.**
+- [x] **D.2 Rewrite DESIGN-0001 (Blueprint Authoring) for HCL2.**
   - Per OQ-8: rewrite in place; do not supersede with a new doc.
     DESIGN-0001 stays the living authoring contract.
   - Preserve the section structure (Goals, Detailed Design, etc.);
@@ -631,7 +631,7 @@ reflect HCL2 as the contract, and prepare release notes.
   - Update References at the bottom to link DESIGN-0003,
     ADR-0001, and `docs/MIGRATION.md`.
 
-- [ ] **D.3 Update CLAUDE.md and README.md.**
+- [x] **D.3 Update CLAUDE.md and README.md.**
   - `CLAUDE.md`: replace any references to Go `text/template` in
     the architecture notes; add `forge migrate` to the cmd list.
   - `README.md`: update the Quick Start example if it shows
@@ -639,7 +639,7 @@ reflect HCL2 as the contract, and prepare release notes.
     table; add a "Migrating from v1" pointer to
     `docs/MIGRATION.md`.
 
-- [ ] **D.4 Update DESIGN-0003 status.**
+- [x] **D.4 Update DESIGN-0003 status.**
   - Mark DESIGN-0003 status `Implemented` once Phases A–C land.
 
 - [ ] **D.5 Migrate forge-registry on a branch.**

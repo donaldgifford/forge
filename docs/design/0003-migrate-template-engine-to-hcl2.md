@@ -1,17 +1,20 @@
 ---
 id: DESIGN-0003
 title: "Migrate Template Engine to HCL2"
-status: Draft
+status: Implemented
 author: Donald Gifford
 created: 2026-05-07
+updated: 2026-05-08
 ---
 <!-- markdownlint-disable-file MD025 MD041 -->
 
 # DESIGN 0003: Migrate Template Engine to HCL2
 
-**Status:** Draft
+**Status:** Implemented
 **Author:** Donald Gifford
 **Date:** 2026-05-07
+**Implemented:** 2026-05-08 (IMPL-0004 Phases A–C landed; D.5 forge-registry
+migration is an external follow-up tracked separately).
 
 <!--toc:start-->
 - [Overview](#overview)
