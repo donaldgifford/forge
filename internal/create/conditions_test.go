@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/zclconf/go-cty/cty"
 
 	"github.com/donaldgifford/forge/internal/config"
 	"github.com/donaldgifford/forge/internal/create"
@@ -38,14 +39,14 @@ func TestEvaluateConditions_ExcludeWhenTrue(t *testing.T) {
 
 	conditions := []config.Condition{
 		{
-			When:    `{{ eq .use_grpc "false" }}`,
+			When:    `!use_grpc`,
 			Exclude: []string{"proto/*", "internal/grpc/*"},
 		},
 	}
 
-	vars := map[string]any{"use_grpc": "false"}
+	vars := map[string]cty.Value{"use_grpc": cty.False}
 
-	err := create.EvaluateConditions(conditions, vars, fs, tmpl.NewRenderer())
+	err := create.EvaluateConditions(conditions, vars, fs, tmpl.NewHCLRenderer())
 	require.NoError(t, err)
 
 	assert.Equal(t, 2, fs.Len())
@@ -66,14 +67,14 @@ func TestEvaluateConditions_KeepWhenFalse(t *testing.T) {
 
 	conditions := []config.Condition{
 		{
-			When:    `{{ eq .use_grpc "false" }}`,
+			When:    `!use_grpc`,
 			Exclude: []string{"proto/*", "internal/grpc/*"},
 		},
 	}
 
-	vars := map[string]any{"use_grpc": "true"}
+	vars := map[string]cty.Value{"use_grpc": cty.True}
 
-	err := create.EvaluateConditions(conditions, vars, fs, tmpl.NewRenderer())
+	err := create.EvaluateConditions(conditions, vars, fs, tmpl.NewHCLRenderer())
 	require.NoError(t, err)
 
 	assert.Equal(t, 3, fs.Len())
@@ -90,14 +91,14 @@ func TestEvaluateConditions_DirectoryPrefix(t *testing.T) {
 
 	conditions := []config.Condition{
 		{
-			When:    `{{ eq .include_docs "false" }}`,
+			When:    `!include_docs`,
 			Exclude: []string{"docs/*"},
 		},
 	}
 
-	vars := map[string]any{"include_docs": "false"}
+	vars := map[string]cty.Value{"include_docs": cty.False}
 
-	err := create.EvaluateConditions(conditions, vars, fs, tmpl.NewRenderer())
+	err := create.EvaluateConditions(conditions, vars, fs, tmpl.NewHCLRenderer())
 	require.NoError(t, err)
 
 	assert.Equal(t, 1, fs.Len())
@@ -109,7 +110,7 @@ func TestEvaluateConditions_NoConditions(t *testing.T) {
 
 	fs := buildFileSet("cmd/main.go", "README.md")
 
-	err := create.EvaluateConditions(nil, map[string]any{}, fs, tmpl.NewRenderer())
+	err := create.EvaluateConditions(nil, map[string]cty.Value{}, fs, tmpl.NewHCLRenderer())
 	require.NoError(t, err)
 
 	assert.Equal(t, 2, fs.Len())
@@ -127,21 +128,21 @@ func TestEvaluateConditions_MultipleConditions(t *testing.T) {
 
 	conditions := []config.Condition{
 		{
-			When:    `{{ eq .use_grpc "false" }}`,
+			When:    `!use_grpc`,
 			Exclude: []string{"proto/*"},
 		},
 		{
-			When:    `{{ eq .use_docker "false" }}`,
+			When:    `!use_docker`,
 			Exclude: []string{"docker/*"},
 		},
 	}
 
-	vars := map[string]any{
-		"use_grpc":   "false",
-		"use_docker": "false",
+	vars := map[string]cty.Value{
+		"use_grpc":   cty.False,
+		"use_docker": cty.False,
 	}
 
-	err := create.EvaluateConditions(conditions, vars, fs, tmpl.NewRenderer())
+	err := create.EvaluateConditions(conditions, vars, fs, tmpl.NewHCLRenderer())
 	require.NoError(t, err)
 
 	assert.Equal(t, 2, fs.Len())
@@ -156,11 +157,11 @@ func TestEvaluateConditions_InvalidTemplate(t *testing.T) {
 
 	conditions := []config.Condition{
 		{
-			When:    `{{ invalid }}`,
+			When:    `!!!nonsense`,
 			Exclude: []string{"*"},
 		},
 	}
 
-	err := create.EvaluateConditions(conditions, map[string]any{}, fs, tmpl.NewRenderer())
+	err := create.EvaluateConditions(conditions, map[string]cty.Value{}, fs, tmpl.NewHCLRenderer())
 	require.Error(t, err)
 }

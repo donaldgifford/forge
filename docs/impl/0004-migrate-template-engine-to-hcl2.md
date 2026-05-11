@@ -486,7 +486,7 @@ text/template renderer.
   - Keep the original at `testdata/v1-registry/` as the migration
     test corpus.
 
-- [ ] **C.4 Switch the variable-map type.**
+- [x] **C.4 Switch the variable-map type.**
   - Files (every `map[string]any` for variables):
     - `internal/lockfile/lock.go:28` — `Variables` stays as
       `map[string]any` **on disk** (per OQ-6: config files stay

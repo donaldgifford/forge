@@ -1,7 +1,6 @@
 package create
 
 import (
-	"fmt"
 	"path/filepath"
 	"strings"
 
@@ -18,19 +17,10 @@ import (
 // glob patterns are removed.
 func EvaluateConditions(
 	conditions []config.Condition,
-	vars map[string]any,
+	ctyVars map[string]cty.Value,
 	fileSet *defaults.FileSet,
 	renderer tmpl.Renderer,
 ) error {
-	if len(conditions) == 0 {
-		return nil
-	}
-
-	ctyVars, err := tmpl.ToCtyValues(vars)
-	if err != nil {
-		return fmt.Errorf("converting vars to cty: %w", err)
-	}
-
 	for i := range conditions {
 		if err := evaluateCondition(renderer, &conditions[i], ctyVars, fileSet); err != nil {
 			return err

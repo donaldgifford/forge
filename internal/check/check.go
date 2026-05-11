@@ -11,6 +11,7 @@ import (
 
 	"github.com/zclconf/go-cty/cty"
 
+	"github.com/donaldgifford/forge/internal/config"
 	"github.com/donaldgifford/forge/internal/lockfile"
 	tmpl "github.com/donaldgifford/forge/internal/template"
 )
@@ -70,7 +71,9 @@ func Run(opts *Opts) (*Result, error) {
 
 	renderer := tmpl.NewHCLRenderer()
 
-	ctyVars, err := tmpl.ToCtyValues(lock.Variables)
+	bpVars := loadBlueprintVariables(opts.RegistryDir, lock.Blueprint.Path)
+
+	ctyVars, err := lockfile.ToCtyValues(lock.Variables, bpVars)
 	if err != nil {
 		return nil, fmt.Errorf("converting lockfile variables to cty: %w", err)
 	}
@@ -194,6 +197,24 @@ func resolveRegistryHashForManaged(
 	}
 
 	return lockfile.ContentHash(content)
+}
+
+// loadBlueprintVariables reads the blueprint.yaml under the registry directory
+// to recover the declared variable types. Returns nil when no registry is
+// configured (e.g., local-only check) or the blueprint cannot be loaded.
+func loadBlueprintVariables(registryDir, blueprintPath string) []config.Variable {
+	if registryDir == "" || blueprintPath == "" {
+		return nil
+	}
+
+	bpPath := filepath.Join(registryDir, blueprintPath, "blueprint.yaml")
+
+	bp, err := config.LoadBlueprint(bpPath)
+	if err != nil {
+		return nil
+	}
+
+	return bp.Variables
 }
 
 // findSourceFile looks for a file in known registry locations.
