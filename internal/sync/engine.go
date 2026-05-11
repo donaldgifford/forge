@@ -53,7 +53,7 @@ func Run(opts *Opts) (*Result, error) {
 	}
 
 	result := &Result{}
-	renderer := tmpl.NewRenderer()
+	renderer := tmpl.NewHCLRenderer()
 
 	ctyVars, err := tmpl.ToCtyValues(lock.Variables)
 	if err != nil {

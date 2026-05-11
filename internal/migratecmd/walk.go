@@ -48,16 +48,92 @@ func runMigrate(opts *MigrateOpts) (*MigrateResult, error) {
 		return nil, fmt.Errorf("walking blueprints: %w", err)
 	}
 
+	covered := make(map[string]struct{})
+
 	for _, bpDir := range blueprints {
 		report, err := migrateBlueprint(bpDir, opts.DryRun)
 		if err != nil {
 			return nil, fmt.Errorf("migrating %s: %w", bpDir, err)
 		}
 
+		for _, f := range report.FilesRewritten {
+			covered[f] = struct{}{}
+		}
+
 		result.Blueprints = append(result.Blueprints, *report)
 	}
 
+	// 3. Migrate any .tmpl files under _defaults/ (registry-wide and
+	// category-level) that the per-blueprint walk didn't cover.
+	defaultHits, defaultFiles, err := migrateDefaults(abs, covered, opts.DryRun)
+	if err != nil {
+		return nil, fmt.Errorf("migrating _defaults: %w", err)
+	}
+
+	if len(defaultFiles) > 0 {
+		result.Blueprints = append(result.Blueprints, BlueprintReport{
+			Path:             filepath.Join(abs, "_defaults"),
+			Migrated:         !opts.DryRun,
+			FilesRewritten:   defaultFiles,
+			UntranslatedHits: defaultHits,
+		})
+	}
+
 	return result, nil
+}
+
+// migrateDefaults walks every _defaults/ directory under root and
+// rewrites .tmpl files the per-blueprint pass didn't already cover. The
+// covered set is used to dedupe — a _defaults dir nested *inside* a
+// blueprint already gets migrated by migrateBlueprint.
+func migrateDefaults(root string, covered map[string]struct{}, dryRun bool) ([]UntranslatedHit, []string, error) {
+	var (
+		hits  []UntranslatedHit
+		files []string
+	)
+
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if d.IsDir() || !strings.HasSuffix(d.Name(), tmplExtension) {
+			return nil
+		}
+
+		if _, done := covered[path]; done {
+			return nil
+		}
+
+		// gosec: this is a developer-driven migration tool; the path comes
+		// from filepath.WalkDir under a user-supplied root, and we must
+		// read every .tmpl file we discover to rewrite it in place.
+		src, readErr := os.ReadFile(filepath.Clean(path)) //nolint:gosec // G122: walker rewrites files in user's registry
+		if readErr != nil {
+			return readErr
+		}
+
+		out, fileHits, rewriteErr := RewriteTemplate(path, string(src))
+		if rewriteErr != nil {
+			return fmt.Errorf("rewriting %s: %w", path, rewriteErr)
+		}
+
+		hits = append(hits, fileHits...)
+
+		if string(src) == out {
+			return nil
+		}
+
+		files = append(files, path)
+
+		if dryRun {
+			return nil
+		}
+
+		return os.WriteFile(path, []byte(out), 0o644) //nolint:gosec // G122: walker rewrites files in user's registry
+	})
+
+	return hits, files, err
 }
 
 // walkBlueprints returns every directory under root that contains a
@@ -80,6 +156,60 @@ func walkBlueprints(root string) ([]string, error) {
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	return out, nil
+}
+
+// renamePathShorthandDirs walks root and renames any directory whose
+// name matches the v1 `{{name}}` path shorthand (single identifier, no
+// dot) to the v2 `${name}` form. Walks bottom-up so deeper renames
+// don't break shallower ones.
+func renamePathShorthandDirs(root string, dryRun bool) ([]string, error) {
+	type rename struct{ from, to string }
+
+	var renames []rename
+
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if !d.IsDir() {
+			return nil
+		}
+
+		name := d.Name()
+		match := pathShorthandPattern.FindStringSubmatch(name)
+		if len(match) != 2 || match[0] != name {
+			return nil
+		}
+
+		ident := match[1]
+
+		newName := "${" + ident + "}"
+		renames = append(renames, rename{path, filepath.Join(filepath.Dir(path), newName)})
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Walk bottom-up.
+	out := make([]string, 0, len(renames))
+
+	for i := len(renames) - 1; i >= 0; i-- {
+		r := renames[i]
+		out = append(out, r.from)
+
+		if dryRun {
+			continue
+		}
+
+		if err := os.Rename(r.from, r.to); err != nil {
+			return nil, fmt.Errorf("renaming %s → %s: %w", r.from, r.to, err)
+		}
 	}
 
 	return out, nil
@@ -153,6 +283,13 @@ func migrateBlueprint(dir string, dryRun bool) (*BlueprintReport, error) {
 	if err := os.WriteFile(bpPath, rewritten, 0o644); err != nil {
 		return nil, fmt.Errorf("writing blueprint.yaml: %w", err)
 	}
+
+	renamed, err := renamePathShorthandDirs(dir, dryRun)
+	if err != nil {
+		return nil, fmt.Errorf("renaming dirs: %w", err)
+	}
+
+	report.FilesRewritten = append(report.FilesRewritten, renamed...)
 
 	report.Migrated = true
 	report.FilesRewritten = append(report.FilesRewritten, bpPath)

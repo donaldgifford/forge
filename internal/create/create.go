@@ -83,7 +83,7 @@ func Run(opts *Opts) (*Result, error) {
 
 	renderer := opts.Renderer
 	if renderer == nil {
-		renderer = tmpl.NewRenderer()
+		renderer = tmpl.NewHCLRenderer()
 	}
 
 	// 1-5. Resolve references and load config.

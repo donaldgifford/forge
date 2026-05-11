@@ -22,8 +22,14 @@ var validSyncStrategies = map[string]bool{
 
 // ValidateBlueprint checks a Blueprint for required fields and valid values.
 func ValidateBlueprint(bp *Blueprint) error {
-	if bp.APIVersion != "v1" {
-		return fmt.Errorf("unsupported apiVersion %q, expected \"v1\"", bp.APIVersion)
+	if bp.APIVersion != "v2" {
+		return fmt.Errorf(
+			"blueprint.yaml: apiVersion %q is no longer supported; "+
+				"run `forge migrate templates --path <registry-or-blueprint>` "+
+				"to convert this blueprint to v2 (HCL2 templates); "+
+				"see docs/MIGRATION.md in the forge repository for the v1→v2 migration guide",
+			bp.APIVersion,
+		)
 	}
 
 	if strings.TrimSpace(bp.Name) == "" {
@@ -56,8 +62,14 @@ func ValidateBlueprint(bp *Blueprint) error {
 
 // ValidateRegistry checks a Registry for required fields and valid values.
 func ValidateRegistry(reg *Registry) error {
-	if reg.APIVersion != "v1" {
-		return fmt.Errorf("unsupported apiVersion %q, expected \"v1\"", reg.APIVersion)
+	if reg.APIVersion != "v2" {
+		return fmt.Errorf(
+			"registry.yaml: apiVersion %q is no longer supported; "+
+				"run `forge migrate templates --path <registry-root>` to convert "+
+				"this registry to v2 (HCL2 templates); "+
+				"see docs/MIGRATION.md in the forge repository for the v1→v2 migration guide",
+			reg.APIVersion,
+		)
 	}
 
 	if strings.TrimSpace(reg.Name) == "" {

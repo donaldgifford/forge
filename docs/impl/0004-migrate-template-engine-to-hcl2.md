@@ -439,7 +439,7 @@ text/template renderer.
 
 #### Tasks
 
-- [ ] **C.1 Bump validators to require v2 (blueprint and registry).**
+- [x] **C.1 Bump validators to require v2 (blueprint and registry).**
   - File: `internal/config/validate.go`.
   - In `ValidateBlueprint`: replace
     `if bp.APIVersion != "v1"` with `if bp.APIVersion != "v2"`.
@@ -461,7 +461,7 @@ text/template renderer.
   - Add regression tests in `internal/config/validate_test.go` for
     both v1 rejection paths (blueprint and registry).
 
-- [ ] **C.2 Update scaffolding templates.**
+- [x] **C.2 Update scaffolding templates.**
   - Files:
     - `internal/initcmd/initcmd.go:23` (`blueprintTemplate` const)
     - `internal/initcmd/initcmd.go:135` (`APIVersion: "v1"` literal)
@@ -479,7 +479,7 @@ text/template renderer.
     `forge migrate templates --path <registry-root>` run
     produces a fully v2-compliant tree.
 
-- [ ] **C.3 Migrate `testdata/registry/` to v2.**
+- [x] **C.3 Migrate `testdata/registry/` to v2.**
   - Run `forge migrate templates --path testdata/registry` (using
     the binary built from Phase B).
   - Manually verify the diff is sane.

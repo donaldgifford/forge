@@ -55,12 +55,12 @@ func TestRunBlueprint_BasicScaffold(t *testing.T) {
 	assert.Equal(t, "project_name", bp.Variables[0].Name)
 
 	// Verify starter template exists.
-	tmplPath := filepath.Join(result.BlueprintDir, "{{project_name}}", "README.md.tmpl")
+	tmplPath := filepath.Join(result.BlueprintDir, "${project_name}", "README.md.tmpl")
 	assert.FileExists(t, tmplPath)
 
 	tmplContent, err := os.ReadFile(tmplPath)
 	require.NoError(t, err)
-	assert.Contains(t, string(tmplContent), "{{ .project_name }}")
+	assert.Contains(t, string(tmplContent), "${project_name}")
 
 	// Verify category _defaults/.gitkeep exists.
 	assert.FileExists(t, filepath.Join(regDir, "go", "_defaults", ".gitkeep"))

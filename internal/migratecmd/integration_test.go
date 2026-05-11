@@ -94,7 +94,7 @@ func TestRunMigrate_AgainstV1RegistryFixture(t *testing.T) {
 	// and check the substitutions resolve cleanly.
 	r := tmpl.NewHCLRenderer()
 
-	mainPath := filepath.Join(dst, "go", "api", "{{project_name}}", "cmd", "main.go.tmpl")
+	mainPath := filepath.Join(dst, "go", "api", "${project_name}", "cmd", "main.go.tmpl")
 
 	mainOut, err := r.RenderFile(mainPath, map[string]cty.Value{
 		"project_name": cty.StringVal("my-svc"),

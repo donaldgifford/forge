@@ -35,7 +35,7 @@ type Result struct {
 	GitInitialized bool
 }
 
-const registryTemplate = `apiVersion: v1
+const registryTemplate = `apiVersion: v2
 name: "%s"
 description: "%s"
 blueprints: []

@@ -100,7 +100,7 @@ func TestRunMigrate_HappyPath(t *testing.T) {
 	assert.Equal(t, "!use_grpc", bp.Conditions[0].When)
 	assert.Equal(t, ".", bp.Rename["${project_name}/"])
 
-	tmplPath := filepath.Join(root, "go", "api", "{{project_name}}", "README.md.tmpl")
+	tmplPath := filepath.Join(root, "go", "api", "${project_name}", "README.md.tmpl")
 	tmpl, err := os.ReadFile(tmplPath)
 	require.NoError(t, err)
 	assert.Equal(t, "# ${project_name}\n", string(tmpl))

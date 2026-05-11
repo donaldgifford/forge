@@ -35,7 +35,7 @@ type BlueprintResult struct {
 	RegistryYAML string
 }
 
-const blueprintScaffoldTemplate = `apiVersion: v1
+const blueprintScaffoldTemplate = `apiVersion: v2
 name: "%s"
 description: "%s"
 version: "0.1.0"
@@ -55,7 +55,7 @@ variables:
     default: "Apache-2.0"
 
 # conditions:
-#   - when: "{{ .some_variable }}"
+#   - when: some_variable
 #     exclude:
 #       - "optional-dir/"
 
@@ -68,12 +68,12 @@ sync:
   ignore: []
 
 rename:
-  "{{project_name}}/": "."
+  "${project_name}/": "."
 `
 
-const starterReadmeTemplate = `# {{ .project_name }}
+const starterReadmeTemplate = `# ${project_name}
 
-{{ .description }}
+A new blueprint.
 
 ## Getting Started
 
@@ -197,7 +197,7 @@ func formatTags(tags []string) string {
 }
 
 func createStarterTemplate(blueprintDir string) error {
-	tmplDir := filepath.Join(blueprintDir, "{{project_name}}")
+	tmplDir := filepath.Join(blueprintDir, "${project_name}")
 
 	if err := os.MkdirAll(tmplDir, 0o750); err != nil {
 		return fmt.Errorf("creating template directory: %w", err)
