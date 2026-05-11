@@ -79,6 +79,13 @@ func runMigrate(opts *MigrateOpts) (*MigrateResult, error) {
 		})
 	}
 
+	// 4. Catch any v1-shape directories the per-blueprint pass missed —
+	// most commonly `_defaults/cmd/{{ .name }}/` directories that aren't
+	// inside any blueprint subtree.
+	if _, err := renamePathShorthandDirs(abs, opts.DryRun); err != nil {
+		return nil, fmt.Errorf("renaming registry-wide path dirs: %w", err)
+	}
+
 	return result, nil
 }
 

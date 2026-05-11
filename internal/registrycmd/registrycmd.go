@@ -213,6 +213,7 @@ func createCategory(rootDir, category string) error {
 }
 
 func gitInit(dir string) bool {
+	//nolint:gosec // G204: dir is the user's own registry directory; `git init` against the freshly created tree is the documented scaffold step
 	cmd := exec.CommandContext(context.Background(), "git", "init", dir)
 	cmd.Stdout = nil
 	cmd.Stderr = nil

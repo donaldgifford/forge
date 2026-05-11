@@ -299,6 +299,7 @@ func writeFile(
 		return fmt.Errorf("reading source %s: %w", entry.AbsPath, err)
 	}
 
+	//nolint:gosec // G703: destPath = user output dir + registry-controlled relative path; that's the intended behaviour of forge create
 	return os.WriteFile(destPath, content, 0o644)
 }
 
