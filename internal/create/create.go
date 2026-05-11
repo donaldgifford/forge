@@ -57,12 +57,6 @@ type Opts struct {
 	// If nil, prompting is skipped (variables must come from overrides or defaults).
 	PromptFn prompt.PromptFn
 
-	// Renderer is the template engine to use. If nil, a TextRenderer
-	// (v1) is constructed; cmd/create.go injects an HCLRenderer when
-	// --experimental-hcl2 is set. Phase C of IMPL-0004 removes the v1
-	// fallback.
-	Renderer tmpl.Renderer
-
 	// Logger for debug output.
 	Logger *slog.Logger
 }
@@ -81,10 +75,7 @@ func Run(opts *Opts) (*Result, error) {
 		logger = slog.Default()
 	}
 
-	renderer := opts.Renderer
-	if renderer == nil {
-		renderer = tmpl.NewHCLRenderer()
-	}
+	renderer := tmpl.NewHCLRenderer()
 
 	// 1-5. Resolve references and load config.
 	resolved, bp, err := resolveAndLoad(opts)

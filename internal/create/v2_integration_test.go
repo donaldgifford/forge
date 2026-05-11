@@ -9,15 +9,14 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/donaldgifford/forge/internal/create"
-	tmpl "github.com/donaldgifford/forge/internal/template"
 )
 
 const testV2RegistryDir = "../../testdata/v2-registry"
 
-// TestRun_V2_GoAPI exercises the experimental HCL2 path against the
-// v2-registry fixture: ${project_name} path templating, !use_grpc
-// condition expression, and the rename rule that strips the
-// ${project_name}/ prefix all need to resolve through HCLRenderer.
+// TestRun_V2_GoAPI exercises the HCL2 path against the v2-registry
+// fixture: ${project_name} path templating, !use_grpc condition
+// expression, and the rename rule that strips the ${project_name}/
+// prefix all need to resolve through HCLRenderer.
 func TestRun_V2_GoAPI(t *testing.T) {
 	t.Parallel()
 
@@ -27,7 +26,6 @@ func TestRun_V2_GoAPI(t *testing.T) {
 		BlueprintRef: "go/api",
 		OutputDir:    outputDir,
 		RegistryDir:  testV2RegistryDir,
-		Renderer:     tmpl.NewHCLRenderer(),
 		UseDefaults:  true,
 		ForgeVersion: "0.0.0-v2-test",
 		Overrides: map[string]string{
@@ -64,7 +62,6 @@ func TestRun_V2_HelmChart(t *testing.T) {
 		BlueprintRef: "helm/chart",
 		OutputDir:    outputDir,
 		RegistryDir:  testV2RegistryDir,
-		Renderer:     tmpl.NewHCLRenderer(),
 		UseDefaults:  true,
 		ForgeVersion: "0.0.0-v2-test",
 		Overrides: map[string]string{

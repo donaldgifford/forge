@@ -519,7 +519,7 @@ text/template renderer.
     - `internal/create/conditions.go:16,35` — `EvaluateConditions`,
       condition expression evaluation.
 
-- [ ] **C.5 Remove the `--experimental-hcl2` flag.**
+- [x] **C.5 Remove the `--experimental-hcl2` flag.**
   - File: `cmd/create.go`.
   - Delete the flag and its plumbing. The HCL2 renderer is now
     unconditional.
