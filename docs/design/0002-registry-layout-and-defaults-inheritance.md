@@ -4,6 +4,7 @@ title: "Registry Layout and Defaults Inheritance"
 status: Implemented
 author: Donald Gifford
 created: 2026-05-07
+updated: 2026-05-11
 ---
 <!-- markdownlint-disable-file MD025 MD041 -->
 
@@ -12,6 +13,11 @@ created: 2026-05-07
 **Status:** Implemented
 **Author:** Donald Gifford
 **Date:** 2026-05-07
+**Last revised:** 2026-05-11 — bumped `apiVersion` examples to `v2`
+following the HCL2 cutover (see
+[ADR-0001](../adr/0001-use-hcl2-as-the-template-engine.md),
+[DESIGN-0003](0003-migrate-template-engine-to-hcl2.md), and the
+[migration guide](../MIGRATION.md)).
 
 <!--toc:start-->
 - [Overview](#overview)
@@ -103,7 +109,7 @@ my-registry/
 ### `registry.yaml` Schema
 
 ```yaml
-apiVersion: v1
+apiVersion: v2
 name: my-registry
 description: Company blueprint registry
 blueprints:
@@ -254,7 +260,10 @@ definitions live in `internal/config/registry.go` (`Registry`,
 
 ## Migration / Rollout Plan
 
-Schema versioned via `apiVersion: v1`. Breaking changes bump to `v2`.
+Schema versioned via `apiVersion`. Current accepted version is **v2**
+(post-HCL2 cutover). Existing v1 registries must be migrated using
+`forge migrate templates --path <registry-root>` — see
+[docs/MIGRATION.md](../MIGRATION.md).
 
 ## Hosting
 

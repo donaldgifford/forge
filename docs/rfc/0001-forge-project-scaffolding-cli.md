@@ -13,6 +13,20 @@ created: 2026-05-07
 **Author:** Donald Gifford
 **Date:** 2026-05-07
 
+> **Implementation note (2026-05-11):** The template engine and
+> `apiVersion` references below describe forge's *original* design
+> (v1, Go `text/template`). Forge v0.3.0 cut over to HCL2
+> (`hashicorp/hcl/v2`) and now requires `apiVersion: v2`. The
+> canonical authoring contract is
+> [DESIGN-0001](../design/0001-blueprint-authoring.md) (rewritten
+> for HCL2); the engine swap is documented in
+> [ADR-0001](../adr/0001-use-hcl2-as-the-template-engine.md) and
+> [DESIGN-0003](../design/0003-migrate-template-engine-to-hcl2.md).
+> Existing v1 registries migrate via `forge migrate templates` —
+> see [docs/MIGRATION.md](../MIGRATION.md). The rest of this RFC
+> (registry layout, defaults inheritance, sync semantics, lockfile,
+> CLI surface) is unchanged.
+
 <!--toc:start-->
 - [Summary](#summary)
 - [Problem Statement](#problem-statement)
@@ -78,9 +92,10 @@ A single-binary Go CLI organised around two artifacts:
 - **Registry** — a Git repo cataloging blueprints with `registry.yaml`, plus
   layered `_defaults/` directories.
 
-The CLI handles fetching (via `hashicorp/go-getter`), template rendering (Go
-`text/template`), interactive prompting (`charmbracelet/huh`), and
-ongoing sync via three-way merge.
+The CLI handles fetching (via `hashicorp/go-getter`), template rendering
+(HCL2 — `hashicorp/hcl/v2`; original design used Go `text/template`, see
+implementation note above), interactive prompting (`charmbracelet/huh`),
+and ongoing sync via three-way merge.
 
 ## Design
 
@@ -119,7 +134,7 @@ Key packages:
 - `internal/registry/` — index, resolver, cache
 - `internal/defaults/` — layered inheritance resolver
 - `internal/getter/` — `hashicorp/go-getter` wrapper
-- `internal/template/` — Go `text/template` renderer with custom funcs
+- `internal/template/` — HCL2 renderer with custom funcs (originally Go `text/template`; cut over in v0.3.0 — see DESIGN-0003)
 - `internal/prompt/` — `charmbracelet/huh` interactive prompts
 - `internal/create/`, `internal/sync/`, `internal/check/` — orchestrators
 - `internal/lockfile/` — `.forge-lock.yaml` reader/writer
@@ -335,11 +350,19 @@ managed_files:
 
 ### Template Engine
 
-Uses Go `text/template` with a custom function map: `snakeCase`, `camelCase`,
-`pascalCase`, `kebabCase`, `upper`, `lower`, `title`, `replace`, `trimPrefix`,
-`trimSuffix`, `now`, `env`, `default`. File names ending in `.tmpl` are
-rendered and the extension is stripped; other files are copied verbatim.
-Directory/file names like `{{project_name}}/` are also rendered.
+> Cut over to HCL2 in v0.3.0. See
+> [DESIGN-0001](../design/0001-blueprint-authoring.md) for the
+> current authoring contract.
+
+Originally specified as Go `text/template`. The current engine is
+HCL2 (`hashicorp/hcl/v2`) with `${expr}` interpolation and
+`%{ if … ~}` directives. Custom function map: `snakeCase`,
+`camelCase`, `pascalCase`, `kebabCase`, `now`, `env`. Standard
+library functions from `cty/function/stdlib`: `upper`, `lower`,
+`title`, `replace`, `trimPrefix`, `trimSuffix`, `coalesce`
+(replaces v1 `default`). File names ending in `.tmpl` are rendered
+and the extension is stripped; other files are copied verbatim.
+Directory/file names like `${project_name}/` are also rendered.
 
 ### Sync Strategies
 
