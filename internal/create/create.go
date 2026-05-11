@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/zclconf/go-cty/cty"
+
 	"github.com/donaldgifford/forge/internal/config"
 	"github.com/donaldgifford/forge/internal/defaults"
 	"github.com/donaldgifford/forge/internal/lockfile"
@@ -73,6 +75,8 @@ func Run(opts *Opts) (*Result, error) {
 		logger = slog.Default()
 	}
 
+	renderer := tmpl.NewRenderer()
+
 	// 1-5. Resolve references and load config.
 	resolved, bp, err := resolveAndLoad(opts)
 	if err != nil {
@@ -87,6 +91,11 @@ func Run(opts *Opts) (*Result, error) {
 		return nil, fmt.Errorf("collecting variables: %w", err)
 	}
 
+	ctyVars, err := lockfile.ToCtyValues(vars, bp.Variables)
+	if err != nil {
+		return nil, fmt.Errorf("converting variables to cty: %w", err)
+	}
+
 	// 7. Resolve defaults inheritance.
 	fileSet, err := defaults.Resolve(opts.RegistryDir, resolved.BlueprintPath, bp.Defaults.Exclude)
 	if err != nil {
@@ -94,14 +103,14 @@ func Run(opts *Opts) (*Result, error) {
 	}
 
 	// 7b. Evaluate conditions to exclude files.
-	if err := EvaluateConditions(bp.Conditions, vars, fileSet); err != nil {
+	if err := EvaluateConditions(bp.Conditions, ctyVars, fileSet, renderer); err != nil {
 		return nil, fmt.Errorf("evaluating conditions: %w", err)
 	}
 
 	logger.Debug("resolved files", "count", fileSet.Len())
 
 	// 8. Determine and create output directory.
-	outputDir := resolveOutputDir(opts.OutputDir, vars, bp.Name)
+	outputDir := resolveOutputDir(opts.OutputDir, ctyVars, bp.Name)
 
 	// Guard: refuse to write into a non-empty directory without --force.
 	if !opts.ForceCreate {
@@ -115,14 +124,14 @@ func Run(opts *Opts) (*Result, error) {
 	}
 
 	// 9. Render and write files.
-	filesCreated, err := renderFiles(fileSet, vars, outputDir, bp.Rename)
+	filesCreated, err := renderFiles(fileSet, ctyVars, outputDir, bp.Rename, renderer)
 	if err != nil {
 		return nil, err
 	}
 
 	// 10. Generate lockfile with content hashes.
 	lockPath := filepath.Join(outputDir, lockfile.FileName)
-	lock := buildLockfile(resolved, bp, vars, fileSet, opts.ForgeVersion, opts.RegistryURL)
+	lock := buildLockfile(resolved, bp, ctyVars, fileSet, opts.ForgeVersion, opts.RegistryURL)
 	computeFileHashes(outputDir, lock)
 
 	if err := lockfile.Write(lockPath, lock); err != nil {
@@ -212,25 +221,32 @@ func checkOutputDirEmpty(dir string) error {
 }
 
 // resolveOutputDir determines the output directory from explicit option, project_name variable, or blueprint name.
-func resolveOutputDir(explicit string, vars map[string]any, bpName string) string {
+func resolveOutputDir(explicit string, vars map[string]cty.Value, bpName string) string {
 	if explicit != "" {
 		return explicit
 	}
 
-	if name, ok := vars["project_name"].(string); ok && name != "" {
-		return name
+	if v, ok := vars["project_name"]; ok && v.IsKnown() && !v.IsNull() && v.Type() == cty.String {
+		if name := v.AsString(); name != "" {
+			return name
+		}
 	}
 
 	return bpName
 }
 
 // renderFiles renders all files from the FileSet to the output directory.
-func renderFiles(fileSet *defaults.FileSet, vars map[string]any, outputDir string, rename map[string]string) (int, error) {
-	renderer := tmpl.NewRenderer()
+func renderFiles(
+	fileSet *defaults.FileSet,
+	ctyVars map[string]cty.Value,
+	outputDir string,
+	rename map[string]string,
+	renderer tmpl.Renderer,
+) (int, error) {
 	filesCreated := 0
 
 	for _, entry := range fileSet.Entries() {
-		if err := writeFile(renderer, entry, vars, outputDir, rename); err != nil {
+		if err := writeFile(renderer, entry, ctyVars, outputDir, rename); err != nil {
 			return 0, fmt.Errorf("writing file %s: %w", entry.RelPath, err)
 		}
 
@@ -242,20 +258,20 @@ func renderFiles(fileSet *defaults.FileSet, vars map[string]any, outputDir strin
 
 // writeFile renders a single file and writes it to the output directory.
 func writeFile(
-	renderer *tmpl.Renderer,
+	renderer tmpl.Renderer,
 	entry *defaults.FileEntry,
-	vars map[string]any,
+	ctyVars map[string]cty.Value,
 	outputDir string,
 	rename map[string]string,
 ) error {
-	// Render path templates (e.g., {{project_name}}/cmd/main.go).
-	renderedPath, err := renderer.RenderPath(entry.RelPath, vars)
+	// Render path templates (e.g., ${project_name}/cmd/main.go).
+	renderedPath, err := renderer.RenderPath(entry.RelPath, ctyVars)
 	if err != nil {
 		return fmt.Errorf("rendering path %q: %w", entry.RelPath, err)
 	}
 
 	// Apply rename rules.
-	renderedPath = applyRename(renderedPath, rename, vars)
+	renderedPath = applyRename(renderedPath, rename, ctyVars, renderer)
 
 	// Strip .tmpl extension.
 	renderedPath = tmpl.StripTemplateExtension(renderedPath)
@@ -269,7 +285,7 @@ func writeFile(
 
 	if entry.IsTemplate {
 		// Render template content.
-		content, err := renderer.RenderFile(entry.AbsPath, vars)
+		content, err := renderer.RenderFile(entry.AbsPath, ctyVars)
 		if err != nil {
 			return fmt.Errorf("rendering template %s: %w", entry.AbsPath, err)
 		}
@@ -283,28 +299,27 @@ func writeFile(
 		return fmt.Errorf("reading source %s: %w", entry.AbsPath, err)
 	}
 
+	//nolint:gosec // G703: destPath = user output dir + registry-controlled relative path; that's the intended behaviour of forge create
 	return os.WriteFile(destPath, content, 0o644)
 }
 
 // applyRename applies rename rules to a rendered path.
 // Rename rules map template patterns to replacement patterns.
-func applyRename(path string, rename map[string]string, vars map[string]any) string {
+func applyRename(path string, rename map[string]string, ctyVars map[string]cty.Value, renderer tmpl.Renderer) string {
 	if len(rename) == 0 {
 		return path
 	}
 
-	renderer := tmpl.NewRenderer()
-
 	for pattern, replacement := range rename {
 		// Render the pattern with variables using RenderPath to support
 		// shorthand {{varname}} syntax (without dot prefix).
-		renderedPattern, err := renderer.RenderPath(pattern, vars)
+		renderedPattern, err := renderer.RenderPath(pattern, ctyVars)
 		if err != nil {
 			continue
 		}
 
 		// Render the replacement with variables.
-		renderedReplacement, err := renderer.RenderString(replacement, vars)
+		renderedReplacement, err := renderer.RenderString(replacement, ctyVars)
 		if err != nil {
 			continue
 		}
@@ -353,7 +368,7 @@ func computeFileHashes(outputDir string, lock *lockfile.Lockfile) {
 func buildLockfile(
 	resolved *registry.ResolvedBlueprint,
 	bp *config.Blueprint,
-	vars map[string]any,
+	ctyVars map[string]cty.Value,
 	fileSet *defaults.FileSet,
 	forgeVersion string,
 	registryURL string,
@@ -377,7 +392,7 @@ func buildLockfile(
 		CreatedAt:    now,
 		LastSynced:   now,
 		ForgeVersion: forgeVersion,
-		Variables:    vars,
+		Variables:    lockfile.FromCtyValues(ctyVars),
 	}
 
 	// Record default file entries.

@@ -1,32 +1,108 @@
-// Package template provides the Go text/template rendering engine with custom functions.
 package template
 
 import (
 	"os"
 	"strings"
-	"text/template"
 	"time"
 	"unicode"
+
+	"github.com/zclconf/go-cty/cty"
+	"github.com/zclconf/go-cty/cty/function"
+	"github.com/zclconf/go-cty/cty/function/stdlib"
 )
 
-// FuncMap returns the custom template function map used by forge templates.
-func FuncMap() template.FuncMap {
-	return template.FuncMap{
-		"snakeCase":  snakeCase,
-		"camelCase":  camelCase,
-		"pascalCase": pascalCase,
-		"kebabCase":  kebabCase,
-		"upper":      strings.ToUpper,
-		"lower":      strings.ToLower,
-		"title":      strings.ToTitle,
-		"replace":    replace,
-		"trimPrefix": trimPrefix,
-		"trimSuffix": trimSuffix,
-		"now":        now,
-		"env":        os.Getenv,
-		"default":    defaultVal,
+// hclFuncs returns the forge custom function map for the HCL2 renderer.
+// Custom forge functions (snakeCase/camelCase/pascalCase/kebabCase/now/env)
+// are defined locally; the rest (upper/lower/title/replace/trimPrefix/
+// trimSuffix/coalesce) come from `cty/function/stdlib` to avoid
+// reinventing the wheel.
+//
+// `coalesce` replaces the v1 `default(val, fallback)` custom function per
+// ADR-0001.
+func hclFuncs() map[string]function.Function {
+	return map[string]function.Function{
+		"snakeCase":  snakeCaseFunc,
+		"camelCase":  camelCaseFunc,
+		"pascalCase": pascalCaseFunc,
+		"kebabCase":  kebabCaseFunc,
+		"now":        nowFunc,
+		"env":        envFunc,
+
+		"upper":      stdlib.UpperFunc,
+		"lower":      stdlib.LowerFunc,
+		"title":      stdlib.TitleFunc,
+		"replace":    stdlib.ReplaceFunc,
+		"trimPrefix": stdlib.TrimPrefixFunc,
+		"trimSuffix": stdlib.TrimSuffixFunc,
+		"coalesce":   stdlib.CoalesceFunc,
 	}
 }
+
+var snakeCaseFunc = function.New(&function.Spec{
+	Description: "Converts a string to snake_case.",
+	Params: []function.Parameter{
+		{Name: "str", Type: cty.String},
+	},
+	Type: function.StaticReturnType(cty.String),
+	Impl: func(args []cty.Value, _ cty.Type) (cty.Value, error) {
+		return cty.StringVal(snakeCase(args[0].AsString())), nil
+	},
+})
+
+var camelCaseFunc = function.New(&function.Spec{
+	Description: "Converts a string to camelCase.",
+	Params: []function.Parameter{
+		{Name: "str", Type: cty.String},
+	},
+	Type: function.StaticReturnType(cty.String),
+	Impl: func(args []cty.Value, _ cty.Type) (cty.Value, error) {
+		return cty.StringVal(camelCase(args[0].AsString())), nil
+	},
+})
+
+var pascalCaseFunc = function.New(&function.Spec{
+	Description: "Converts a string to PascalCase.",
+	Params: []function.Parameter{
+		{Name: "str", Type: cty.String},
+	},
+	Type: function.StaticReturnType(cty.String),
+	Impl: func(args []cty.Value, _ cty.Type) (cty.Value, error) {
+		return cty.StringVal(pascalCase(args[0].AsString())), nil
+	},
+})
+
+var kebabCaseFunc = function.New(&function.Spec{
+	Description: "Converts a string to kebab-case.",
+	Params: []function.Parameter{
+		{Name: "str", Type: cty.String},
+	},
+	Type: function.StaticReturnType(cty.String),
+	Impl: func(args []cty.Value, _ cty.Type) (cty.Value, error) {
+		return cty.StringVal(kebabCase(args[0].AsString())), nil
+	},
+})
+
+var nowFunc = function.New(&function.Spec{
+	Description: "Returns the current time formatted with the given Go layout.",
+	Params: []function.Parameter{
+		{Name: "layout", Type: cty.String},
+	},
+	Type: function.StaticReturnType(cty.String),
+	Impl: func(args []cty.Value, _ cty.Type) (cty.Value, error) {
+		return cty.StringVal(time.Now().Format(args[0].AsString())), nil
+	},
+})
+
+var envFunc = function.New(&function.Spec{
+	Description: "Returns the value of the named environment variable, or empty string if unset.",
+	Params: []function.Parameter{
+		{Name: "key", Type: cty.String},
+	},
+	Type: function.StaticReturnType(cty.String),
+	Impl: func(args []cty.Value, _ cty.Type) (cty.Value, error) {
+		return cty.StringVal(os.Getenv(args[0].AsString())), nil
+	},
+})
 
 // snakeCase converts a string to snake_case.
 func snakeCase(s string) string {
@@ -63,48 +139,6 @@ func pascalCase(s string) string {
 // kebabCase converts a string to kebab-case.
 func kebabCase(s string) string {
 	return strings.ToLower(toDelimited(s, '-'))
-}
-
-// replace replaces all occurrences of old with repl in s.
-// Argument order is (old, repl, s) to support piping: {{ "foo-bar" | replace "-" "_" }}.
-func replace(old, repl, s string) string {
-	return strings.ReplaceAll(s, old, repl)
-}
-
-// trimPrefix removes the given prefix from s.
-// Argument order is (prefix, s) to support piping: {{ "v1.2.3" | trimPrefix "v" }}.
-func trimPrefix(prefix, s string) string {
-	return strings.TrimPrefix(s, prefix)
-}
-
-// trimSuffix removes the given suffix from s.
-// Argument order is (suffix, s) to support piping: {{ "file.tmpl" | trimSuffix ".tmpl" }}.
-func trimSuffix(suffix, s string) string {
-	return strings.TrimSuffix(s, suffix)
-}
-
-// now returns the current time formatted with the given Go layout.
-func now(layout string) string {
-	return time.Now().Format(layout)
-}
-
-// defaultVal returns val if it's non-empty, otherwise returns def.
-// Accepts any type for val to handle missingkey=zero (nil values).
-func defaultVal(def string, val any) string {
-	if val == nil {
-		return def
-	}
-
-	s, ok := val.(string)
-	if !ok {
-		return def
-	}
-
-	if s != "" {
-		return s
-	}
-
-	return def
 }
 
 // splitWords splits a string into words by separators and casing transitions.

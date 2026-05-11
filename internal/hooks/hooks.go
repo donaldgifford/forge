@@ -51,6 +51,7 @@ func RunPostCreate(ctx context.Context, opts *Opts) []error {
 }
 
 func runHook(ctx context.Context, hook string, opts *Opts) error {
+	//nolint:gosec // G204: hooks come from blueprint.yaml (trusted registry maintainer); running them is the documented post_create behaviour
 	cmd := exec.CommandContext(ctx, "sh", "-c", hook)
 	cmd.Dir = opts.WorkDir
 	cmd.Stdout = opts.Stdout

@@ -9,6 +9,9 @@ import (
 	"path/filepath"
 	"text/tabwriter"
 
+	"github.com/zclconf/go-cty/cty"
+
+	"github.com/donaldgifford/forge/internal/config"
 	"github.com/donaldgifford/forge/internal/lockfile"
 	tmpl "github.com/donaldgifford/forge/internal/template"
 )
@@ -67,16 +70,23 @@ func Run(opts *Opts) (*Result, error) {
 	}
 
 	renderer := tmpl.NewRenderer()
+
+	bpVars := loadBlueprintVariables(opts.RegistryDir, lock.Blueprint.Path)
+
+	ctyVars, err := lockfile.ToCtyValues(lock.Variables, bpVars)
+	if err != nil {
+		return nil, fmt.Errorf("converting lockfile variables to cty: %w", err)
+	}
+
 	result := &Result{}
 
 	// Check defaults.
 	for i := range lock.Defaults {
 		d := &lock.Defaults[i]
-		// Strip .tmpl extension from path to match rendered output file.
 		renderedPath := tmpl.StripTemplateExtension(d.Path)
 		localPath := filepath.Join(projectDir, renderedPath)
 
-		registryHash := resolveRegistryHash(opts.RegistryDir, d.Path, lock.Variables, renderer)
+		registryHash := resolveRegistryHash(opts.RegistryDir, d.Path, ctyVars, renderer)
 		update := checkFile(localPath, renderedPath, d.Source, d.Hash, registryHash)
 		result.DefaultsUpdates = append(result.DefaultsUpdates, update)
 	}
@@ -87,7 +97,7 @@ func Run(opts *Opts) (*Result, error) {
 		localPath := filepath.Join(projectDir, mf.Path)
 
 		registryHash := resolveRegistryHashForManaged(
-			opts.RegistryDir, lock.Blueprint.Path, mf.Path, lock.Variables, renderer,
+			opts.RegistryDir, lock.Blueprint.Path, mf.Path, ctyVars, renderer,
 		)
 		update := checkFile(localPath, mf.Path, mf.Strategy, mf.Hash, registryHash)
 		result.ManagedUpdates = append(result.ManagedUpdates, update)
@@ -141,8 +151,8 @@ func checkFile(localPath, relPath, source, lockfileHash, registryHash string) Fi
 // Returns empty string if registry dir is not set or the file cannot be resolved.
 func resolveRegistryHash(
 	registryDir, relPath string,
-	vars map[string]any,
-	renderer *tmpl.Renderer,
+	vars map[string]cty.Value,
+	renderer tmpl.Renderer,
 ) string {
 	if registryDir == "" {
 		return ""
@@ -164,8 +174,8 @@ func resolveRegistryHash(
 // resolveRegistryHashForManaged computes the content hash of a managed file from the registry.
 func resolveRegistryHashForManaged(
 	registryDir, blueprintPath, relPath string,
-	vars map[string]any,
-	renderer *tmpl.Renderer,
+	vars map[string]cty.Value,
+	renderer tmpl.Renderer,
 ) string {
 	if registryDir == "" {
 		return ""
@@ -187,6 +197,24 @@ func resolveRegistryHashForManaged(
 	}
 
 	return lockfile.ContentHash(content)
+}
+
+// loadBlueprintVariables reads the blueprint.yaml under the registry directory
+// to recover the declared variable types. Returns nil when no registry is
+// configured (e.g., local-only check) or the blueprint cannot be loaded.
+func loadBlueprintVariables(registryDir, blueprintPath string) []config.Variable {
+	if registryDir == "" || blueprintPath == "" {
+		return nil
+	}
+
+	bpPath := filepath.Join(registryDir, blueprintPath, "blueprint.yaml")
+
+	bp, err := config.LoadBlueprint(bpPath)
+	if err != nil {
+		return nil
+	}
+
+	return bp.Variables
 }
 
 // findSourceFile looks for a file in known registry locations.
@@ -215,7 +243,7 @@ func findBlueprintFile(registryDir, blueprintPath, relPath string) string {
 }
 
 // readSourceContent reads a source file, rendering templates if needed.
-func readSourceContent(sourcePath string, vars map[string]any, renderer *tmpl.Renderer) ([]byte, error) {
+func readSourceContent(sourcePath string, vars map[string]cty.Value, renderer tmpl.Renderer) ([]byte, error) {
 	if tmpl.IsTemplate(sourcePath) {
 		return renderer.RenderFile(sourcePath, vars)
 	}

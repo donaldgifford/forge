@@ -5,11 +5,17 @@ code in this repository.
 
 ## Project Overview
 
-Forge is a Go CLI tool (Go 1.25.4, Cobra CLI) that scaffolds projects from
+Forge is a Go CLI tool (Go 1.26.2, Cobra CLI) that scaffolds projects from
 **blueprints** — project templates in a Git-based **registry**. Inspired by
 Python's cookiecutter but with layered defaults inheritance, managed file sync,
 and registry-based browsing. The full specification lives in
-`docs/PROJECT_PLAN.md`.
+`docs/rfc/0001-forge-project-scaffolding-cli.md`.
+
+Templates use **HCL2** (`hashicorp/hcl/v2`) with `${expr}` interpolation and
+`%{ if … ~}` directives. HCL2 was chosen so `{{ }}`-using downstream tools
+(Helm, Argo CD, kustomize) can be scaffolded without escape gymnastics — see
+[ADR-0001](docs/adr/0001-use-hcl2-as-the-template-engine.md). Authors upgrading
+older blueprints follow [docs/MIGRATION.md](docs/MIGRATION.md).
 
 ## Build & Development Commands
 
@@ -39,29 +45,35 @@ packages:
 
 - **cmd/forge/** — Entry point (`main.go`)
 - **cmd/** — Cobra command definitions (create, init, sync, check, list, search,
-  info, registry init/blueprint/update, cache)
-- **internal/config/** — `blueprint.yaml` and `registry.yaml` parsing, validation,
-  global config with multi-registry support
+  info, migrate, registry init/blueprint/update, cache)
+- **internal/config/** — `blueprint.yaml` and `registry.yaml` parsing, validation
+  (requires `apiVersion: v2`), global config with multi-registry support
 - **internal/registry/** — Registry index (`registry.yaml`), blueprint
   resolution, local cache with TTL
 - **internal/defaults/** — `_defaults/` layered inheritance resolution
   (registry-wide → category → blueprint, last wins)
 - **internal/getter/** — Source fetching via `hashicorp/go-getter` (registry
   cloning, archive extraction, checksum verification)
-- **internal/template/** — Go `text/template` rendering with custom functions
-- **internal/prompt/** — Interactive variable collection via charmbracelet/huh
+- **internal/template/** — HCL2 (`hashicorp/hcl/v2`) rendering with custom
+  functions; values flow as `cty.Value` (`zclconf/go-cty`)
+- **internal/prompt/** — Interactive variable collection via charmbracelet/huh;
+  default-value templates also render through HCL2
 - **internal/create/** — Full create workflow orchestration (resolve, prompt,
   render, conditions, lockfile)
 - **internal/sync/** — Three-way merge sync engine for managed files
   (overwrite/merge strategies), conflict detection and resolution
 - **internal/lockfile/** — `.forge-lock.yaml` state tracking for scaffolded
-  projects
+  projects; YAML scalars on disk, `cty.Value` in memory (typed coercion via
+  `lockfile.ToCtyValues` using declared variable types)
 - **internal/check/** — Drift detection comparing lockfile vs local files
 - **internal/hooks/** — Post-create hook execution with context cancellation
 - **internal/list/** — Blueprint listing with tag filtering
 - **internal/search/** — Blueprint search across name, description, tags
 - **internal/info/** — Blueprint inspection with text/JSON output
 - **internal/initcmd/** — Blueprint scaffolding (`init` is Go reserved keyword)
+- **internal/migratecmd/** — `forge migrate templates` one-shot v1→v2 rewriter
+  (only place in the tree that still imports `text/template`, used to parse
+  v1 input)
 - **internal/registrycmd/** — Registry scaffolding (`forge registry init`),
   blueprint scaffolding (`forge registry blueprint`), and registry metadata
   update (`forge registry update`)
@@ -82,7 +94,7 @@ packages:
 
 ### CLI Design Decisions
 
-See `docs/gaps_implementation.md` for the full history and rationale.
+See `docs/impl/0002-mvp-cli-gap-closure.md` for the full history and rationale.
 
 - **`--registry-dir`** is a unified flag on `create`, `sync`, and `check`:
   accepts local paths AND go-getter URLs (auto-detected via `os.Stat`)
@@ -92,6 +104,10 @@ See `docs/gaps_implementation.md` for the full history and rationale.
   upstream-changed, both-changed)
 - **`forge sync --ref`** pins to a specific registry version; outputs which ref
   is being synced against
+- **`forge migrate templates --path <registry>`** rewrites legacy v1
+  `text/template` blueprints to v2 (HCL2) in place. Documented in
+  [docs/MIGRATION.md](docs/MIGRATION.md); guarded by a dirty-worktree check
+  (override with `--force`).
 
 ## Code Style
 

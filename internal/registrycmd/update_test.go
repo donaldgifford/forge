@@ -147,7 +147,7 @@ func TestRunUpdate_FilesChanged(t *testing.T) {
 	dir := setupGitRegistry(t)
 
 	// Modify a template file without changing the version.
-	tmplPath := filepath.Join(dir, "go", "api", "{{project_name}}", "README.md.tmpl")
+	tmplPath := filepath.Join(dir, "go", "api", "${project_name}", "README.md.tmpl")
 	require.NoError(t, os.WriteFile(tmplPath, []byte("# Updated content\n"), 0o644))
 
 	runGit(t, dir, "add", "-A")
@@ -197,7 +197,7 @@ func TestRunUpdate_BothChanged(t *testing.T) {
 	updated := strings.Replace(string(bpData), `version: "0.1.0"`, `version: "1.0.0"`, 1)
 	require.NoError(t, os.WriteFile(bpPath, []byte(updated), 0o644))
 
-	tmplPath := filepath.Join(dir, "go", "api", "{{project_name}}", "README.md.tmpl")
+	tmplPath := filepath.Join(dir, "go", "api", "${project_name}", "README.md.tmpl")
 	require.NoError(t, os.WriteFile(tmplPath, []byte("# v1.0 content\n"), 0o644))
 
 	runGit(t, dir, "add", "-A")

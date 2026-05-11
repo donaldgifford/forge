@@ -29,7 +29,7 @@ func TestRun_Standalone(t *testing.T) {
 	// Verify the generated blueprint is valid YAML.
 	bp, err := config.LoadBlueprint(bpPath)
 	require.NoError(t, err)
-	assert.Equal(t, "v1", bp.APIVersion)
+	assert.Equal(t, "v2", bp.APIVersion)
 	assert.NotEmpty(t, bp.Name)
 	assert.Len(t, bp.Variables, 1)
 	assert.Equal(t, "project_name", bp.Variables[0].Name)
@@ -84,7 +84,7 @@ func TestRun_RegistryModeExistingIndex(t *testing.T) {
 	registryDir := t.TempDir()
 
 	// Create an existing registry.yaml.
-	indexContent := `apiVersion: v1
+	indexContent := `apiVersion: v2
 name: "test-registry"
 blueprints:
   - name: existing

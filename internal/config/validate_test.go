@@ -13,7 +13,7 @@ func TestValidateBlueprint_Valid(t *testing.T) {
 	t.Parallel()
 
 	bp := &config.Blueprint{
-		APIVersion: "v1",
+		APIVersion: "v2",
 		Name:       "test",
 		Variables: []config.Variable{
 			{Name: "name", Type: "string"},
@@ -26,19 +26,36 @@ func TestValidateBlueprint_InvalidAPIVersion(t *testing.T) {
 	t.Parallel()
 
 	bp := &config.Blueprint{
-		APIVersion: "v2",
+		APIVersion: "v1",
 		Name:       "test",
 	}
 	err := config.ValidateBlueprint(bp)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "apiVersion")
+	assert.Contains(t, err.Error(), "no longer supported")
+	assert.Contains(t, err.Error(), "forge migrate templates")
+	assert.Contains(t, err.Error(), "docs/MIGRATION.md")
+}
+
+func TestValidateRegistry_InvalidAPIVersion(t *testing.T) {
+	t.Parallel()
+
+	reg := &config.Registry{
+		APIVersion: "v1",
+		Name:       "test",
+	}
+	err := config.ValidateRegistry(reg)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "apiVersion")
+	assert.Contains(t, err.Error(), "no longer supported")
+	assert.Contains(t, err.Error(), "forge migrate templates")
 }
 
 func TestValidateBlueprint_EmptyName(t *testing.T) {
 	t.Parallel()
 
 	bp := &config.Blueprint{
-		APIVersion: "v1",
+		APIVersion: "v2",
 		Name:       "",
 	}
 	err := config.ValidateBlueprint(bp)
@@ -50,7 +67,7 @@ func TestValidateBlueprint_InvalidVariableType(t *testing.T) {
 	t.Parallel()
 
 	bp := &config.Blueprint{
-		APIVersion: "v1",
+		APIVersion: "v2",
 		Name:       "test",
 		Variables: []config.Variable{
 			{Name: "foo", Type: "float"},
@@ -65,7 +82,7 @@ func TestValidateBlueprint_ChoiceWithoutChoices(t *testing.T) {
 	t.Parallel()
 
 	bp := &config.Blueprint{
-		APIVersion: "v1",
+		APIVersion: "v2",
 		Name:       "test",
 		Variables: []config.Variable{
 			{Name: "pick", Type: "choice"},
@@ -80,7 +97,7 @@ func TestValidateBlueprint_InvalidRegex(t *testing.T) {
 	t.Parallel()
 
 	bp := &config.Blueprint{
-		APIVersion: "v1",
+		APIVersion: "v2",
 		Name:       "test",
 		Variables: []config.Variable{
 			{Name: "bad", Type: "string", Validate: "[invalid"},
@@ -95,7 +112,7 @@ func TestValidateBlueprint_InvalidOverrideStrategy(t *testing.T) {
 	t.Parallel()
 
 	bp := &config.Blueprint{
-		APIVersion: "v1",
+		APIVersion: "v2",
 		Name:       "test",
 		Defaults: config.Defaults{
 			OverrideStrategy: map[string]string{"file.txt": "invalid"},
@@ -110,7 +127,7 @@ func TestValidateBlueprint_InvalidManagedFileStrategy(t *testing.T) {
 	t.Parallel()
 
 	bp := &config.Blueprint{
-		APIVersion: "v1",
+		APIVersion: "v2",
 		Name:       "test",
 		Sync: config.SyncConfig{
 			ManagedFiles: []config.ManagedFile{
@@ -127,7 +144,7 @@ func TestValidateRegistry_Valid(t *testing.T) {
 	t.Parallel()
 
 	reg := &config.Registry{
-		APIVersion: "v1",
+		APIVersion: "v2",
 		Name:       "test-registry",
 		Blueprints: []config.BlueprintEntry{
 			{Name: "go/api", Path: "go/api"},
@@ -136,7 +153,7 @@ func TestValidateRegistry_Valid(t *testing.T) {
 	require.NoError(t, config.ValidateRegistry(reg))
 }
 
-func TestValidateRegistry_InvalidAPIVersion(t *testing.T) {
+func TestValidateRegistry_UnsupportedAPIVersion(t *testing.T) {
 	t.Parallel()
 
 	reg := &config.Registry{
@@ -152,7 +169,7 @@ func TestValidateRegistry_MissingBlueprintPath(t *testing.T) {
 	t.Parallel()
 
 	reg := &config.Registry{
-		APIVersion: "v1",
+		APIVersion: "v2",
 		Name:       "test",
 		Blueprints: []config.BlueprintEntry{
 			{Name: "go/api", Path: ""},
@@ -167,7 +184,7 @@ func TestValidateBlueprint_VariableNameRequired(t *testing.T) {
 	t.Parallel()
 
 	bp := &config.Blueprint{
-		APIVersion: "v1",
+		APIVersion: "v2",
 		Name:       "test",
 		Variables: []config.Variable{
 			{Name: "", Type: "string"},
@@ -182,7 +199,7 @@ func TestValidateBlueprint_VariableTypeRequired(t *testing.T) {
 	t.Parallel()
 
 	bp := &config.Blueprint{
-		APIVersion: "v1",
+		APIVersion: "v2",
 		Name:       "test",
 		Variables: []config.Variable{
 			{Name: "foo", Type: ""},

@@ -52,7 +52,7 @@ func TestCollectVariables_TemplatedDefault(t *testing.T) {
 
 	vars := []config.Variable{
 		{Name: "project_name", Type: "string", Default: "my-api"},
-		{Name: "go_module", Type: "string", Default: "github.com/example/{{ .project_name }}"},
+		{Name: "go_module", Type: "string", Default: "github.com/example/${project_name}"},
 	}
 
 	result, err := prompt.CollectVariables(vars, nil, true, nil)

@@ -6,10 +6,16 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"text/template"
+
+	"github.com/zclconf/go-cty/cty"
 
 	"github.com/donaldgifford/forge/internal/config"
+	tmpl "github.com/donaldgifford/forge/internal/template"
 )
+
+// defaultRenderer is the HCL2 renderer used to evaluate default-value
+// templates. Constructed once because it carries no per-call state.
+var defaultRenderer = tmpl.NewRenderer()
 
 // PromptFn is a callback for interactive variable input.
 type PromptFn func(v *config.Variable, current map[string]any) (string, error)
@@ -135,23 +141,37 @@ func resolveFromPrompt(
 	return val, nil
 }
 
-// renderDefault renders a default value template with the current variable values.
+// renderDefault renders a default value through the HCL2 renderer with the
+// current variable values. Defaults without `${` or `%{` markers short-circuit
+// and pass through unchanged.
 func renderDefault(defaultTmpl string, current map[string]any) (string, error) {
-	if defaultTmpl == "" || !strings.Contains(defaultTmpl, "{{") {
+	if defaultTmpl == "" || (!strings.Contains(defaultTmpl, "${") && !strings.Contains(defaultTmpl, "%{")) {
 		return defaultTmpl, nil
 	}
 
-	tmpl, err := template.New("default").Option("missingkey=zero").Parse(defaultTmpl)
+	ctyVars := make(map[string]cty.Value, len(current))
+
+	for k, v := range current {
+		switch x := v.(type) {
+		case string:
+			ctyVars[k] = cty.StringVal(x)
+		case bool:
+			ctyVars[k] = cty.BoolVal(x)
+		case int:
+			ctyVars[k] = cty.NumberIntVal(int64(x))
+		case int64:
+			ctyVars[k] = cty.NumberIntVal(x)
+		default:
+			ctyVars[k] = cty.StringVal(fmt.Sprintf("%v", v))
+		}
+	}
+
+	out, err := defaultRenderer.RenderString(defaultTmpl, ctyVars)
 	if err != nil {
-		return "", fmt.Errorf("parsing default template %q: %w", defaultTmpl, err)
+		return "", fmt.Errorf("rendering default %q: %w", defaultTmpl, err)
 	}
 
-	var buf strings.Builder
-	if err := tmpl.Execute(&buf, current); err != nil {
-		return "", fmt.Errorf("executing default template %q: %w", defaultTmpl, err)
-	}
-
-	return buf.String(), nil
+	return out, nil
 }
 
 // coerceValue converts a string value to the appropriate Go type based on the variable type.

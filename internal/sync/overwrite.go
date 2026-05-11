@@ -33,6 +33,7 @@ func applyOverwrite(localPath string, newContent []byte, dryRun bool, result *Re
 		return fmt.Errorf("creating directory for %s: %w", localPath, err)
 	}
 
+	//nolint:gosec // G703: localPath = project dir + lockfile-tracked relative path; writing there is the documented behaviour of forge sync
 	if err := os.WriteFile(localPath, newContent, 0o644); err != nil {
 		return fmt.Errorf("writing %s: %w", localPath, err)
 	}

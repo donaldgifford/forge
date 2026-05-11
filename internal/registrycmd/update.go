@@ -119,6 +119,7 @@ func RunUpdate(opts *UpdateOpts) (*UpdateResult, error) {
 }
 
 func isGitRepo(dir string) bool {
+	//nolint:gosec // G204: dir is the user's registry path; this is a read-only `git rev-parse` probe to decide if metadata-update operations can run
 	cmd := exec.CommandContext(context.Background(), "git", "-C", dir, "rev-parse", "--git-dir")
 	cmd.Stdout = nil
 	cmd.Stderr = nil

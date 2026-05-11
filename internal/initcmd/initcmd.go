@@ -20,7 +20,7 @@ type Opts struct {
 	RegistryDir string
 }
 
-const blueprintTemplate = `apiVersion: v1
+const blueprintTemplate = `apiVersion: v2
 name: "%s"
 description: "TODO: Add a description for this blueprint"
 version: "0.1.0"
@@ -132,7 +132,7 @@ func loadOrCreateRegistry(path string) (*config.Registry, error) {
 	if err != nil {
 		if os.IsNotExist(err) {
 			return &config.Registry{
-				APIVersion: "v1",
+				APIVersion: "v2",
 				Name:       "registry",
 			}, nil
 		}

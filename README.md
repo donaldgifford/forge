@@ -4,7 +4,7 @@ A CLI tool that scaffolds projects from **blueprints** -- project templates stor
 
 ## Features
 
-- **Blueprint scaffolding** -- Create projects from templates with variable substitution via Go `text/template`
+- **Blueprint scaffolding** -- Create projects from templates with variable substitution via HCL2 (`${expr}` interpolation and `%{ if … ~}` directives — friendly to `{{ }}`-using tools like Helm and Argo CD)
 - **Layered defaults** -- Inherit config files through `_defaults/` directories (registry-wide, category, blueprint)
 - **Managed file sync** -- Keep files aligned with upstream blueprints using overwrite or three-way merge strategies
 - **Registry browsing** -- List, search, and inspect blueprints from Git-based registries
@@ -79,16 +79,31 @@ forge cache clean
 | `forge registry init <path>` | Scaffold a new blueprint registry |
 | `forge registry blueprint` | Scaffold a new blueprint in a registry |
 | `forge registry update` | Sync blueprint metadata in registry.yaml |
+| `forge migrate templates` | Rewrite legacy v1 (`text/template`) blueprints to v2 (HCL2) — see [docs/MIGRATION.md](docs/MIGRATION.md) |
 | `forge cache clean` | Clear cached registries |
 
 ## Documentation
 
-- [Blueprint Authoring Guide](docs/BLUEPRINT_AUTHORING.md) -- How to create blueprints
-- [Registry Setup Guide](docs/REGISTRY_SETUP.md) -- How to set up a blueprint registry
+- [DESIGN-0001 — Blueprint Authoring](docs/design/0001-blueprint-authoring.md) -- How to create blueprints
+- [DESIGN-0002 — Registry Layout & Defaults Inheritance](docs/design/0002-registry-layout-and-defaults-inheritance.md) -- How to set up a blueprint registry
+- [DESIGN-0003 — Migrate template engine to HCL2](docs/design/0003-migrate-template-engine-to-hcl2.md) -- Engine swap rationale
+- [ADR-0001 — Use HCL2 as the template engine](docs/adr/0001-use-hcl2-as-the-template-engine.md) -- Decision record
+- [docs/MIGRATION.md](docs/MIGRATION.md) -- v1 → v2 migration guide for existing registries
+- [RFC-0001 — Forge: Project Scaffolding CLI](docs/rfc/0001-forge-project-scaffolding-cli.md) -- High-level proposal and architecture
+
+## Migrating from v1
+
+Earlier forge releases used Go `text/template` (`{{ .var }}`). Current releases require HCL2 (`apiVersion: v2`). Maintainers of v1 registries should run:
+
+```bash
+forge migrate templates --path /path/to/registry
+```
+
+See [docs/MIGRATION.md](docs/MIGRATION.md) for the complete walkthrough.
 
 ## Development
 
-Requires Go 1.25.4+ and tools managed via [mise](https://mise.jdx.dev/).
+Requires Go 1.26.2+ and tools managed via [mise](https://mise.jdx.dev/).
 
 ```bash
 mise install        # Set up development tools

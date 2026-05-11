@@ -7,6 +7,9 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/zclconf/go-cty/cty"
+
+	"github.com/donaldgifford/forge/internal/config"
 	"github.com/donaldgifford/forge/internal/lockfile"
 	tmpl "github.com/donaldgifford/forge/internal/template"
 )
@@ -53,6 +56,13 @@ func Run(opts *Opts) (*Result, error) {
 	result := &Result{}
 	renderer := tmpl.NewRenderer()
 
+	bpVars := loadBlueprintVariables(opts.RegistryDir, lock.Blueprint.Path)
+
+	ctyVars, err := lockfile.ToCtyValues(lock.Variables, bpVars)
+	if err != nil {
+		return nil, fmt.Errorf("converting lockfile variables to cty: %w", err)
+	}
+
 	// Sync defaults.
 	for i := range lock.Defaults {
 		d := &lock.Defaults[i]
@@ -61,7 +71,7 @@ func Run(opts *Opts) (*Result, error) {
 			continue
 		}
 
-		if err := syncDefault(opts, d, lock.Variables, renderer, result); err != nil {
+		if err := syncDefault(opts, d, ctyVars, renderer, result); err != nil {
 			return nil, fmt.Errorf("syncing default %s: %w", d.Path, err)
 		}
 	}
@@ -74,7 +84,7 @@ func Run(opts *Opts) (*Result, error) {
 			continue
 		}
 
-		if err := syncManagedFile(opts, mf, lock, renderer, result); err != nil {
+		if err := syncManagedFile(opts, mf, lock, ctyVars, renderer, result); err != nil {
 			return nil, fmt.Errorf("syncing managed file %s: %w", mf.Path, err)
 		}
 	}
@@ -97,8 +107,8 @@ func Run(opts *Opts) (*Result, error) {
 func syncDefault(
 	opts *Opts,
 	d *lockfile.DefaultEntry,
-	vars map[string]any,
-	renderer *tmpl.Renderer,
+	vars map[string]cty.Value,
+	renderer tmpl.Renderer,
 	result *Result,
 ) error {
 	sourcePath := findSourceFile(opts.RegistryDir, d.Path)
@@ -122,12 +132,12 @@ func syncManagedFile(
 	opts *Opts,
 	mf *lockfile.ManagedFileEntry,
 	lock *lockfile.Lockfile,
-	renderer *tmpl.Renderer,
+	vars map[string]cty.Value,
+	renderer tmpl.Renderer,
 	result *Result,
 ) error {
 	sourcePath := findSourceFile(opts.RegistryDir, mf.Path)
 	if sourcePath == "" {
-		// Check in blueprint directory.
 		sourcePath = findBlueprintFile(opts.RegistryDir, lock.Blueprint.Path, mf.Path)
 	}
 
@@ -137,7 +147,7 @@ func syncManagedFile(
 		return nil
 	}
 
-	sourceContent, err := readSourceContent(sourcePath, lock.Variables, renderer)
+	sourceContent, err := readSourceContent(sourcePath, vars, renderer)
 	if err != nil {
 		return err
 	}
@@ -145,7 +155,7 @@ func syncManagedFile(
 	localPath := filepath.Join(opts.ProjectDir, mf.Path)
 
 	if mf.Strategy == "merge" {
-		return applyMerge(opts, mf, lock, renderer, localPath, sourceContent, result)
+		return applyMerge(opts, mf, lock, vars, renderer, localPath, sourceContent, result)
 	}
 
 	return applyOverwrite(localPath, sourceContent, opts.DryRun, result)
@@ -155,26 +165,23 @@ func applyMerge(
 	opts *Opts,
 	mf *lockfile.ManagedFileEntry,
 	lock *lockfile.Lockfile,
-	renderer *tmpl.Renderer,
+	vars map[string]cty.Value,
+	renderer tmpl.Renderer,
 	localPath string,
 	remoteContent []byte,
 	result *Result,
 ) error {
-	// Read local file.
 	localContent, err := os.ReadFile(filepath.Clean(localPath))
 	if err != nil {
 		if os.IsNotExist(err) {
-			// No local file — accept remote content directly.
 			return applyOverwrite(localPath, remoteContent, opts.DryRun, result)
 		}
 
 		return fmt.Errorf("reading local file %s: %w", localPath, err)
 	}
 
-	// Resolve base content from the base registry directory.
-	baseContent, err := resolveBaseContent(opts, mf, lock, renderer)
+	baseContent, err := resolveBaseContent(opts, mf, lock, vars, renderer)
 	if err != nil {
-		// If base is unavailable, fall back to overwrite.
 		return applyOverwrite(localPath, remoteContent, opts.DryRun, result)
 	}
 
@@ -195,7 +202,8 @@ func resolveBaseContent(
 	opts *Opts,
 	mf *lockfile.ManagedFileEntry,
 	lock *lockfile.Lockfile,
-	renderer *tmpl.Renderer,
+	vars map[string]cty.Value,
+	renderer tmpl.Renderer,
 ) ([]byte, error) {
 	if opts.BaseDir == "" {
 		return nil, fmt.Errorf("no base directory configured")
@@ -210,7 +218,7 @@ func resolveBaseContent(
 		return nil, fmt.Errorf("base file not found for %s", mf.Path)
 	}
 
-	return readSourceContent(basePath, lock.Variables, renderer)
+	return readSourceContent(basePath, vars, renderer)
 }
 
 // updateFileHashes recomputes SHA256 hashes for all tracked files in the lockfile.
@@ -262,7 +270,26 @@ func findSourceFile(registryDir, relPath string) string {
 	return ""
 }
 
-func readSourceContent(sourcePath string, vars map[string]any, renderer *tmpl.Renderer) ([]byte, error) {
+// loadBlueprintVariables reads the blueprint.yaml under the registry directory
+// to recover the declared variable types. Returns nil when no registry is
+// configured or the blueprint cannot be loaded — callers fall back to runtime
+// type inference in that case.
+func loadBlueprintVariables(registryDir, blueprintPath string) []config.Variable {
+	if registryDir == "" || blueprintPath == "" {
+		return nil
+	}
+
+	bpPath := filepath.Join(registryDir, blueprintPath, "blueprint.yaml")
+
+	bp, err := config.LoadBlueprint(bpPath)
+	if err != nil {
+		return nil
+	}
+
+	return bp.Variables
+}
+
+func readSourceContent(sourcePath string, vars map[string]cty.Value, renderer tmpl.Renderer) ([]byte, error) {
 	if tmpl.IsTemplate(sourcePath) {
 		content, err := renderer.RenderFile(sourcePath, vars)
 		if err != nil {

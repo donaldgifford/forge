@@ -17,42 +17,36 @@ func TestLoadBlueprint(t *testing.T) {
 	bp, err := config.LoadBlueprint(testdataPath(t, "go/api/blueprint.yaml"))
 	require.NoError(t, err)
 
-	assert.Equal(t, "v1", bp.APIVersion)
+	assert.Equal(t, "v2", bp.APIVersion)
 	assert.Equal(t, "go-api", bp.Name)
 	assert.Equal(t, "1.0.0", bp.Version)
 	assert.Contains(t, bp.Tags, "go")
 	assert.Contains(t, bp.Tags, "api")
 
-	// Variables.
-	require.Len(t, bp.Variables, 4)
+	require.Len(t, bp.Variables, 5)
 	assert.Equal(t, "project_name", bp.Variables[0].Name)
 	assert.Equal(t, "string", bp.Variables[0].Type)
 	assert.True(t, bp.Variables[0].Required)
 	assert.Equal(t, "^[a-z][a-z0-9-]*$", bp.Variables[0].Validate)
 
-	assert.Equal(t, "license", bp.Variables[3].Name)
-	assert.Equal(t, "choice", bp.Variables[3].Type)
-	assert.Equal(t, []string{"MIT", "Apache-2.0", "BSD-3-Clause", "none"}, bp.Variables[3].Choices)
+	assert.Equal(t, "license", bp.Variables[4].Name)
+	assert.Equal(t, "choice", bp.Variables[4].Type)
+	assert.Equal(t, []string{"MIT", "Apache-2.0", "BSD-3-Clause", "none"}, bp.Variables[4].Choices)
 
-	// Defaults.
 	assert.Contains(t, bp.Defaults.Exclude, ".pre-commit-config.yaml")
 	assert.Equal(t, "merge", bp.Defaults.OverrideStrategy["renovate.json"])
 
-	// Conditions.
 	require.Len(t, bp.Conditions, 1)
-	assert.Equal(t, "{{ not .use_grpc }}", bp.Conditions[0].When)
+	assert.Equal(t, "!use_grpc", bp.Conditions[0].When)
 	assert.Contains(t, bp.Conditions[0].Exclude, "proto/")
 
-	// Hooks.
 	assert.Contains(t, bp.Hooks.PostCreate, "git init")
 
-	// Sync.
 	require.Len(t, bp.Sync.ManagedFiles, 1)
 	assert.Equal(t, "Makefile", bp.Sync.ManagedFiles[0].Path)
 	assert.Equal(t, "merge", bp.Sync.ManagedFiles[0].Strategy)
 
-	// Rename.
-	assert.Equal(t, ".", bp.Rename["{{project_name}}/"])
+	assert.Equal(t, ".", bp.Rename["${project_name}/"])
 }
 
 func TestLoadRegistry(t *testing.T) {
@@ -61,7 +55,7 @@ func TestLoadRegistry(t *testing.T) {
 	reg, err := config.LoadRegistry(testdataPath(t, "registry.yaml"))
 	require.NoError(t, err)
 
-	assert.Equal(t, "v1", reg.APIVersion)
+	assert.Equal(t, "v2", reg.APIVersion)
 	assert.Equal(t, "test-blueprints", reg.Name)
 
 	// Maintainers.
@@ -120,6 +114,24 @@ func TestLoadBlueprint_ValidationError(t *testing.T) {
 	_, err := config.LoadBlueprint(path)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "apiVersion")
+}
+
+// TestLoadBlueprint_RejectsV1Fixture is the IMPL-0004 C.10 integration
+// test: loading the real frozen v1 fixture must surface the migration
+// guidance, not silently coerce or fall through.
+func TestLoadBlueprint_RejectsV1Fixture(t *testing.T) {
+	t.Parallel()
+
+	v1Path := filepath.Join("..", "..", "testdata", "v1-registry", "go", "api", "blueprint.yaml")
+
+	_, err := config.LoadBlueprint(v1Path)
+	require.Error(t, err)
+
+	msg := err.Error()
+	assert.Contains(t, msg, "v1")
+	assert.Contains(t, msg, "no longer supported")
+	assert.Contains(t, msg, "forge migrate templates")
+	assert.Contains(t, msg, "docs/MIGRATION.md")
 }
 
 func testdataPath(t *testing.T, relPath string) string {

@@ -70,8 +70,7 @@ func TestResolve_BlueprintFiles(t *testing.T) {
 	fs, err := defaults.Resolve(testRegistryRoot, "go/api", nil)
 	require.NoError(t, err)
 
-	// Blueprint-specific template files
-	entry := fs.Get(filepath.Join("{{project_name}}", "cmd", "main.go.tmpl"))
+	entry := fs.Get(filepath.Join("${project_name}", "cmd", "main.go.tmpl"))
 	require.NotNil(t, entry, "expected blueprint template file")
 	assert.Equal(t, defaults.LayerBlueprint, entry.SourceLayer)
 	assert.True(t, entry.IsTemplate)

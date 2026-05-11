@@ -4,24 +4,25 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/zclconf/go-cty/cty"
+
 	"github.com/donaldgifford/forge/internal/config"
 	"github.com/donaldgifford/forge/internal/defaults"
 	tmpl "github.com/donaldgifford/forge/internal/template"
 )
 
 // EvaluateConditions processes blueprint conditions and removes excluded files
-// from the FileSet. Each condition has a when template expression that is
-// rendered against the variables. If the result is "true", files matching
-// the exclude glob patterns are removed.
-func EvaluateConditions(conditions []config.Condition, vars map[string]any, fileSet *defaults.FileSet) error {
-	if len(conditions) == 0 {
-		return nil
-	}
-
-	renderer := tmpl.NewRenderer()
-
+// from the FileSet. Each condition has a when expression that is evaluated
+// as a bool against the variables; when true, files matching the exclude
+// glob patterns are removed.
+func EvaluateConditions(
+	conditions []config.Condition,
+	ctyVars map[string]cty.Value,
+	fileSet *defaults.FileSet,
+	renderer tmpl.Renderer,
+) error {
 	for i := range conditions {
-		if err := evaluateCondition(renderer, &conditions[i], vars, fileSet); err != nil {
+		if err := evaluateCondition(renderer, &conditions[i], ctyVars, fileSet); err != nil {
 			return err
 		}
 	}
@@ -30,22 +31,20 @@ func EvaluateConditions(conditions []config.Condition, vars map[string]any, file
 }
 
 func evaluateCondition(
-	renderer *tmpl.Renderer,
+	renderer tmpl.Renderer,
 	cond *config.Condition,
-	vars map[string]any,
+	vars map[string]cty.Value,
 	fileSet *defaults.FileSet,
 ) error {
-	result, err := renderer.RenderString(cond.When, vars)
+	active, err := renderer.EvaluateBool(cond.When, vars)
 	if err != nil {
 		return err
 	}
 
-	// Condition is active when the rendered result is "true".
-	if strings.TrimSpace(result) != "true" {
+	if !active {
 		return nil
 	}
 
-	// Remove files matching the exclude patterns.
 	for _, entry := range fileSet.Entries() {
 		if matchesAnyPattern(entry.RelPath, cond.Exclude) {
 			fileSet.Remove(entry.RelPath)
