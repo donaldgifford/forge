@@ -161,10 +161,25 @@ func walkBlueprints(root string) ([]string, error) {
 	return out, nil
 }
 
+// matchPathIdentifier returns the identifier embedded in a v1 path segment
+// like `{{name}}` or `{{ .name }}`, or empty string if the segment is not a
+// pure-template name. Requires that the whole segment match the pattern.
+func matchPathIdentifier(name string) string {
+	if match := pathShorthandPattern.FindStringSubmatch(name); len(match) == 2 && match[0] == name {
+		return match[1]
+	}
+
+	if match := pathDottedPattern.FindStringSubmatch(name); len(match) == 2 && match[0] == name {
+		return match[1]
+	}
+
+	return ""
+}
+
 // renamePathShorthandDirs walks root and renames any directory whose
-// name matches the v1 `{{name}}` path shorthand (single identifier, no
-// dot) to the v2 `${name}` form. Walks bottom-up so deeper renames
-// don't break shallower ones.
+// name matches the v1 `{{name}}` shorthand or `{{ .name }}` dotted form
+// to the v2 `${name}` form. Walks bottom-up so deeper renames don't
+// break shallower ones.
 func renamePathShorthandDirs(root string, dryRun bool) ([]string, error) {
 	type rename struct{ from, to string }
 
@@ -180,12 +195,11 @@ func renamePathShorthandDirs(root string, dryRun bool) ([]string, error) {
 		}
 
 		name := d.Name()
-		match := pathShorthandPattern.FindStringSubmatch(name)
-		if len(match) != 2 || match[0] != name {
+
+		ident := matchPathIdentifier(name)
+		if ident == "" {
 			return nil
 		}
-
-		ident := match[1]
 
 		newName := "${" + ident + "}"
 		renames = append(renames, rename{path, filepath.Join(filepath.Dir(path), newName)})

@@ -55,6 +55,52 @@ rename:
 	require.NoError(t, os.WriteFile(filepath.Join(bpDir, "{{project_name}}", "README.md.tmpl"), tmpl, 0o644))
 }
 
+// TestRunMigrate_RenamesDottedDirForm covers the `{{ .name }}` dotted form
+// that some authors used in directory names (e.g. forge-registry's
+// go/_defaults/cmd/{{ .project_name }}/). The shorthand-only renamer
+// missed these; this fixture pins the regression.
+func TestRunMigrate_RenamesDottedDirForm(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+
+	bpDir := filepath.Join(root, "go", "api")
+	require.NoError(t, os.MkdirAll(filepath.Join(bpDir, "cmd", "{{ .project_name }}"), 0o755))
+
+	registry := []byte(`apiVersion: v1
+name: "test"
+blueprints:
+  - name: go/api
+    path: go/api
+`)
+	require.NoError(t, os.WriteFile(filepath.Join(root, "registry.yaml"), registry, 0o644))
+
+	blueprint := []byte(`apiVersion: v1
+name: "go-api"
+version: "1.0.0"
+
+variables:
+  - name: project_name
+    type: string
+`)
+	require.NoError(t, os.WriteFile(filepath.Join(bpDir, "blueprint.yaml"), blueprint, 0o644))
+
+	mainTmpl := []byte("package main\n")
+	require.NoError(t, os.WriteFile(
+		filepath.Join(bpDir, "cmd", "{{ .project_name }}", "main.go.tmpl"),
+		mainTmpl, 0o644,
+	))
+
+	_, err := migratecmd.RunMigrate(&migratecmd.MigrateOpts{Path: root, Force: true})
+	require.NoError(t, err)
+
+	renamedPath := filepath.Join(bpDir, "cmd", "${project_name}", "main.go.tmpl")
+	assert.FileExists(t, renamedPath, "dotted-form directory should be renamed to ${name}")
+
+	_, err = os.Stat(filepath.Join(bpDir, "cmd", "{{ .project_name }}"))
+	assert.True(t, os.IsNotExist(err), "original dotted-form directory should be gone")
+}
+
 func TestRunMigrate_HappyPath(t *testing.T) {
 	t.Parallel()
 

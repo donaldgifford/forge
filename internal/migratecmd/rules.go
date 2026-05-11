@@ -36,6 +36,12 @@ import (
 // emits `${name}` from the resulting FieldNode.
 var pathShorthandPattern = regexp.MustCompile(`\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}`)
 
+// pathDottedPattern matches the v1 `{{ .name }}` dotted form used in path
+// segments (with optional whitespace). Used by the directory renamer so
+// authors who wrote `{{ .project_name }}` as a directory name get the same
+// `${name}` treatment as the shorthand form.
+var pathDottedPattern = regexp.MustCompile(`\{\{\s*\.([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}`)
+
 // knownFuncs declares the v1 forge custom functions plus stdlib
 // comparators so the parser doesn't reject sources that use them. The
 // function bodies don't matter — parse.Parse only checks that the names
