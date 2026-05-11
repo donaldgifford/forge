@@ -124,6 +124,7 @@ See `docs/impl/0002-mvp-cli-gap-closure.md` for the full history and rationale.
 - Tests use `testify` for assertions; test helpers must call `t.Helper()`
 - Mocks generated with `mockery`
 - `nolint` directives require both an explanation and a specific linter name
+- **gosec baseline:** 5 inline `//nolint:gosec` directives intentionally annotate correct-by-design CLI behaviour (file writes to user-chosen output dirs, `git` against user registry dirs, hook execution from `blueprint.yaml`). They live in `internal/create/create.go`, `internal/sync/overwrite.go`, `internal/hooks/hooks.go`, `internal/registrycmd/registrycmd.go`, `internal/registrycmd/update.go`. Don't remove without a real fix — gosec reports them as G703/G204.
 
 ## CI/CD
 
