@@ -32,6 +32,7 @@ upgrading from v1 should follow [docs/MIGRATION.md](../MIGRATION.md).
   - [blueprint.yaml Schema](#blueprintyaml-schema)
   - [Variables](#variables)
   - [Template Files](#template-files)
+    - [Why HCL2](#why-hcl2)
   - [Conditions](#conditions)
   - [Hooks](#hooks)
   - [Managed Files](#managed-files)
