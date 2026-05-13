@@ -563,13 +563,18 @@ swap scaffolding emitters to HCL.
     error text including the migrate command, the
     `docs/MIGRATION.md` pointer, and the `.hcl` sibling filename.
 
-- [ ] **C.8 Confirm `forge migrate templates` still works post-cutover.**
+- [x] **C.8 Confirm `forge migrate templates` still works post-cutover.**
   - The legacy v1→v2 template-content rewriter doesn't depend on
     config-file format. Confirm via a regression test that
     `forge migrate templates --path testdata/v1-registry` still
     produces a v2-shaped output (which then needs `forge migrate
     config` as a second pass — document this in the user-facing
     migration guide).
+  - Done: `TestRunMigrate_TwoStepEndToEnd` pins the full two-step
+    upgrade path against the v1-registry corpus. Runs templates
+    migrator → config migrator → `config.LoadBlueprint` /
+    `config.LoadRegistry` to prove the migrated tree is loadable
+    end-to-end. Doc updates for MIGRATION.md land in D.3.
 
 - [ ] **C.9 Update integration tests for HCL fixtures.**
   - Files:
