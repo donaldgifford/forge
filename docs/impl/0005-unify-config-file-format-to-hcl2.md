@@ -384,7 +384,7 @@ guards. Validate against the forge-registry corpus before shipping.
     boundary). User-level idempotence is enforced by the walker's
     OQ-5 collision check (covered in B.3 tests).
 
-- [ ] **B.7 Integration test against a frozen YAML fixture.**
+- [x] **B.7 Integration test against a frozen YAML fixture.**
   - File: `internal/migratecmd/config_integration_test.go`.
   - Snapshot the current `testdata/v2-registry/` into
     `testdata/v2-registry-yaml/` (read-only). The test copies it to
@@ -393,6 +393,12 @@ guards. Validate against the forge-registry corpus before shipping.
       decodes.
     - Runs `forge create` against the migrated tree and confirms the
       output matches the pre-migration baseline.
+  - Done: skipped the v2-registry-yaml snapshot — `testdata/v2-registry/`
+    is itself the read-only YAML corpus, copied per-test to a
+    `t.TempDir()` via the existing `copyTree` helper. Test migrates
+    all three .yaml files (registry + two blueprints), reloads each
+    via the HCL loader, then runs `create.Run()` against the migrated
+    tree to prove end-to-end equivalence with the pre-migration shape.
 
 - [ ] **B.8 Manual verification against forge-registry.**
   - Clone the forge-registry repo into a scratch dir.
