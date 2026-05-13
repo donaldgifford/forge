@@ -621,7 +621,7 @@ open the fresh forge-registry migration PR.
 
 #### Tasks
 
-- [ ] **D.1 Rewrite DESIGN-0001 examples in HCL.**
+- [x] **D.1 Rewrite DESIGN-0001 examples in HCL.**
   - File: `docs/design/0001-blueprint-authoring.md`.
   - Replace every `blueprint.yaml` code block with the HCL equivalent.
   - Update the "schema" table to reflect dropped `apiVersion` and
