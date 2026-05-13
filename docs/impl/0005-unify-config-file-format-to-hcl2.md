@@ -112,13 +112,16 @@ the load error in Phase C).
 
 #### Tasks
 
-- [ ] **A.1 Document the HCL decoding approach.**
+- [x] **A.1 Document the HCL decoding approach.**
   - Decision (per Resolved Questions OQ-1): `hcldec.ObjectSpec`. Keeps
     the existing struct definitions intact (no dual yaml/hcl tags) and
     gives precise diagnostics with file/line/col.
   - Document the choice as a one-paragraph note at the top of the new
     loader file (`internal/config/loader_hcl.go`) so a future
     contributor doesn't relitigate.
+  - Done: `internal/config/loader_hcl.go` created with the decision
+    rationale at the top and stub `LoadBlueprintHCL` / `LoadRegistryHCL`
+    signatures returning `errHCLNotImplemented`. A.3 fills these in.
 
 - [ ] **A.2 Define `Blueprint` and `Registry` HCL schemas.**
   - File: `internal/config/hcldec_spec.go` (new).
