@@ -505,7 +505,7 @@ swap scaffolding emitters to HCL.
     after scaffold-template emit catches any malformed templates
     before the user does.
 
-- [ ] **C.4 Migrate `testdata/` fixtures.**
+- [x] **C.4 Migrate `testdata/` fixtures.**
   - Run `forge migrate config --path testdata/registry` and `--path
     testdata/v2-registry` against the in-tree binary built from
     Phase B.
@@ -516,6 +516,14 @@ swap scaffolding emitters to HCL.
     OQ-6) — it remains the v1→v2 template-migration corpus, two
     migration steps behind current.
   - Update every test that references the old paths.
+  - Done: testdata/registry/ and testdata/v2-registry/ both contain
+    only HCL configs now. testdata/v2-yaml-registry/ holds the
+    pre-cutover YAML snapshot for the migration-tool integration
+    test. Updated `internal/defaults/resolver.go` to skip
+    `blueprint.hcl` (was `blueprint.yaml`) and pointed
+    `TestMigrateConfig_FullV2Registry` at the new YAML snapshot.
+    Most other integration tests went green automatically via the
+    dispatcher's transparent .yaml→.hcl sibling upgrade.
 
 - [x] **C.5 Delete the YAML loaders.**
   - File: `internal/config/loader.go` — remove
