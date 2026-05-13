@@ -172,3 +172,63 @@ name: "x"
 		"apiVersion should be dropped on HCL emit")
 	assert.NotContains(t, string(hclBytes), "api_version")
 }
+
+// TestRewriteBlueprintYAMLToHCL_MinimalInput exercises the smallest
+// valid blueprint: a name and nothing else. Confirms the rewriter
+// doesn't crash on empty defaults/variables/conditions and produces
+// loadable HCL.
+func TestRewriteBlueprintYAMLToHCL_MinimalInput(t *testing.T) {
+	t.Parallel()
+
+	src := []byte(`
+apiVersion: v2
+name: "minimal"
+`)
+
+	hclBytes, err := migratecmd.RewriteBlueprintYAMLToHCL(src)
+	require.NoError(t, err)
+
+	dir := t.TempDir()
+	hclPath := filepath.Join(dir, "blueprint.hcl")
+	require.NoError(t, os.WriteFile(hclPath, hclBytes, 0o600))
+
+	bp, err := config.LoadBlueprintHCL(hclPath)
+	require.NoError(t, err, "minimal HCL output should still load: %s", hclBytes)
+	assert.Equal(t, "minimal", bp.Name)
+	assert.Empty(t, bp.Variables)
+	assert.Empty(t, bp.Conditions)
+}
+
+// TestRewriteBlueprintYAMLToHCL_RejectsHCLInput verifies the rewriter
+// fails (rather than silently misinterpreting) when fed an HCL byte
+// slice instead of YAML. The walker's collision check covers the
+// user-level idempotence story, but the rewriter itself shouldn't try
+// to parse HCL as YAML.
+func TestRewriteBlueprintYAMLToHCL_RejectsHCLInput(t *testing.T) {
+	t.Parallel()
+
+	hclSrc := []byte(`
+name = "x"
+
+variable "foo" {
+  type = "string"
+}
+`)
+
+	// gopkg.in/yaml.v3 parses bare-word HCL surprisingly leniently —
+	// the test must accept either an explicit error or a result that
+	// fails to round-trip. We check the latter: if no error, the result
+	// must not load as a valid blueprint.
+	out, err := migratecmd.RewriteBlueprintYAMLToHCL(hclSrc)
+	if err != nil {
+		return
+	}
+
+	dir := t.TempDir()
+	hclPath := filepath.Join(dir, "blueprint.hcl")
+	require.NoError(t, os.WriteFile(hclPath, out, 0o600))
+
+	if _, loadErr := config.LoadBlueprintHCL(hclPath); loadErr == nil {
+		t.Errorf("expected HCL input to fail rewrite or fail re-load, got valid output: %s", out)
+	}
+}

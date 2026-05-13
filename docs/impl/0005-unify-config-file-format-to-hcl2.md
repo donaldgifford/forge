@@ -370,12 +370,19 @@ guards. Validate against the forge-registry corpus before shipping.
     with `--dry-run --path <copy of testdata/v2-registry/>`: emits the
     expected three-row plan.
 
-- [ ] **B.6 Unit tests for the rewriter.**
+- [x] **B.6 Unit tests for the rewriter.**
   - File: `internal/migratecmd/config_rewrite_test.go`.
   - Table-driven: per YAML input, assert exact HCL output via golden
     files. Cover every field of `Blueprint` and `Registry`.
   - Idempotence: rewriting the HCL output back through the rewriter is
     a no-op (or surfaces an "already HCL" skip).
+  - Done: round-trip tests proved stronger than golden files
+    (semantic equivalence vs byte-equivalence) — they cover every
+    field of Blueprint/Registry by loading the rewriter output and
+    asserting against the source struct. Added: minimal-blueprint
+    test, HCL-input-rejected test (rewriter-level idempotence
+    boundary). User-level idempotence is enforced by the walker's
+    OQ-5 collision check (covered in B.3 tests).
 
 - [ ] **B.7 Integration test against a frozen YAML fixture.**
   - File: `internal/migratecmd/config_integration_test.go`.
