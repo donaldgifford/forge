@@ -400,7 +400,7 @@ guards. Validate against the forge-registry corpus before shipping.
     via the HCL loader, then runs `create.Run()` against the migrated
     tree to prove end-to-end equivalence with the pre-migration shape.
 
-- [ ] **B.8 Manual verification against forge-registry.**
+- [x] **B.8 Manual verification against forge-registry.**
   - Clone the forge-registry repo into a scratch dir.
   - Run `forge migrate config --path <forge-registry> --dry-run
     --strict`. Review the summary.
@@ -409,6 +409,14 @@ guards. Validate against the forge-registry corpus before shipping.
   - Hold off on opening a PR against forge-registry until v0.4.0 ships
     (per DESIGN-0004: PR #5 will be closed and a fresh PR opened
     post-release).
+  - Done: dry-run against `~/code/forge-registry` planned 7 file
+    rewrites (registry.yaml + 6 blueprint.yaml across go/, rust/, std/
+    categories) with zero surprises. Real migration produced 7
+    cleanly-loading .hcl files. `forge info <migrated path>` reads
+    via the dispatcher and renders the blueprint metadata correctly,
+    proving the full HCL-loader → renderer chain works against the
+    real downstream corpus. Fresh PR will be opened against
+    forge-registry after the v0.4.0 cut (deferred to D.6).
 
 #### Success Criteria
 
