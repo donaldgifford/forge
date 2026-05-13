@@ -46,7 +46,7 @@ func TestRunBlueprint_BasicScaffold(t *testing.T) {
 	assert.NotNil(t, result)
 
 	// Verify blueprint.yaml exists and is valid.
-	bp, err := config.LoadBlueprint(result.BlueprintYAML)
+	bp, err := config.LoadBlueprint(result.BlueprintHCL)
 	require.NoError(t, err)
 	assert.Equal(t, "go-grpc-service", bp.Name)
 	assert.Equal(t, "0.1.0", bp.Version)
@@ -65,8 +65,7 @@ func TestRunBlueprint_BasicScaffold(t *testing.T) {
 	// Verify category _defaults/.gitkeep exists.
 	assert.FileExists(t, filepath.Join(regDir, "go", "_defaults", ".gitkeep"))
 
-	// Verify registry.yaml updated with new entry.
-	reg, err := config.LoadRegistry(filepath.Join(regDir, "registry.yaml"))
+	reg, err := config.LoadRegistry(filepath.Join(regDir, "registry.hcl"))
 	require.NoError(t, err)
 
 	var found bool
@@ -79,7 +78,7 @@ func TestRunBlueprint_BasicScaffold(t *testing.T) {
 		}
 	}
 
-	assert.True(t, found, "blueprint entry should be in registry.yaml")
+	assert.True(t, found, "blueprint entry should be in registry.hcl")
 }
 
 func TestRunBlueprint_CustomTagsAndDescription(t *testing.T) {
@@ -98,12 +97,12 @@ func TestRunBlueprint_CustomTagsAndDescription(t *testing.T) {
 	result, err := registrycmd.RunBlueprint(opts)
 	require.NoError(t, err)
 
-	bp, err := config.LoadBlueprint(result.BlueprintYAML)
+	bp, err := config.LoadBlueprint(result.BlueprintHCL)
 	require.NoError(t, err)
 	assert.Equal(t, "A custom Go API blueprint", bp.Description)
 	assert.Equal(t, []string{"go", "api", "http"}, bp.Tags)
 
-	reg, err := config.LoadRegistry(filepath.Join(regDir, "registry.yaml"))
+	reg, err := config.LoadRegistry(filepath.Join(regDir, "registry.hcl"))
 	require.NoError(t, err)
 	require.NotEmpty(t, reg.Blueprints)
 
@@ -143,7 +142,7 @@ func TestRunBlueprint_MissingRegistry(t *testing.T) {
 
 	_, err := registrycmd.RunBlueprint(opts)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "registry.yaml not found")
+	assert.Contains(t, err.Error(), "registry.hcl not found")
 }
 
 func TestRunBlueprint_MissingCategoryOrName(t *testing.T) {

@@ -66,7 +66,7 @@ func runRegistryBlueprint(_ *cobra.Command, args []string) error {
 	}
 
 	w.Successf("Blueprint scaffolded at %s", result.BlueprintDir)
-	w.Infof("Edit %s to customize your blueprint", result.BlueprintYAML)
+	w.Infof("Edit %s to customize your blueprint", result.BlueprintHCL)
 	w.Infof("Run: forge registry update --registry-dir %s", regBlueprintRegistryDir)
 
 	return nil
