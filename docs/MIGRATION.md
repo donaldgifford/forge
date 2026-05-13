@@ -156,6 +156,40 @@ v2:
 direct HCL equivalent. Inline the helper, or split it into a
 separate file and reference it from blueprint hooks.
 
+#### Literal `${...}` for downstream tools (goreleaser, shell, etc.)
+
+A few downstream consumers use `${name}` as their own variable
+syntax — goreleaser, GitHub Actions expressions, shell parameter
+expansion. v1 forge ignored these (only `{{ }}` was the
+substitution syntax). Under v2, HCL2 treats every `${...}` as
+substitution, so unescaped occurrences fail strict-vars
+validation:
+
+```text
+Error: rendering template ".goreleaser.yml.tmpl":
+  Unknown variable; There is no variable named "signature".
+```
+
+The migration tool does not rewrite these because the choice
+between *"this is a forge variable I forgot to declare"* and
+*"this is a downstream variable that should be a literal"* is
+domain-specific. The fix is to escape with `$$`:
+
+```text
+v1 (no escape needed — forge ignored ${} ):
+  - "${signature}"
+  - "${artifact}"
+
+v2 (escape so HCL2 emits a literal `${...}` ):
+  - "$${signature}"
+  - "$${artifact}"
+```
+
+Same rule applies to GitHub Actions templates (`$${{ secrets.X }}`)
+and shell scripts with parameter expansion. Audit any `.tmpl`
+file that mixes forge variables with downstream `${...}` syntax
+after running `forge migrate templates`.
+
 #### Three-or-more-arg pipes
 
 ```text

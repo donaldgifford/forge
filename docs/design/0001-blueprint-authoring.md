@@ -240,6 +240,31 @@ the renderer untouched. See
 [ADR-0001](../adr/0001-use-hcl2-as-the-template-engine.md) for the
 full rationale.
 
+#### Emitting literal `${...}` for downstream tools
+
+A few downstreams (goreleaser, GitHub Actions expression syntax,
+shell parameter expansion) do use `${name}`. Inside a `.tmpl`
+file, escape these as `$${name}` — HCL2 collapses `$$` to a
+literal `$` on render, so the output contains the bare `${name}`
+that the downstream consumer expects. Example from a goreleaser
+config that needs forge variables *and* goreleaser variables in
+the same file:
+
+```text
+release:
+  github:
+    owner: ${project_owner}      # forge variable — interpolated
+    name:  ${project_name}       # forge variable — interpolated
+signs:
+  - args:
+      - "--output"
+      - "$${signature}"          # goreleaser variable — literal ${signature}
+      - "$${artifact}"           # goreleaser variable — literal ${artifact}
+```
+
+Forge's strict-vars renderer will fail loudly if you forget the
+escape: `Unknown variable; There is no variable named "signature"`.
+
 ### Conditions
 
 Conditions allow excluding files based on variable values:
