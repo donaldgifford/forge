@@ -4,7 +4,7 @@ title: "Blueprint Authoring"
 status: Implemented
 author: Donald Gifford
 created: 2026-05-07
-updated: 2026-05-08
+updated: 2026-05-13
 ---
 <!-- markdownlint-disable-file MD025 MD041 -->
 
@@ -13,13 +13,16 @@ updated: 2026-05-08
 **Status:** Implemented
 **Author:** Donald Gifford
 **Date:** 2026-05-07
-**Last revised:** 2026-05-08 — rewritten for `apiVersion: v2` (HCL2).
-The original Go `text/template`-based contract is preserved for
-historical reference in
+**Last revised:** 2026-05-13 — config files moved from YAML to HCL
+per [DESIGN-0004](0004-unify-config-file-format-after-hcl2-cutover.md).
+The `apiVersion` field is gone; the file extension is now the version
+signal. The original Go `text/template`-based contract is preserved
+for historical reference in
 [DESIGN-0003](0003-migrate-template-engine-to-hcl2.md). The decision
 record for the engine swap is
 [ADR-0001](../adr/0001-use-hcl2-as-the-template-engine.md). Authors
-upgrading from v1 should follow [docs/MIGRATION.md](../MIGRATION.md).
+upgrading from v0.2.x or v0.3.x should follow
+[docs/MIGRATION.md](../MIGRATION.md).
 
 <!--toc:start-->
 - [Overview](#overview)
@@ -29,9 +32,10 @@ upgrading from v1 should follow [docs/MIGRATION.md](../MIGRATION.md).
 - [Background](#background)
 - [Detailed Design](#detailed-design)
   - [Directory Structure](#directory-structure)
-  - [blueprint.yaml Schema](#blueprintyaml-schema)
+  - [blueprint.hcl Schema](#blueprinthcl-schema)
   - [Variables](#variables)
   - [Template Files](#template-files)
+    - [Why HCL2](#why-hcl2)
   - [Conditions](#conditions)
   - [Hooks](#hooks)
   - [Managed Files](#managed-files)
@@ -46,22 +50,22 @@ upgrading from v1 should follow [docs/MIGRATION.md](../MIGRATION.md).
 ## Overview
 
 This document specifies the contract for authoring a forge blueprint:
-the directory layout, the `blueprint.yaml` schema, variable types,
+the directory layout, the `blueprint.hcl` schema, variable types,
 conditions, hooks, and managed-file/sync behavior. It is the
 reference for anyone publishing or maintaining a blueprint inside a
 forge registry.
 
-The current contract is **`apiVersion: v2`**, backed by HCL2
-(`hashicorp/hcl/v2`). The v1 (`text/template`) contract is no longer
-accepted — load-time validation rejects v1 blueprints with a pointer
-to the migration tool.
+The current contract is **`blueprint.hcl`** — HCL2
+(`hashicorp/hcl/v2`) for both config files and templates. Older
+formats (`apiVersion: v1` text/template, `apiVersion: v2` YAML
+configs) are no longer accepted — load-time validation rejects them
+with a pointer to the migration tools.
 
 ## Goals and Non-Goals
 
 ### Goals
 
-- Define a single, versioned schema (`apiVersion: v2`) for
-  `blueprint.yaml`.
+- Define the single accepted schema for `blueprint.hcl`.
 - Specify the runtime semantics of variables, conditions, hooks, and
   sync strategies under HCL2 templating.
 - Document the file layout convention (`.tmpl` extension, templated
@@ -77,7 +81,7 @@ to the migration tool.
 
 ## Background
 
-A blueprint is a project template that consists of a `blueprint.yaml`
+A blueprint is a project template that consists of a `blueprint.hcl`
 configuration file and a directory of template files. Blueprints
 live inside a registry (see DESIGN-0002) and inherit shared files
 from `_defaults/` directories at the registry-root and category
@@ -89,7 +93,7 @@ levels.
 
 ```
 my-blueprint/
-  blueprint.yaml             # Blueprint configuration
+  blueprint.hcl              # Blueprint configuration
   ${project_name}/           # Templated directory name
     go.mod.tmpl              # Templated file (.tmpl extension)
     cmd/main.go.tmpl
@@ -106,65 +110,72 @@ Directory and file names support `${project_name}`-style
 interpolation — e.g., `${project_name}/cmd/main.go.tmpl` renders to
 `my-api/cmd/main.go` once `project_name = "my-api"` is bound.
 
-### `blueprint.yaml` Schema
+### `blueprint.hcl` Schema
 
-```yaml
-apiVersion: v2
-name: my-blueprint
-description: A starter project
-version: 1.0.0
-tags:
-  - go
-  - api
+```hcl
+name        = "my-blueprint"
+description = "A starter project"
+version     = "1.0.0"
+tags        = ["go", "api"]
 
-variables:
-  - name: project_name
-    type: string
-    description: Name of the project
-    required: true
-    validate: "^[a-z][a-z0-9-]*$"
-  - name: go_module
-    type: string
-    description: Go module path
-    default: "github.com/example/${project_name}"
-  - name: use_docker
-    type: bool
-    default: "true"
-    description: Include Docker support
-  - name: license
-    type: choice
-    choices:
-      - MIT
-      - Apache-2.0
-      - BSD-3-Clause
-    default: MIT
+variable "project_name" {
+  type        = "string"
+  description = "Name of the project"
+  required    = true
+  validate    = "^[a-z][a-z0-9-]*$"
+}
 
-defaults:
-  exclude:
-    - ".github/CODEOWNERS"
-  override_strategy:
-    ".golangci.yml": overwrite
+variable "go_module" {
+  type        = "string"
+  description = "Go module path"
+  default     = "github.com/example/${project_name}"
+}
 
-conditions:
-  - when: 'license == "none"'
-    exclude:
-      - LICENSE*
+variable "use_docker" {
+  type        = "bool"
+  default     = "true"
+  description = "Include Docker support"
+}
 
-hooks:
-  post_create:
-    - "go mod tidy"
-    - "git init"
+variable "license" {
+  type    = "choice"
+  choices = ["MIT", "Apache-2.0", "BSD-3-Clause"]
+  default = "MIT"
+}
 
-sync:
-  managed_files:
-    - path: Makefile
-      strategy: merge
-  ignore:
-    - "*.local"
+defaults {
+  exclude           = [".github/CODEOWNERS"]
+  override_strategy = { ".golangci.yml" = "overwrite" }
+}
 
-rename:
-  "${project_name}/": "."
+condition {
+  when    = license == "none"
+  exclude = ["LICENSE*"]
+}
+
+hooks {
+  post_create = ["go mod tidy", "git init"]
+}
+
+sync {
+  ignore = ["*.local"]
+
+  managed_file "Makefile" {
+    strategy = "merge"
+  }
+}
+
+rename {
+  entry {
+    from = "${project_name}/"
+    to   = "."
+  }
+}
 ```
+
+There is no `apiVersion` field. The file extension (`.hcl` vs the
+legacy `.yaml`) is the version signal — see
+[DESIGN-0004](0004-unify-config-file-format-after-hcl2-cutover.md).
 
 ### Variables
 
@@ -233,35 +244,34 @@ full rationale.
 
 Conditions allow excluding files based on variable values:
 
-```yaml
-conditions:
-  - when: '!use_docker'
-    exclude:
-      - Dockerfile
-      - docker-compose.yml
-      - .dockerignore
+```hcl
+condition {
+  when    = !use_docker
+  exclude = ["Dockerfile", "docker-compose.yml", ".dockerignore"]
+}
 ```
 
-The `when` field is a **bare HCL expression** that must evaluate to
-a `bool`. Examples:
+The `when` attribute is an **HCL expression** that must evaluate to
+a `bool`. It's parsed at load time, so syntax errors surface with
+file/line/column at `forge create` startup rather than on first
+evaluation. Examples:
 
 - `!use_docker`
 - `license == "none"`
 - `replicas > 1`
 - `project_name != ""`
 
-The `exclude` patterns support globs and directory prefixes.
+The `exclude` patterns support globs and directory prefixes. Multiple
+`condition { ... }` blocks are allowed.
 
 ### Hooks
 
 Post-create hooks run after all files are written:
 
-```yaml
-hooks:
-  post_create:
-    - "go mod tidy"
-    - "git init"
-    - "git add -A"
+```hcl
+hooks {
+  post_create = ["go mod tidy", "git init", "git add -A"]
+}
 ```
 
 Hooks run in the project directory. If a hook fails, the project
@@ -287,51 +297,61 @@ the full inheritance chain.
 ## API / Interface Changes
 
 This document specifies the user-facing authoring contract. Changes
-to the schema require an `apiVersion` bump and a migration plan.
-The most recent bump (v1 → v2) is documented in
-[DESIGN-0003](0003-migrate-template-engine-to-hcl2.md).
+to the schema require a file-format bump and a migration plan. The
+most recent bumps were the v1 → v2 template-engine swap (DESIGN-0003)
+and the v2 YAML → HCL config-file move
+([DESIGN-0004](0004-unify-config-file-format-after-hcl2-cutover.md)).
 
 ## Data Model
 
-The on-disk schema is YAML, parsed by `gopkg.in/yaml.v3`. Go struct
+The on-disk schema is HCL, parsed by `hashicorp/hcl/v2/hcldec` against
+declarative specs in `internal/config/hcldec_spec.go`. Go struct
 definitions live in `internal/config/blueprint.go` (`Blueprint`,
-`Variable`, `Condition`, `Hook`, `SyncManifest`, etc.).
+`Variable`, `Condition`, `Hooks`, `SyncConfig`, etc.) and carry no
+encoding-specific tags.
+
+`Condition.When` is an `hcl.Expression` parsed at load time so syntax
+errors surface with source location at `LoadBlueprint` time rather
+than on first evaluation. The original source text is retained on
+`Condition.WhenSource` for diagnostics and migrate-config round-trip.
 
 In-memory variable values are typed as `cty.Value` (from
-`zclconf/go-cty`). Conversion between the YAML scalars on disk and
-the cty representation in memory happens in
+`zclconf/go-cty`). Conversion between the lockfile YAML scalars on
+disk and the cty representation in memory happens in
 `internal/lockfile/cty.go` using the declared variable types as the
 source of truth.
 
 ## Testing Strategy
 
-- Unit tests over the YAML loader
-  (`internal/config/loader_test.go`) with fixtures in
-  `testdata/registry/go/api/blueprint.yaml`.
-- Integration tests of `forge create` end-to-end (see
-  `internal/create/cli_integration_test.go`).
+- Unit tests over the HCL loader
+  (`internal/config/loader_hcl_test.go`) with the hermetic fixture
+  in `testdata/hcl-registry/`.
+- Integration tests of `forge create` end-to-end against
+  `testdata/registry/` and `testdata/v2-registry/` (HCL).
 - Schema validation tests cover required fields, allowed variable
-  types, regex compilability for `validate`, and the v1-rejection
-  path (`TestLoadBlueprint_RejectsV1Fixture`).
+  types, regex compilability for `validate`, and the YAML-rejection
+  path (`TestLoadBlueprint_RejectsBareYAML`,
+  `TestLoadBlueprint_RejectsV1Fixture`).
 
 ## Migration / Rollout Plan
 
-The schema is versioned via `apiVersion`. The current accepted
-version is **v2**. Existing v1 blueprints must be migrated using
-`forge migrate templates --path <registry>` — see
-[docs/MIGRATION.md](../MIGRATION.md).
+The schema is versioned via the file extension. The current accepted
+file is `blueprint.hcl`. Migration paths:
 
-Future schema bumps will follow the same pattern: a `forge migrate
-…` subcommand, a load-time error pointing at the migration command
-and the migration guide, and a frozen pre-bump fixture in
-`testdata/` so the rejection path stays under test.
+- v0.3.x (v2 YAML) → v0.4.x (HCL): `forge migrate config --path <registry>`
+- v0.2.x (v1 text/template) → v0.4.x (HCL): two steps —
+  `forge migrate templates` then `forge migrate config`.
+
+Both are documented in [docs/MIGRATION.md](../MIGRATION.md).
 
 ## References
 
 - [RFC-0001 — Forge: Project Scaffolding CLI](../rfc/0001-forge-project-scaffolding-cli.md)
 - [DESIGN-0002 — Registry Layout & Defaults Inheritance](0002-registry-layout-and-defaults-inheritance.md)
 - [DESIGN-0003 — Migrate template engine to HCL2](0003-migrate-template-engine-to-hcl2.md)
+- [DESIGN-0004 — Unify Config File Format After HCL2 Cutover](0004-unify-config-file-format-after-hcl2-cutover.md)
 - [ADR-0001 — Use HCL2 as the template engine](../adr/0001-use-hcl2-as-the-template-engine.md)
-- [docs/MIGRATION.md](../MIGRATION.md) — v1 → v2 migration guide.
+- [docs/MIGRATION.md](../MIGRATION.md) — v0.2.x/v0.3.x → v0.4.x migration guides.
 - `internal/config/blueprint.go` — Go struct definitions.
+- `internal/config/hcldec_spec.go` — HCL decoding schemas.
 - `internal/template/` — template rendering.

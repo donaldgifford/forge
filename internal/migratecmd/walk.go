@@ -34,15 +34,10 @@ func runMigrate(opts *MigrateOpts) (*MigrateResult, error) {
 
 	result := &MigrateResult{}
 
-	// 1. Bump registry.yaml apiVersion if present (per OQ-5).
-	registryPath := filepath.Join(abs, registryFileName)
-	if _, statErr := os.Stat(registryPath); statErr == nil {
-		if err := bumpRegistryAPIVersion(registryPath, opts.DryRun); err != nil {
-			return nil, fmt.Errorf("bumping registry.yaml: %w", err)
-		}
-	}
-
-	// 2. Discover and migrate every blueprint under root.
+	// Discover and migrate every blueprint under root. Per IMPL-0005
+	// OQ-4, registry.yaml/blueprint.yaml apiVersion bumping is gone —
+	// the field is meaningless to the loader (which rejects YAML
+	// outright now), and migrate config drops it on emit anyway.
 	blueprints, err := walkBlueprints(abs)
 	if err != nil {
 		return nil, fmt.Errorf("walking blueprints: %w", err)
@@ -237,11 +232,11 @@ func renamePathShorthandDirs(root string, dryRun bool) ([]string, error) {
 }
 
 // migrateBlueprint runs the migration for one blueprint directory:
-//  1. Read blueprint.yaml; if apiVersion is already v2, return AlreadyV2.
+//  1. Read blueprint.yaml; if apiVersion is already v2, return AlreadyV2
+//     (the field still serves as an idempotence signal for re-runs of
+//     the templates migrator, even though the loader no longer reads it).
 //  2. Rewrite expression fields (variable.default, condition.when, rename).
 //  3. Rewrite all .tmpl files under the directory.
-//  4. Bump apiVersion v1 → v2 (last so a mid-run failure doesn't claim
-//     v2 on a partially converted blueprint).
 func migrateBlueprint(dir string, dryRun bool) (*BlueprintReport, error) {
 	report := &BlueprintReport{Path: dir}
 	bpPath := filepath.Join(dir, blueprintFileName)
@@ -354,9 +349,11 @@ func readAPIVersion(data []byte) string {
 	return probe.APIVersion
 }
 
-// rewriteBlueprintYAML walks the blueprint.yaml node tree, rewrites the
-// string fields that hold v1 template expressions (variable.default,
-// condition.when, rename keys+values), and bumps apiVersion to v2.
+// rewriteBlueprintYAML walks the blueprint.yaml node tree and rewrites
+// the string fields that hold v1 template expressions
+// (variable.default, condition.when, rename keys+values). Per IMPL-0005
+// OQ-4 the apiVersion field is left untouched — it's meaningless to the
+// loader and `forge migrate config` drops it on emit.
 //
 // Uses yaml.Node to preserve structure and comments. Untranslated hits
 // from expression-field rewrites are surfaced so the summary table
@@ -373,10 +370,6 @@ func rewriteBlueprintYAML(path string, data []byte) ([]byte, []UntranslatedHit, 
 	}
 
 	var hits []UntranslatedHit
-
-	rewriteScalar(root, "apiVersion", func(_ string) (string, []UntranslatedHit, error) {
-		return apiVersionV2, nil, nil
-	})
 
 	rewriteVariableDefaults(root, path, &hits)
 	rewriteConditionWhens(root, path, &hits)
@@ -414,24 +407,6 @@ func findMappingValue(m *yaml.Node, key string) *yaml.Node {
 	}
 
 	return nil
-}
-
-// rewriteScalar replaces the value of a scalar field inside a mapping
-// using the given transform. The transform may surface UntranslatedHits;
-// they are returned via the *[]UntranslatedHit caller.
-func rewriteScalar(m *yaml.Node, key string, transform func(string) (string, []UntranslatedHit, error)) {
-	v := findMappingValue(m, key)
-	if v == nil || v.Kind != yaml.ScalarNode {
-		return
-	}
-
-	out, _, err := transform(v.Value)
-	if err != nil {
-		return
-	}
-
-	v.Value = out
-	v.Style = 0
 }
 
 func rewriteVariableDefaults(root *yaml.Node, fileName string, hits *[]UntranslatedHit) {
@@ -513,40 +488,4 @@ func rewriteRenameMap(root *yaml.Node, fileName string, hits *[]UntranslatedHit)
 			}
 		}
 	}
-}
-
-// bumpRegistryAPIVersion rewrites registry.yaml's apiVersion from v1 to v2
-// in place. registry.yaml has no expression fields so only the version
-// literal changes.
-func bumpRegistryAPIVersion(path string, dryRun bool) error {
-	data, err := os.ReadFile(filepath.Clean(path))
-	if err != nil {
-		return err
-	}
-
-	if readAPIVersion(data) == apiVersionV2 {
-		return nil
-	}
-
-	var doc yaml.Node
-	if err := yaml.Unmarshal(data, &doc); err != nil {
-		return fmt.Errorf("parsing yaml: %w", err)
-	}
-
-	root := documentRoot(&doc)
-
-	rewriteScalar(root, "apiVersion", func(_ string) (string, []UntranslatedHit, error) {
-		return apiVersionV2, nil, nil
-	})
-
-	if dryRun {
-		return nil
-	}
-
-	out, err := yaml.Marshal(&doc)
-	if err != nil {
-		return fmt.Errorf("marshalling yaml: %w", err)
-	}
-
-	return os.WriteFile(path, out, 0o644)
 }

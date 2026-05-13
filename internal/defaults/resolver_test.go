@@ -76,15 +76,14 @@ func TestResolve_BlueprintFiles(t *testing.T) {
 	assert.True(t, entry.IsTemplate)
 }
 
-func TestResolve_ExcludesBluerintYAML(t *testing.T) {
+func TestResolve_ExcludesBlueprintHCL(t *testing.T) {
 	t.Parallel()
 
 	fs, err := defaults.Resolve(testRegistryRoot, "go/api", nil)
 	require.NoError(t, err)
 
-	// blueprint.yaml should not be in the output file set
-	entry := fs.Get("blueprint.yaml")
-	assert.Nil(t, entry, "blueprint.yaml should be excluded from file set")
+	entry := fs.Get("blueprint.hcl")
+	assert.Nil(t, entry, "blueprint.hcl should be excluded from file set")
 }
 
 func TestResolve_AppliesExclusions(t *testing.T) {

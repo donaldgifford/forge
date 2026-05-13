@@ -36,7 +36,7 @@ func evaluateCondition(
 	vars map[string]cty.Value,
 	fileSet *defaults.FileSet,
 ) error {
-	active, err := renderer.EvaluateBool(cond.When, vars)
+	active, err := renderer.EvaluateBoolExpr(cond.When, vars)
 	if err != nil {
 		return err
 	}

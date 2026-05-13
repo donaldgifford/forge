@@ -16,9 +16,9 @@ var (
 
 var registryUpdateCmd = &cobra.Command{
 	Use:   "update",
-	Short: "Update blueprint metadata in registry.yaml",
-	Long: `Walk all blueprints in a registry, compare blueprint.yaml versions and
-git commit hashes against registry.yaml entries, and update stale metadata.
+	Short: "Update blueprint metadata in registry.hcl",
+	Long: `Walk all blueprints in a registry, compare blueprint.hcl versions and
+git commit hashes against registry.hcl entries, and update stale metadata.
 
 Use --check for CI mode: reports stale entries and exits non-zero without
 modifying any files.`,
@@ -72,7 +72,7 @@ func runRegistryUpdate(_ *cobra.Command, _ []string) error {
 	}
 
 	if result.Updated > 0 {
-		w.Successf("Updated registry.yaml (%d blueprint(s) updated)", result.Updated)
+		w.Successf("Updated registry.hcl (%d blueprint(s) updated)", result.Updated)
 	} else {
 		w.Info("All blueprints up to date")
 	}

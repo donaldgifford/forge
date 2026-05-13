@@ -174,7 +174,7 @@ func resolveAndLoad(opts *Opts) (*registry.ResolvedBlueprint, *config.Blueprint,
 		return nil, nil, err
 	}
 
-	bpPath := filepath.Join(registryDir, resolved.BlueprintPath, "blueprint.yaml")
+	bpPath := filepath.Join(registryDir, resolved.BlueprintPath, "blueprint.hcl")
 
 	bp, err := config.LoadBlueprint(bpPath)
 	if err != nil {

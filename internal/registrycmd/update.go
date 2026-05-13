@@ -1,6 +1,7 @@
 package registrycmd
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -8,30 +9,28 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gopkg.in/yaml.v3"
-
 	"github.com/donaldgifford/forge/internal/config"
 )
 
-// BlueprintStatus represents the sync state of a blueprint entry in registry.yaml.
+// BlueprintStatus represents the sync state of a blueprint entry in registry.hcl.
 type BlueprintStatus string
 
 const (
 	// StatusUpToDate means the registry entry matches the blueprint and git state.
 	StatusUpToDate BlueprintStatus = "up-to-date"
-	// StatusVersionChanged means the blueprint.yaml version differs from registry.yaml.
+	// StatusVersionChanged means the blueprint.hcl version differs from registry.hcl.
 	StatusVersionChanged BlueprintStatus = "version-changed"
 	// StatusFilesChanged means the git commit differs but the version is unchanged.
 	StatusFilesChanged BlueprintStatus = "files-changed"
 	// StatusBothChanged means both version and git commit differ.
 	StatusBothChanged BlueprintStatus = "both-changed"
-	// StatusMissing means the blueprint path in registry.yaml does not exist on disk.
+	// StatusMissing means the blueprint path in registry.hcl does not exist on disk.
 	StatusMissing BlueprintStatus = "missing"
 )
 
 // UpdateOpts configures the registry update operation.
 type UpdateOpts struct {
-	// RegistryDir is the registry root directory (must contain registry.yaml).
+	// RegistryDir is the registry root directory (must contain registry.hcl).
 	RegistryDir string
 	// Check enables check-only mode: no files are written, exit 1 if stale.
 	Check bool
@@ -43,11 +42,11 @@ type BlueprintReport struct {
 	Path string
 	// Status is the detected sync state.
 	Status BlueprintStatus
-	// RegistryVersion is the version currently in registry.yaml.
+	// RegistryVersion is the version currently in registry.hcl.
 	RegistryVersion string
-	// BlueprintVersion is the version currently in blueprint.yaml.
+	// BlueprintVersion is the version currently in blueprint.hcl.
 	BlueprintVersion string
-	// RegistryCommit is the commit hash currently in registry.yaml.
+	// RegistryCommit is the commit hash currently in registry.hcl.
 	RegistryCommit string
 	// LatestCommit is the actual latest git commit for the blueprint path.
 	LatestCommit string
@@ -64,7 +63,7 @@ type UpdateResult struct {
 }
 
 // RunUpdate walks all blueprints in a registry, detects metadata drift,
-// and updates registry.yaml (unless in check mode).
+// and updates registry.hcl (unless in check mode).
 func RunUpdate(opts *UpdateOpts) (*UpdateResult, error) {
 	if opts.RegistryDir == "" {
 		return nil, fmt.Errorf("registry directory is required")
@@ -75,18 +74,18 @@ func RunUpdate(opts *UpdateOpts) (*UpdateResult, error) {
 		return nil, fmt.Errorf("resolving registry path %s: %w", opts.RegistryDir, err)
 	}
 
-	registryYAML := filepath.Join(registryDir, "registry.yaml")
-	if _, err := os.Stat(registryYAML); err != nil {
-		return nil, fmt.Errorf("registry.yaml not found at %s; run forge registry init first", registryDir)
+	registryHCL := filepath.Join(registryDir, "registry.hcl")
+	if _, err := os.Stat(registryHCL); err != nil {
+		return nil, fmt.Errorf("registry.hcl not found at %s; run forge registry init first", registryDir)
 	}
 
 	if !isGitRepo(registryDir) {
 		return nil, fmt.Errorf("registry update requires a git repository")
 	}
 
-	reg, err := config.LoadRegistry(registryYAML)
+	reg, err := config.LoadRegistryHCL(registryHCL)
 	if err != nil {
-		return nil, fmt.Errorf("loading registry.yaml: %w", err)
+		return nil, fmt.Errorf("loading registry.hcl: %w", err)
 	}
 
 	reports := make([]BlueprintReport, 0, len(reg.Blueprints))
@@ -151,14 +150,14 @@ func detectStatus(registryDir string, entry *config.BlueprintEntry) BlueprintRep
 		RegistryCommit:  entry.LatestCommit,
 	}
 
-	bpYAMLPath := filepath.Join(registryDir, entry.Path, "blueprint.yaml")
-	if _, err := os.Stat(bpYAMLPath); err != nil {
+	bpHCLPath := filepath.Join(registryDir, entry.Path, "blueprint.hcl")
+	if _, err := os.Stat(bpHCLPath); err != nil {
 		report.Status = StatusMissing
 
 		return report
 	}
 
-	bp, err := config.LoadBlueprint(bpYAMLPath)
+	bp, err := config.LoadBlueprintHCL(bpHCLPath)
 	if err != nil {
 		report.Status = StatusMissing
 
@@ -218,14 +217,15 @@ func updateRegistryEntries(reg *config.Registry, reports []BlueprintReport) int 
 }
 
 func writeRegistry(registryDir string, reg *config.Registry) error {
-	data, err := yaml.Marshal(reg)
-	if err != nil {
-		return fmt.Errorf("marshaling registry.yaml: %w", err)
+	indexPath := filepath.Join(registryDir, "registry.hcl")
+
+	var buf bytes.Buffer
+	if err := config.WriteRegistryHCL(&buf, reg); err != nil {
+		return fmt.Errorf("rendering registry.hcl: %w", err)
 	}
 
-	indexPath := filepath.Join(registryDir, "registry.yaml")
-	if err := os.WriteFile(indexPath, data, 0o644); err != nil {
-		return fmt.Errorf("writing registry.yaml: %w", err)
+	if err := os.WriteFile(indexPath, buf.Bytes(), 0o644); err != nil {
+		return fmt.Errorf("writing registry.hcl: %w", err)
 	}
 
 	return nil

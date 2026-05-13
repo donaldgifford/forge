@@ -53,12 +53,10 @@ func copyTree(t *testing.T, src, dst string) {
 
 // TestRunMigrate_AgainstV1RegistryFixture migrates the frozen
 // testdata/v1-registry corpus and verifies:
-//  1. blueprint.yaml apiVersion is bumped to v2.
-//  2. registry.yaml apiVersion is bumped to v2.
-//  3. The rewritten templates pass the v2 renderer end-to-end.
-//  4. The migrated blueprint config validates as v1 (validator bumps
-//     to v2-required only in Phase C, so we pre-bump apiVersion back
-//     down to v1 in this Phase B test to exercise the load path).
+//  1. The rewritten templates pass the v2 renderer end-to-end.
+//  2. The migrated blueprint.yaml is well-formed YAML (post-OQ-4 the
+//     migrator no longer touches the apiVersion field — the user runs
+//     `forge migrate config` as a second pass to reach the HCL form).
 func TestRunMigrate_AgainstV1RegistryFixture(t *testing.T) {
 	t.Parallel()
 
@@ -84,11 +82,6 @@ func TestRunMigrate_AgainstV1RegistryFixture(t *testing.T) {
 		assert.True(t, bp.Migrated, "blueprint %s should be migrated", bp.Path)
 		assert.Empty(t, bp.UntranslatedHits, "no untranslated hits expected for v1-registry corpus")
 	}
-
-	// The migrated blueprint.yaml should advertise apiVersion v2.
-	bpData, err := os.ReadFile(filepath.Join(dst, "go", "api", "blueprint.yaml"))
-	require.NoError(t, err)
-	assert.Contains(t, string(bpData), "apiVersion: v2")
 
 	// Render a sample of the migrated tmpl files via the v2 renderer
 	// and check the substitutions resolve cleanly.
@@ -123,10 +116,70 @@ func TestRunMigrate_AgainstV1RegistryFixture_Strict(t *testing.T) {
 	}
 }
 
+// TestRunMigrate_TwoStepEndToEnd is the C.8 regression: it walks the
+// full v1→v2-HCL upgrade path documented in MIGRATION.md.
+//  1. `forge migrate templates` rewrites the v1 corpus to v2 YAML.
+//  2. `forge migrate config` rewrites the v2 YAML to HCL.
+//  3. The resulting blueprint.hcl loads cleanly via the dispatcher
+//     and renders end-to-end through the v2 template engine.
+//
+// This pins the full upgrade path against future regressions in either
+// migration tool — if the templates migrator outputs YAML the config
+// migrator can no longer parse, this test surfaces it loudly.
+func TestRunMigrate_TwoStepEndToEnd(t *testing.T) {
+	t.Parallel()
+
+	dst := t.TempDir()
+	copyTree(t, v1RegistryFixture, dst)
+
+	ctx := context.Background()
+	for _, args := range [][]string{
+		{"init", "-q"},
+		{"add", "-A"},
+		{"-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "fixture"},
+	} {
+		cmd := exec.CommandContext(ctx, "git", append([]string{"-C", dst}, args...)...)
+		require.NoError(t, cmd.Run())
+	}
+
+	// Step 1: v1 → v2 YAML (template-content rewrite).
+	templatesResult, err := migratecmd.RunMigrate(&migratecmd.MigrateOpts{Path: dst})
+	require.NoError(t, err)
+	require.NotEmpty(t, templatesResult.Blueprints)
+
+	for _, bp := range templatesResult.Blueprints {
+		assert.True(t, bp.Migrated, "templates migrator should have rewritten %s", bp.Path)
+	}
+
+	// Step 2: v2 YAML → v2 HCL (config-file rewrite).
+	configResult, err := migratecmd.RunMigrateConfig(&migratecmd.MigrateOpts{
+		Path:  dst,
+		Force: true,
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, configResult.Files)
+
+	for _, f := range configResult.Files {
+		assert.True(t, f.Migrated, "config migrator should have rewritten %s", f.Path)
+		assert.Empty(t, f.Errors, "%s: %v", f.Path, f.Errors)
+	}
+
+	// Step 3: confirm the migrated tree loads end-to-end.
+	bp, err := config.LoadBlueprint(filepath.Join(dst, "go", "api", "blueprint.yaml"))
+	require.NoError(t, err, "post-two-step blueprint must load via the dispatcher")
+	assert.Equal(t, "go-api", bp.Name)
+
+	reg, err := config.LoadRegistry(filepath.Join(dst, "registry.yaml"))
+	require.NoError(t, err)
+	assert.NotEmpty(t, reg.Blueprints)
+}
+
 // TestRunMigrate_ParsesAfterMigration verifies the migrated
-// blueprint.yaml still parses through the config loader's YAML
-// unmarshalling layer (validator-pre-bump). Once C.1 lands, the
-// validator will accept v2 and this test can switch to LoadBlueprint.
+// blueprint.yaml is still well-formed YAML and carries the expected
+// blueprint name. Post-OQ-4 the migrator output is YAML-shaped and
+// requires a second `forge migrate config` pass to reach the HCL
+// form the loader accepts — full two-step end-to-end coverage lives
+// in TestRunMigrate_TwoStepEndToEnd.
 func TestRunMigrate_ParsesAfterMigration(t *testing.T) {
 	t.Parallel()
 
@@ -149,8 +202,12 @@ func TestRunMigrate_ParsesAfterMigration(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join(dst, "go", "api", "blueprint.yaml"))
 	require.NoError(t, err)
 
-	var bp config.Blueprint
+	// Local probe — config.Blueprint dropped its yaml tags in C.6 and
+	// the Condition struct can no longer be yaml-unmarshalled directly
+	// (its `When hcl.Expression` field has no string-decoder).
+	var bp struct {
+		Name string `yaml:"name"`
+	}
 	require.NoError(t, yaml.Unmarshal(data, &bp))
-	assert.Equal(t, "v2", bp.APIVersion)
 	assert.Equal(t, "go-api", bp.Name)
 }

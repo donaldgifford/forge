@@ -36,4 +36,5 @@ docz create impl "Your Implementation Title"
 | IMPL-0002 | MVP CLI Gap Closure | Completed | 2026-05-07 | Donald Gifford | [0002-mvp-cli-gap-closure.md](0002-mvp-cli-gap-closure.md) |
 | IMPL-0003 | Registry Commands | Completed | 2026-05-07 | Donald Gifford | [0003-registry-commands.md](0003-registry-commands.md) |
 | IMPL-0004 | Migrate Template Engine to HCL2 | Draft | 2026-05-07 | Donald Gifford | [0004-migrate-template-engine-to-hcl2.md](0004-migrate-template-engine-to-hcl2.md) |
+| IMPL-0005 | Unify Config File Format to HCL2 | Draft | 2026-05-12 | Donald Gifford | [0005-unify-config-file-format-to-hcl2.md](0005-unify-config-file-format-to-hcl2.md) |
 <!-- END DOCZ AUTO-GENERATED -->

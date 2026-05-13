@@ -11,12 +11,14 @@ nav:
         - 'DESIGN-0001: Blueprint Authoring': design/0001-blueprint-authoring.md
         - 'DESIGN-0002: Registry Layout and Defaults Inheritance': design/0002-registry-layout-and-defaults-inheritance.md
         - 'DESIGN-0003: Migrate Template Engine to HCL2': design/0003-migrate-template-engine-to-hcl2.md
+        - 'DESIGN-0004: Unify Config File Format After HCL2 Cutover': design/0004-unify-config-file-format-after-hcl2-cutover.md
     - Implementation Plans:
         - Overview: impl/README.md
         - 'IMPL-0001: Forge Phased Build Plan': impl/0001-forge-phased-build-plan.md
         - 'IMPL-0002: MVP CLI Gap Closure': impl/0002-mvp-cli-gap-closure.md
         - 'IMPL-0003: Registry Commands': impl/0003-registry-commands.md
         - 'IMPL-0004: Migrate Template Engine to HCL2': impl/0004-migrate-template-engine-to-hcl2.md
+        - 'IMPL-0005: Unify Config File Format to HCL2': impl/0005-unify-config-file-format-to-hcl2.md
     - Investigations:
         - Overview: investigation/README.md
         - 'INV-0001: Templating YAML Files and HCL2 Migration': investigation/0001-templating-yaml-files-and-hcl2-migration.md
@@ -26,6 +28,10 @@ nav:
     - RFCs:
         - Overview: rfc/README.md
         - 'RFC-0001: Forge: Project Scaffolding CLI': rfc/0001-forge-project-scaffolding-cli.md
+    - Migrating forge blueprints: MIGRATION.md
+    - Release Notes:
+        - Release notes — v0.4.0 HCL config-file unification: release-notes/v0.4.0-hcl-config.md
+        - Release notes — v0.3.0 HCL2 template engine cutover: release-notes/v0.3.0-hcl2-cutover.md
 plugins:
     - techdocs-core
 site_description: Documentation for forge

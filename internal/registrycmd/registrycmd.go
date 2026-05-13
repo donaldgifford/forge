@@ -8,8 +8,6 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"gopkg.in/yaml.v3"
-
 	"github.com/donaldgifford/forge/internal/config"
 )
 
@@ -35,10 +33,8 @@ type Result struct {
 	GitInitialized bool
 }
 
-const registryTemplate = `apiVersion: v2
-name: "%s"
-description: "%s"
-blueprints: []
+const registryTemplate = `name        = "%s"
+description = "%s"
 `
 
 const editorConfigContent = `# EditorConfig helps maintain consistent coding styles
@@ -74,7 +70,7 @@ const readmeTemplate = `# %s
 ## Structure
 
 ` + "```" + `
-├── registry.yaml        # Registry index
+├── registry.hcl         # Registry index
 ├── _defaults/           # Registry-wide default files
 │   ├── .editorconfig
 │   └── .gitignore
@@ -100,9 +96,9 @@ func Run(opts *Opts) (*Result, error) {
 		return nil, fmt.Errorf("resolving path %s: %w", opts.Path, err)
 	}
 
-	registryYAML := filepath.Join(absPath, "registry.yaml")
-	if _, err := os.Stat(registryYAML); err == nil {
-		return nil, fmt.Errorf("registry.yaml already exists at %s", registryYAML)
+	registryHCL := filepath.Join(absPath, "registry.hcl")
+	if _, err := os.Stat(registryHCL); err == nil {
+		return nil, fmt.Errorf("registry.hcl already exists at %s", registryHCL)
 	}
 
 	if err := os.MkdirAll(absPath, 0o750); err != nil {
@@ -119,7 +115,7 @@ func Run(opts *Opts) (*Result, error) {
 		description = "A forge blueprint registry"
 	}
 
-	if err := writeRegistryYAML(registryYAML, name, description); err != nil {
+	if err := writeRegistryHCL(registryHCL, name, description); err != nil {
 		return nil, err
 	}
 
@@ -146,21 +142,17 @@ func Run(opts *Opts) (*Result, error) {
 	return result, nil
 }
 
-func writeRegistryYAML(path, name, description string) error {
+func writeRegistryHCL(path, name, description string) error {
 	content := fmt.Sprintf(registryTemplate, name, description)
 
-	// Validate the generated YAML by round-tripping through config types.
-	var reg config.Registry
-	if err := yaml.Unmarshal([]byte(content), &reg); err != nil {
-		return fmt.Errorf("internal error: invalid registry YAML: %w", err)
-	}
-
-	if err := config.ValidateRegistry(&reg); err != nil {
-		return fmt.Errorf("internal error: invalid registry config: %w", err)
-	}
-
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		return fmt.Errorf("writing registry.yaml: %w", err)
+		return fmt.Errorf("writing registry.hcl: %w", err)
+	}
+
+	// Round-trip the generated file through the loader to catch any
+	// malformed scaffold-template typos before the user runs into them.
+	if _, err := config.LoadRegistryHCL(path); err != nil {
+		return fmt.Errorf("internal error: scaffolded registry.hcl failed to load: %w", err)
 	}
 
 	return nil

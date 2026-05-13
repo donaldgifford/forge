@@ -17,7 +17,7 @@ type ResolvedBlueprint struct {
 	// Ref is the git ref to fetch (tag, branch, commit). Empty means latest/HEAD.
 	Ref string
 
-	// Standalone indicates this is a standalone blueprint (no registry.yaml expected).
+	// Standalone indicates this is a standalone blueprint (no registry.hcl expected).
 	Standalone bool
 }
 

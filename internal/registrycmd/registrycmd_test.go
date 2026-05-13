@@ -29,13 +29,12 @@ func TestRun_BasicScaffold(t *testing.T) {
 	assert.Equal(t, dir, result.Dir)
 	assert.False(t, result.GitInitialized)
 
-	// Verify registry.yaml exists and is valid.
-	regPath := filepath.Join(dir, "registry.yaml")
+	// Verify registry.hcl exists and is valid.
+	regPath := filepath.Join(dir, "registry.hcl")
 	assert.FileExists(t, regPath)
 
 	reg, err := config.LoadRegistry(regPath)
 	require.NoError(t, err)
-	assert.Equal(t, "v2", reg.APIVersion)
 	assert.Equal(t, "Test Registry", reg.Name)
 	assert.Equal(t, "A test registry", reg.Description)
 	assert.Empty(t, reg.Blueprints)
@@ -66,7 +65,7 @@ func TestRun_DerivedName(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, dir, result.Dir)
 
-	reg, err := config.LoadRegistry(filepath.Join(dir, "registry.yaml"))
+	reg, err := config.LoadRegistry(filepath.Join(dir, "registry.hcl"))
 	require.NoError(t, err)
 	assert.Equal(t, "company-blueprints", reg.Name)
 }
@@ -97,8 +96,8 @@ func TestRun_GuardExistingRegistry(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "existing-registry")
 	require.NoError(t, os.MkdirAll(dir, 0o750))
 	require.NoError(t, os.WriteFile(
-		filepath.Join(dir, "registry.yaml"),
-		[]byte("apiVersion: v1\nname: existing\n"),
+		filepath.Join(dir, "registry.hcl"),
+		[]byte(`name = "existing"`+"\n"),
 		0o644,
 	))
 

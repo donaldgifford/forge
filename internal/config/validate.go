@@ -20,18 +20,10 @@ var validSyncStrategies = map[string]bool{
 	"merge":     true,
 }
 
-// ValidateBlueprint checks a Blueprint for required fields and valid values.
+// ValidateBlueprint checks a Blueprint for required fields and valid
+// values. Format gating (HCL-only) lives in LoadBlueprint, not here —
+// this validator runs against the in-memory shape and is encoding-agnostic.
 func ValidateBlueprint(bp *Blueprint) error {
-	if bp.APIVersion != "v2" {
-		return fmt.Errorf(
-			"blueprint.yaml: apiVersion %q is no longer supported; "+
-				"run `forge migrate templates --path <registry-or-blueprint>` "+
-				"to convert this blueprint to v2 (HCL2 templates); "+
-				"see docs/MIGRATION.md in the forge repository for the v1→v2 migration guide",
-			bp.APIVersion,
-		)
-	}
-
 	if strings.TrimSpace(bp.Name) == "" {
 		return fmt.Errorf("blueprint name is required")
 	}
@@ -60,18 +52,10 @@ func ValidateBlueprint(bp *Blueprint) error {
 	return nil
 }
 
-// ValidateRegistry checks a Registry for required fields and valid values.
+// ValidateRegistry checks a Registry for required fields and valid
+// values. Same rationale as ValidateBlueprint: format gating lives in
+// LoadRegistry, not here.
 func ValidateRegistry(reg *Registry) error {
-	if reg.APIVersion != "v2" {
-		return fmt.Errorf(
-			"registry.yaml: apiVersion %q is no longer supported; "+
-				"run `forge migrate templates --path <registry-root>` to convert "+
-				"this registry to v2 (HCL2 templates); "+
-				"see docs/MIGRATION.md in the forge repository for the v1→v2 migration guide",
-			reg.APIVersion,
-		)
-	}
-
 	if strings.TrimSpace(reg.Name) == "" {
 		return fmt.Errorf("registry name is required")
 	}

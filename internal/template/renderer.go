@@ -20,11 +20,17 @@ import (
 // Renderer is the abstraction the orchestrator (`internal/create`,
 // `internal/sync`, `internal/check`) depends on. Tests can substitute a
 // fake; production code uses NewRenderer.
+//
+// EvaluateBool takes an expression as a string and parses it on each call.
+// EvaluateBoolExpr takes a pre-parsed hcl.Expression — preferred when the
+// caller already holds a parsed expression (e.g. `Condition.When`
+// populated by the HCL loader at parse time).
 type Renderer interface {
 	RenderFile(path string, vars map[string]cty.Value) ([]byte, error)
 	RenderString(tmpl string, vars map[string]cty.Value) (string, error)
 	RenderPath(path string, vars map[string]cty.Value) (string, error)
 	EvaluateBool(expr string, vars map[string]cty.Value) (bool, error)
+	EvaluateBoolExpr(expr hcl.Expression, vars map[string]cty.Value) (bool, error)
 }
 
 // hclRenderer is the production HCL2-backed Renderer.
@@ -84,14 +90,23 @@ func (r *hclRenderer) EvaluateBool(expr string, vars map[string]cty.Value) (bool
 		return false, fmt.Errorf("parsing expression %q: %s", expr, diags.Error())
 	}
 
-	result, diags := parsed.Value(r.evalContext(vars))
+	return r.EvaluateBoolExpr(parsed, vars)
+}
+
+// EvaluateBoolExpr evaluates a pre-parsed HCL expression against the given
+// variables and converts the result to bool. Preferred over EvaluateBool
+// when the caller already holds an hcl.Expression — avoids re-parsing on
+// every call and surfaces evaluation diagnostics with the original source
+// range.
+func (r *hclRenderer) EvaluateBoolExpr(expr hcl.Expression, vars map[string]cty.Value) (bool, error) {
+	result, diags := expr.Value(r.evalContext(vars))
 	if diags.HasErrors() {
-		return false, fmt.Errorf("evaluating expression %q: %s", expr, diags.Error())
+		return false, fmt.Errorf("evaluating expression: %s", diags.Error())
 	}
 
 	asBool, err := convert.Convert(result, cty.Bool)
 	if err != nil {
-		return false, fmt.Errorf("expression %q is not a bool: %w", expr, err)
+		return false, fmt.Errorf("expression is not a bool: %w", err)
 	}
 
 	return asBool.True(), nil

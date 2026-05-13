@@ -146,7 +146,7 @@ func Resolve(registryRoot, blueprintPath string, exclusions []string) (*FileSet,
 
 // collectFiles walks a directory and adds all regular files to the FileSet.
 // The _defaults directory name is skipped when collecting blueprint files.
-// The blueprint.yaml file is also skipped as it's metadata, not output content.
+// The blueprint.hcl file is also skipped as it's metadata, not output content.
 func collectFiles(dir string, fs *FileSet, layer SourceLayer) error {
 	info, err := os.Stat(dir)
 	if os.IsNotExist(err) {
@@ -176,8 +176,8 @@ func collectFiles(dir string, fs *FileSet, layer SourceLayer) error {
 			return nil
 		}
 
-		// Skip blueprint.yaml — it's config, not output content.
-		if info.Name() == "blueprint.yaml" {
+		// Skip blueprint.hcl — it's config, not output content.
+		if info.Name() == "blueprint.hcl" {
 			return nil
 		}
 

@@ -18,8 +18,8 @@ var (
 var registryBlueprintCmd = &cobra.Command{
 	Use:   "blueprint [category/name]",
 	Short: "Scaffold a new blueprint in a registry",
-	Long: `Scaffold a new blueprint directory with a rich starter blueprint.yaml,
-template files, and automatic registry.yaml update.
+	Long: `Scaffold a new blueprint directory with a rich starter blueprint.hcl,
+template files, and automatic registry.hcl update.
 
 Provide the blueprint path as a positional argument (category/name) or
 use --category and --name flags.`,
@@ -66,7 +66,7 @@ func runRegistryBlueprint(_ *cobra.Command, args []string) error {
 	}
 
 	w.Successf("Blueprint scaffolded at %s", result.BlueprintDir)
-	w.Infof("Edit %s to customize your blueprint", result.BlueprintYAML)
+	w.Infof("Edit %s to customize your blueprint", result.BlueprintHCL)
 	w.Infof("Run: forge registry update --registry-dir %s", regBlueprintRegistryDir)
 
 	return nil

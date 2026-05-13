@@ -26,10 +26,9 @@ func TestRun_Standalone(t *testing.T) {
 
 	assert.FileExists(t, bpPath)
 
-	// Verify the generated blueprint is valid YAML.
+	// Verify the generated blueprint loads via the dispatcher.
 	bp, err := config.LoadBlueprint(bpPath)
 	require.NoError(t, err)
-	assert.Equal(t, "v2", bp.APIVersion)
 	assert.NotEmpty(t, bp.Name)
 	assert.Len(t, bp.Variables, 1)
 	assert.Equal(t, "project_name", bp.Variables[0].Name)
@@ -67,8 +66,7 @@ func TestRun_RegistryMode(t *testing.T) {
 	require.NoError(t, err)
 	assert.FileExists(t, bpPath)
 
-	// Verify registry.yaml was created/updated.
-	indexPath := filepath.Join(registryDir, "registry.yaml")
+	indexPath := filepath.Join(registryDir, "registry.hcl")
 	assert.FileExists(t, indexPath)
 
 	reg, err := config.LoadRegistry(indexPath)
@@ -83,16 +81,16 @@ func TestRun_RegistryModeExistingIndex(t *testing.T) {
 
 	registryDir := t.TempDir()
 
-	// Create an existing registry.yaml.
-	indexContent := `apiVersion: v2
-name: "test-registry"
-blueprints:
-  - name: existing
-    path: existing/bp
-    version: "1.0.0"
+	// Pre-existing registry.hcl with one blueprint entry.
+	indexContent := `name = "test-registry"
+
+blueprint "existing" {
+  path    = "existing/bp"
+  version = "1.0.0"
+}
 `
 	require.NoError(t, os.WriteFile(
-		filepath.Join(registryDir, "registry.yaml"),
+		filepath.Join(registryDir, "registry.hcl"),
 		[]byte(indexContent),
 		0o644,
 	))
@@ -105,7 +103,7 @@ blueprints:
 	_, err := initcmd.Run(opts)
 	require.NoError(t, err)
 
-	reg, err := config.LoadRegistry(filepath.Join(registryDir, "registry.yaml"))
+	reg, err := config.LoadRegistry(filepath.Join(registryDir, "registry.hcl"))
 	require.NoError(t, err)
 	assert.Len(t, reg.Blueprints, 2)
 }

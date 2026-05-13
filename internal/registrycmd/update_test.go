@@ -1,6 +1,7 @@
 package registrycmd_test
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"os/exec"
@@ -10,7 +11,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
 
 	"github.com/donaldgifford/forge/internal/config"
 	"github.com/donaldgifford/forge/internal/registrycmd"
@@ -35,7 +35,7 @@ func setupGitRegistry(t *testing.T) string {
 
 	initGitRepo(t, dir)
 
-	// Run update once to seed latest_commit in registry.yaml, then commit.
+	// Run update once to seed latest_commit in registry.hcl, then commit.
 	result, err := registrycmd.RunUpdate(&registrycmd.UpdateOpts{
 		RegistryDir: dir,
 	})
@@ -97,12 +97,12 @@ func TestRunUpdate_VersionChanged(t *testing.T) {
 
 	dir := setupGitRegistry(t)
 
-	// Bump the version in blueprint.yaml.
-	bpPath := filepath.Join(dir, "go", "api", "blueprint.yaml")
+	// Bump the version in blueprint.hcl.
+	bpPath := filepath.Join(dir, "go", "api", "blueprint.hcl")
 	bpData, err := os.ReadFile(bpPath)
 	require.NoError(t, err)
 
-	updated := strings.Replace(string(bpData), `version: "0.1.0"`, `version: "0.2.0"`, 1)
+	updated := strings.Replace(string(bpData), `version     = "0.1.0"`, `version     = "0.2.0"`, 1)
 	require.NoError(t, os.WriteFile(bpPath, []byte(updated), 0o644))
 
 	runGit(t, dir, "add", "-A")
@@ -129,8 +129,8 @@ func TestRunUpdate_VersionChanged(t *testing.T) {
 	assert.Equal(t, registrycmd.StatusBothChanged, report.Status)
 	assert.Equal(t, "0.2.0", report.BlueprintVersion)
 
-	// Verify registry.yaml was updated on disk.
-	reg, err := config.LoadRegistry(filepath.Join(dir, "registry.yaml"))
+	// Verify registry.hcl was updated on disk.
+	reg, err := config.LoadRegistry(filepath.Join(dir, "registry.hcl"))
 	require.NoError(t, err)
 
 	for _, entry := range reg.Blueprints {
@@ -172,8 +172,8 @@ func TestRunUpdate_FilesChanged(t *testing.T) {
 	require.NotNil(t, report)
 	assert.Equal(t, registrycmd.StatusFilesChanged, report.Status)
 
-	// Verify registry.yaml commit was updated but version unchanged.
-	reg, err := config.LoadRegistry(filepath.Join(dir, "registry.yaml"))
+	// Verify registry.hcl commit was updated but version unchanged.
+	reg, err := config.LoadRegistry(filepath.Join(dir, "registry.hcl"))
 	require.NoError(t, err)
 
 	for _, entry := range reg.Blueprints {
@@ -190,11 +190,11 @@ func TestRunUpdate_BothChanged(t *testing.T) {
 	dir := setupGitRegistry(t)
 
 	// Modify both version and template file.
-	bpPath := filepath.Join(dir, "go", "api", "blueprint.yaml")
+	bpPath := filepath.Join(dir, "go", "api", "blueprint.hcl")
 	bpData, err := os.ReadFile(bpPath)
 	require.NoError(t, err)
 
-	updated := strings.Replace(string(bpData), `version: "0.1.0"`, `version: "1.0.0"`, 1)
+	updated := strings.Replace(string(bpData), `version     = "0.1.0"`, `version     = "1.0.0"`, 1)
 	require.NoError(t, os.WriteFile(bpPath, []byte(updated), 0o644))
 
 	tmplPath := filepath.Join(dir, "go", "api", "${project_name}", "README.md.tmpl")
@@ -221,8 +221,8 @@ func TestRunUpdate_BothChanged(t *testing.T) {
 	assert.Equal(t, registrycmd.StatusBothChanged, report.Status)
 	assert.Equal(t, "1.0.0", report.BlueprintVersion)
 
-	// Verify both fields updated in registry.yaml.
-	reg, err := config.LoadRegistry(filepath.Join(dir, "registry.yaml"))
+	// Verify both fields updated in registry.hcl.
+	reg, err := config.LoadRegistry(filepath.Join(dir, "registry.hcl"))
 	require.NoError(t, err)
 
 	for _, entry := range reg.Blueprints {
@@ -239,7 +239,7 @@ func TestRunUpdate_MissingBlueprint(t *testing.T) {
 	dir := setupGitRegistry(t)
 
 	// Load registry, add a bogus entry, re-marshal and write.
-	regPath := filepath.Join(dir, "registry.yaml")
+	regPath := filepath.Join(dir, "registry.hcl")
 	reg, err := config.LoadRegistry(regPath)
 	require.NoError(t, err)
 
@@ -251,9 +251,9 @@ func TestRunUpdate_MissingBlueprint(t *testing.T) {
 		Tags:        []string{"python"},
 	})
 
-	data, err := yaml.Marshal(reg)
-	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(regPath, data, 0o644))
+	var buf bytes.Buffer
+	require.NoError(t, config.WriteRegistryHCL(&buf, reg))
+	require.NoError(t, os.WriteFile(regPath, buf.Bytes(), 0o644))
 
 	runGit(t, dir, "add", "-A")
 	runGit(t, dir, "commit", "-m", "add bogus entry")
@@ -293,17 +293,17 @@ func TestRunUpdate_CheckMode_Stale(t *testing.T) {
 
 	dir := setupGitRegistry(t)
 
-	// Record registry.yaml content before update.
-	regPath := filepath.Join(dir, "registry.yaml")
+	// Record registry.hcl content before update.
+	regPath := filepath.Join(dir, "registry.hcl")
 	beforeData, err := os.ReadFile(regPath)
 	require.NoError(t, err)
 
 	// Bump version to make it stale.
-	bpPath := filepath.Join(dir, "go", "api", "blueprint.yaml")
+	bpPath := filepath.Join(dir, "go", "api", "blueprint.hcl")
 	bpData, err := os.ReadFile(bpPath)
 	require.NoError(t, err)
 
-	updated := strings.Replace(string(bpData), `version: "0.1.0"`, `version: "0.3.0"`, 1)
+	updated := strings.Replace(string(bpData), `version     = "0.1.0"`, `version     = "0.3.0"`, 1)
 	require.NoError(t, os.WriteFile(bpPath, []byte(updated), 0o644))
 
 	runGit(t, dir, "add", "-A")
@@ -317,10 +317,10 @@ func TestRunUpdate_CheckMode_Stale(t *testing.T) {
 	assert.Positive(t, result.Stale)
 	assert.Equal(t, 0, result.Updated, "check mode should not update any entries")
 
-	// Verify registry.yaml was NOT modified.
+	// Verify registry.hcl was NOT modified.
 	afterData, err := os.ReadFile(regPath)
 	require.NoError(t, err)
-	assert.Equal(t, string(beforeData), string(afterData), "registry.yaml should not be modified in check mode")
+	assert.Equal(t, string(beforeData), string(afterData), "registry.hcl should not be modified in check mode")
 }
 
 func TestRunUpdate_NotGitRepo(t *testing.T) {
@@ -335,7 +335,7 @@ func TestRunUpdate_NotGitRepo(t *testing.T) {
 	assert.Contains(t, err.Error(), "requires a git repository")
 }
 
-func TestRunUpdate_MissingRegistryYAML(t *testing.T) {
+func TestRunUpdate_MissingRegistryHCL(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
@@ -344,5 +344,5 @@ func TestRunUpdate_MissingRegistryYAML(t *testing.T) {
 		RegistryDir: dir,
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "registry.yaml not found")
+	assert.Contains(t, err.Error(), "registry.hcl not found")
 }

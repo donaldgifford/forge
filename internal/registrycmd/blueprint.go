@@ -1,19 +1,18 @@
 package registrycmd
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
-
-	"gopkg.in/yaml.v3"
 
 	"github.com/donaldgifford/forge/internal/config"
 )
 
 // BlueprintOpts configures the blueprint scaffolding operation.
 type BlueprintOpts struct {
-	// RegistryDir is the registry root directory (must contain registry.yaml).
+	// RegistryDir is the registry root directory (must contain registry.hcl).
 	RegistryDir string
 	// Category is the blueprint category directory (e.g., "go").
 	Category string
@@ -29,46 +28,46 @@ type BlueprintOpts struct {
 type BlueprintResult struct {
 	// BlueprintDir is the absolute path to the created blueprint directory.
 	BlueprintDir string
-	// BlueprintYAML is the absolute path to the created blueprint.yaml.
-	BlueprintYAML string
-	// RegistryYAML is the absolute path to the updated registry.yaml.
-	RegistryYAML string
+	// BlueprintHCL is the absolute path to the created blueprint.hcl.
+	BlueprintHCL string
+	// RegistryHCL is the absolute path to the updated registry.hcl.
+	RegistryHCL string
 }
 
-const blueprintScaffoldTemplate = `apiVersion: v2
-name: "%s"
-description: "%s"
-version: "0.1.0"
-tags: [%s]
+const blueprintScaffoldTemplate = `name        = "%s"
+description = "%s"
+version     = "0.1.0"
+tags        = [%s]
 
-variables:
-  - name: project_name
-    description: "Name of the project"
-    type: string
-    required: true
-    validate: "^[a-z][a-z0-9-]*$"
+variable "project_name" {
+  description = "Name of the project"
+  type        = "string"
+  required    = true
+  validate    = "^[a-z][a-z0-9-]*$"
+}
 
-  - name: license
-    description: "License type"
-    type: choice
-    choices: ["MIT", "Apache-2.0", "BSD-3-Clause", "none"]
-    default: "Apache-2.0"
+variable "license" {
+  description = "License type"
+  type        = "choice"
+  choices     = ["MIT", "Apache-2.0", "BSD-3-Clause", "none"]
+  default     = "Apache-2.0"
+}
 
-# conditions:
-#   - when: some_variable
-#     exclude:
-#       - "optional-dir/"
+# condition {
+#   when    = some_variable
+#   exclude = ["optional-dir/"]
+# }
 
-hooks:
-  post_create:
-    - "git init"
+hooks {
+  post_create = ["git init"]
+}
 
-sync:
-  managed_files: []
-  ignore: []
-
-rename:
-  "${project_name}/": "."
+rename {
+  entry {
+    from = "${project_name}/"
+    to   = "."
+  }
+}
 `
 
 const starterReadmeTemplate = `# ${project_name}
@@ -105,9 +104,9 @@ func RunBlueprint(opts *BlueprintOpts) (*BlueprintResult, error) {
 		return nil, fmt.Errorf("resolving registry path %s: %w", opts.RegistryDir, err)
 	}
 
-	registryYAML := filepath.Join(registryDir, "registry.yaml")
-	if _, err := os.Stat(registryYAML); err != nil {
-		return nil, fmt.Errorf("registry.yaml not found at %s; run forge registry init first", registryDir)
+	registryHCL := filepath.Join(registryDir, "registry.hcl")
+	if _, err := os.Stat(registryHCL); err != nil {
+		return nil, fmt.Errorf("registry.hcl not found at %s; run forge registry init first", registryDir)
 	}
 
 	if opts.Category == "" || opts.Name == "" {
@@ -116,10 +115,10 @@ func RunBlueprint(opts *BlueprintOpts) (*BlueprintResult, error) {
 
 	bpRelPath := opts.Category + "/" + opts.Name
 	bpDir := filepath.Join(registryDir, opts.Category, opts.Name)
-	bpYAMLPath := filepath.Join(bpDir, "blueprint.yaml")
+	bpHCLPath := filepath.Join(bpDir, "blueprint.hcl")
 
-	if _, err := os.Stat(bpYAMLPath); err == nil {
-		return nil, fmt.Errorf("blueprint.yaml already exists at %s", bpYAMLPath)
+	if _, err := os.Stat(bpHCLPath); err == nil {
+		return nil, fmt.Errorf("blueprint.hcl already exists at %s", bpHCLPath)
 	}
 
 	// Apply defaults.
@@ -140,48 +139,38 @@ func RunBlueprint(opts *BlueprintOpts) (*BlueprintResult, error) {
 		return nil, fmt.Errorf("creating blueprint directory %s: %w", bpDir, err)
 	}
 
-	// Write blueprint.yaml.
-	if err := writeBlueprintYAML(bpYAMLPath, bpName, description, tags); err != nil {
+	if err := writeBlueprintHCL(bpHCLPath, bpName, description, tags); err != nil {
 		return nil, err
 	}
 
-	// Create starter template files.
 	if err := createStarterTemplate(bpDir); err != nil {
 		return nil, err
 	}
 
-	// Ensure category _defaults/ directory exists.
 	if err := ensureCategoryDefaults(registryDir, opts.Category); err != nil {
 		return nil, err
 	}
 
-	// Update registry.yaml with new blueprint entry.
 	if err := appendBlueprint(registryDir, bpRelPath, description, tags); err != nil {
 		return nil, err
 	}
 
 	return &BlueprintResult{
-		BlueprintDir:  bpDir,
-		BlueprintYAML: bpYAMLPath,
-		RegistryYAML:  registryYAML,
+		BlueprintDir: bpDir,
+		BlueprintHCL: bpHCLPath,
+		RegistryHCL:  registryHCL,
 	}, nil
 }
 
-func writeBlueprintYAML(path, name, description string, tags []string) error {
+func writeBlueprintHCL(path, name, description string, tags []string) error {
 	content := fmt.Sprintf(blueprintScaffoldTemplate, name, description, formatTags(tags))
 
-	// Validate the generated YAML by round-tripping through config types.
-	var bp config.Blueprint
-	if err := yaml.Unmarshal([]byte(content), &bp); err != nil {
-		return fmt.Errorf("internal error: invalid blueprint YAML: %w", err)
-	}
-
-	if err := config.ValidateBlueprint(&bp); err != nil {
-		return fmt.Errorf("internal error: invalid blueprint config: %w", err)
-	}
-
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		return fmt.Errorf("writing blueprint.yaml: %w", err)
+		return fmt.Errorf("writing blueprint.hcl: %w", err)
+	}
+
+	if _, err := config.LoadBlueprintHCL(path); err != nil {
+		return fmt.Errorf("internal error: scaffolded blueprint.hcl failed to load: %w", err)
 	}
 
 	return nil
@@ -231,17 +220,16 @@ func ensureCategoryDefaults(registryDir, category string) error {
 }
 
 func appendBlueprint(registryDir, bpRelPath, description string, tags []string) error {
-	indexPath := filepath.Join(registryDir, "registry.yaml")
+	indexPath := filepath.Join(registryDir, "registry.hcl")
 
-	reg, err := config.LoadRegistry(indexPath)
+	reg, err := config.LoadRegistryHCL(indexPath)
 	if err != nil {
-		return fmt.Errorf("loading registry.yaml: %w", err)
+		return fmt.Errorf("loading registry.hcl: %w", err)
 	}
 
-	// Check for duplicates.
 	for i := range reg.Blueprints {
 		if reg.Blueprints[i].Path == bpRelPath {
-			return fmt.Errorf("blueprint %s already exists in registry.yaml", bpRelPath)
+			return fmt.Errorf("blueprint %s already exists in registry.hcl", bpRelPath)
 		}
 	}
 
@@ -253,13 +241,13 @@ func appendBlueprint(registryDir, bpRelPath, description string, tags []string) 
 		Tags:        tags,
 	})
 
-	data, err := yaml.Marshal(reg)
-	if err != nil {
-		return fmt.Errorf("marshaling registry.yaml: %w", err)
+	var buf bytes.Buffer
+	if err := config.WriteRegistryHCL(&buf, reg); err != nil {
+		return fmt.Errorf("rendering registry.hcl: %w", err)
 	}
 
-	if err := os.WriteFile(indexPath, data, 0o644); err != nil {
-		return fmt.Errorf("writing registry.yaml: %w", err)
+	if err := os.WriteFile(indexPath, buf.Bytes(), 0o644); err != nil {
+		return fmt.Errorf("writing registry.hcl: %w", err)
 	}
 
 	return nil

@@ -270,7 +270,7 @@ func findSourceFile(registryDir, relPath string) string {
 	return ""
 }
 
-// loadBlueprintVariables reads the blueprint.yaml under the registry directory
+// loadBlueprintVariables reads the blueprint.hcl under the registry directory
 // to recover the declared variable types. Returns nil when no registry is
 // configured or the blueprint cannot be loaded — callers fall back to runtime
 // type inference in that case.
@@ -279,7 +279,7 @@ func loadBlueprintVariables(registryDir, blueprintPath string) []config.Variable
 		return nil
 	}
 
-	bpPath := filepath.Join(registryDir, blueprintPath, "blueprint.yaml")
+	bpPath := filepath.Join(registryDir, blueprintPath, "blueprint.hcl")
 
 	bp, err := config.LoadBlueprint(bpPath)
 	if err != nil {
