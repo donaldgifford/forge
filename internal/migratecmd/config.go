@@ -15,7 +15,6 @@ package migratecmd
 
 import (
 	"errors"
-	"fmt"
 )
 
 // MigrateConfigResult is the outcome of a `forge migrate config` run.
@@ -53,19 +52,25 @@ type ConfigFileReport struct {
 	Errors []error
 }
 
-// errMigrateConfigNotImplemented is returned by RunMigrateConfig until
-// Phase B.3 wires up the file walker. Sentinel keeps the package
-// compiling while B.2 (rewriter) and B.3 (walker) land in their own
-// commits.
-var errMigrateConfigNotImplemented = errors.New("migratecmd: config rewriter not yet implemented (IMPL-0005 Phase B.3)")
-
 // RunMigrateConfig executes the YAML→HCL config rewrite described by
 // opts. Mirrors RunMigrate's dirty-worktree guard and dry-run/strict
-// semantics. Implementation lands in IMPL-0005 Phase B.3.
+// semantics — the same checkCleanWorktree helper that gates
+// `forge migrate templates` (per B.4: reuse, don't reinvent).
 func RunMigrateConfig(opts *MigrateOpts) (*MigrateConfigResult, error) {
 	if opts == nil {
-		return nil, fmt.Errorf("migrate config: opts is nil")
+		return nil, errors.New("migrate config: opts is nil")
 	}
 
-	return nil, errMigrateConfigNotImplemented
+	if !opts.Force && !opts.DryRun {
+		path := opts.Path
+		if path == "" {
+			path = "."
+		}
+
+		if err := checkCleanWorktree(path); err != nil {
+			return nil, err
+		}
+	}
+
+	return runMigrateConfig(opts)
 }

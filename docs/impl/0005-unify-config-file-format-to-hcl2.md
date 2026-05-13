@@ -324,7 +324,7 @@ guards. Validate against the forge-registry corpus before shipping.
     (blueprint, registry, apiVersion-drop) prove
     rewrite → write → load roundtrips lossless.
 
-- [ ] **B.3 Implement the per-blueprint file walker.**
+- [x] **B.3 Implement the per-blueprint file walker.**
   - File: `internal/migratecmd/config_walk.go` (new).
   - `walkConfigs(rootPath) ([]ConfigFileReport, error)` — find every
     `blueprint.yaml` and `registry.yaml` under root.
@@ -338,10 +338,19 @@ guards. Validate against the forge-registry corpus before shipping.
     - On `--dry-run`: write nothing, just report what would change.
     - On error: surface in `ConfigFileReport.Errors`, continue to next
       file.
+  - Done: `findYAMLConfigs` walks under the root and gathers every
+    `blueprint.yaml` / `registry.yaml`. `rewriteConfigFile` runs the
+    full per-file pipeline: collision check, read, dispatch to the
+    right rewriter (B.2), write `.hcl`, remove `.yaml` (skipped on
+    `--dry-run`). All errors are captured per-file so the walker keeps
+    going. Tests cover happy-path two-file rewrite, dry-run, and the
+    OQ-5 collision skip.
 
-- [ ] **B.4 Reuse the dirty-worktree guard.**
+- [x] **B.4 Reuse the dirty-worktree guard.**
   - File: existing `internal/migratecmd/git.go`.
   - No new code; just call the existing guard from the new entry point.
+  - Done: `RunMigrateConfig` calls the same `checkCleanWorktree`
+    helper as `RunMigrate`. Same `--force` override semantics.
 
 - [ ] **B.5 Wire the Cobra subcommand.**
   - File: `cmd/migrate.go` (modify existing).
