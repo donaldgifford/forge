@@ -1,10 +1,7 @@
 // Package config handles parsing and validation of blueprint and
-// registry config files.
-//
-// The HCL loaders (LoadBlueprintHCL, LoadRegistryHCL in loader_hcl.go)
-// are the new primary path; the YAML loaders (LoadBlueprint,
-// LoadRegistry in loader.go) stay around during the IMPL-0005 Phase A
-// side-by-side window and are removed in Phase C.
+// registry config files. HCL is the only supported on-disk format
+// (post-IMPL-0005 cutover); the loaders in loader.go reject .yaml
+// inputs with a migration-pointer error.
 package config
 
 import (
@@ -12,9 +9,8 @@ import (
 )
 
 // Blueprint represents the configuration of a single blueprint
-// (blueprint.hcl, or legacy blueprint.yaml).
+// (blueprint.hcl).
 type Blueprint struct {
-	APIVersion  string            `yaml:"apiVersion"`
 	Name        string            `yaml:"name"`
 	Description string            `yaml:"description"`
 	Version     string            `yaml:"version"`

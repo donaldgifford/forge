@@ -53,12 +53,10 @@ func copyTree(t *testing.T, src, dst string) {
 
 // TestRunMigrate_AgainstV1RegistryFixture migrates the frozen
 // testdata/v1-registry corpus and verifies:
-//  1. blueprint.yaml apiVersion is bumped to v2.
-//  2. registry.yaml apiVersion is bumped to v2.
-//  3. The rewritten templates pass the v2 renderer end-to-end.
-//  4. The migrated blueprint config validates as v1 (validator bumps
-//     to v2-required only in Phase C, so we pre-bump apiVersion back
-//     down to v1 in this Phase B test to exercise the load path).
+//  1. The rewritten templates pass the v2 renderer end-to-end.
+//  2. The migrated blueprint.yaml is well-formed YAML (post-OQ-4 the
+//     migrator no longer touches the apiVersion field — the user runs
+//     `forge migrate config` as a second pass to reach the HCL form).
 func TestRunMigrate_AgainstV1RegistryFixture(t *testing.T) {
 	t.Parallel()
 
@@ -84,11 +82,6 @@ func TestRunMigrate_AgainstV1RegistryFixture(t *testing.T) {
 		assert.True(t, bp.Migrated, "blueprint %s should be migrated", bp.Path)
 		assert.Empty(t, bp.UntranslatedHits, "no untranslated hits expected for v1-registry corpus")
 	}
-
-	// The migrated blueprint.yaml should advertise apiVersion v2.
-	bpData, err := os.ReadFile(filepath.Join(dst, "go", "api", "blueprint.yaml"))
-	require.NoError(t, err)
-	assert.Contains(t, string(bpData), "apiVersion: v2")
 
 	// Render a sample of the migrated tmpl files via the v2 renderer
 	// and check the substitutions resolve cleanly.
@@ -124,9 +117,11 @@ func TestRunMigrate_AgainstV1RegistryFixture_Strict(t *testing.T) {
 }
 
 // TestRunMigrate_ParsesAfterMigration verifies the migrated
-// blueprint.yaml still parses through the config loader's YAML
-// unmarshalling layer (validator-pre-bump). Once C.1 lands, the
-// validator will accept v2 and this test can switch to LoadBlueprint.
+// blueprint.yaml is still well-formed YAML and carries the expected
+// blueprint name. Post-OQ-4 the migrator output is YAML-shaped and
+// requires a second `forge migrate config` pass to reach the HCL
+// form the loader accepts — full two-step end-to-end coverage lives
+// in C.8.
 func TestRunMigrate_ParsesAfterMigration(t *testing.T) {
 	t.Parallel()
 
@@ -151,6 +146,5 @@ func TestRunMigrate_ParsesAfterMigration(t *testing.T) {
 
 	var bp config.Blueprint
 	require.NoError(t, yaml.Unmarshal(data, &bp))
-	assert.Equal(t, "v2", bp.APIVersion)
 	assert.Equal(t, "go-api", bp.Name)
 }

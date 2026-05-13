@@ -35,7 +35,6 @@ func TestRun_BasicScaffold(t *testing.T) {
 
 	reg, err := config.LoadRegistry(regPath)
 	require.NoError(t, err)
-	assert.Equal(t, "v2", reg.APIVersion)
 	assert.Equal(t, "Test Registry", reg.Name)
 	assert.Equal(t, "A test registry", reg.Description)
 	assert.Empty(t, reg.Blueprints)

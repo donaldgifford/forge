@@ -26,10 +26,9 @@ func TestRun_Standalone(t *testing.T) {
 
 	assert.FileExists(t, bpPath)
 
-	// Verify the generated blueprint is valid YAML.
+	// Verify the generated blueprint loads via the dispatcher.
 	bp, err := config.LoadBlueprint(bpPath)
 	require.NoError(t, err)
-	assert.Equal(t, "v2", bp.APIVersion)
 	assert.NotEmpty(t, bp.Name)
 	assert.Len(t, bp.Variables, 1)
 	assert.Equal(t, "project_name", bp.Variables[0].Name)

@@ -1,8 +1,7 @@
 package config
 
-// Registry represents the index file at the root of a registry repo (registry.yaml).
+// Registry represents the index file at the root of a registry repo (registry.hcl).
 type Registry struct {
-	APIVersion  string           `yaml:"apiVersion"`
 	Name        string           `yaml:"name"`
 	Description string           `yaml:"description"`
 	Maintainers []Maintainer     `yaml:"maintainers"`

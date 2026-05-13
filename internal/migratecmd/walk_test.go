@@ -116,21 +116,16 @@ func TestRunMigrate_HappyPath(t *testing.T) {
 	assert.False(t, report.AlreadyV2)
 	assert.Empty(t, report.UntranslatedHits)
 
-	registry, err := os.ReadFile(filepath.Join(root, "registry.yaml"))
-	require.NoError(t, err)
-
-	var rg struct {
-		APIVersion string `yaml:"apiVersion"`
-	}
-	require.NoError(t, yaml.Unmarshal(registry, &rg))
-	assert.Equal(t, "v2", rg.APIVersion)
-
+	// Per OQ-4 the templates migrator no longer touches apiVersion —
+	// the field is meaningless to the loader and migrate config drops
+	// it on emit. registry.yaml stays untouched (no expression fields
+	// there); blueprint.yaml retains its v1 apiVersion but every
+	// expression field is now HCL2 syntax.
 	bpData, err := os.ReadFile(filepath.Join(root, "go", "api", "blueprint.yaml"))
 	require.NoError(t, err)
 
 	var bp struct {
-		APIVersion string `yaml:"apiVersion"`
-		Variables  []struct {
+		Variables []struct {
 			Name    string `yaml:"name"`
 			Default string `yaml:"default"`
 		} `yaml:"variables"`
@@ -141,7 +136,6 @@ func TestRunMigrate_HappyPath(t *testing.T) {
 	}
 	require.NoError(t, yaml.Unmarshal(bpData, &bp))
 
-	assert.Equal(t, "v2", bp.APIVersion)
 	assert.Equal(t, "github.com/example/${project_name}", bp.Variables[1].Default)
 	assert.Equal(t, "!use_grpc", bp.Conditions[0].When)
 	assert.Equal(t, ".", bp.Rename["${project_name}/"])

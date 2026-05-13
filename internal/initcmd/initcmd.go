@@ -131,10 +131,7 @@ func loadOrCreateRegistry(path string) (*config.Registry, error) {
 	data, err := os.ReadFile(filepath.Clean(path))
 	if err != nil {
 		if os.IsNotExist(err) {
-			return &config.Registry{
-				APIVersion: "v2",
-				Name:       "registry",
-			}, nil
+			return &config.Registry{Name: "registry"}, nil
 		}
 
 		return nil, fmt.Errorf("reading %s: %w", path, err)

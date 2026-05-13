@@ -14,7 +14,6 @@ import (
 
 func sampleBlueprint() *config.Blueprint {
 	return &config.Blueprint{
-		APIVersion:  "v1",
 		Name:        "go-api",
 		Description: "A Go API starter",
 		Version:     "1.0.0",
