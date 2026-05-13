@@ -13,7 +13,6 @@ import (
 	"github.com/zclconf/go-cty/cty"
 	"gopkg.in/yaml.v3"
 
-	"github.com/donaldgifford/forge/internal/config"
 	"github.com/donaldgifford/forge/internal/migratecmd"
 	tmpl "github.com/donaldgifford/forge/internal/template"
 )
@@ -144,7 +143,12 @@ func TestRunMigrate_ParsesAfterMigration(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join(dst, "go", "api", "blueprint.yaml"))
 	require.NoError(t, err)
 
-	var bp config.Blueprint
+	// Local probe — config.Blueprint dropped its yaml tags in C.6 and
+	// the Condition struct can no longer be yaml-unmarshalled directly
+	// (its `When hcl.Expression` field has no string-decoder).
+	var bp struct {
+		Name string `yaml:"name"`
+	}
 	require.NoError(t, yaml.Unmarshal(data, &bp))
 	assert.Equal(t, "go-api", bp.Name)
 }

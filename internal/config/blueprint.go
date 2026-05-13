@@ -11,33 +11,33 @@ import (
 // Blueprint represents the configuration of a single blueprint
 // (blueprint.hcl).
 type Blueprint struct {
-	Name        string            `yaml:"name"`
-	Description string            `yaml:"description"`
-	Version     string            `yaml:"version"`
-	Tags        []string          `yaml:"tags"`
-	Defaults    Defaults          `yaml:"defaults"`
-	Variables   []Variable        `yaml:"variables"`
-	Conditions  []Condition       `yaml:"conditions"`
-	Hooks       Hooks             `yaml:"hooks"`
-	Sync        SyncConfig        `yaml:"sync"`
-	Rename      map[string]string `yaml:"rename"`
+	Name        string
+	Description string
+	Version     string
+	Tags        []string
+	Defaults    Defaults
+	Variables   []Variable
+	Conditions  []Condition
+	Hooks       Hooks
+	Sync        SyncConfig
+	Rename      map[string]string
 }
 
 // Defaults controls which inherited default files are included or excluded.
 type Defaults struct {
-	Exclude          []string          `yaml:"exclude"`
-	OverrideStrategy map[string]string `yaml:"override_strategy"`
+	Exclude          []string
+	OverrideStrategy map[string]string
 }
 
 // Variable represents a user-prompted variable in a blueprint.
 type Variable struct {
-	Name        string   `yaml:"name"`
-	Description string   `yaml:"description"`
-	Type        string   `yaml:"type"`
-	Default     string   `yaml:"default"`
-	Required    bool     `yaml:"required"`
-	Validate    string   `yaml:"validate"`
-	Choices     []string `yaml:"choices"`
+	Name        string
+	Description string
+	Type        string
+	Default     string
+	Required    bool
+	Validate    string
+	Choices     []string
 }
 
 // Condition defines conditional file inclusion/exclusion based on
@@ -47,24 +47,24 @@ type Variable struct {
 // retains the original expression text for diagnostics, lockfile
 // snapshots, and round-trip output by `forge migrate config`.
 type Condition struct {
-	When       hcl.Expression `yaml:"-"`
-	WhenSource string         `yaml:"when"`
-	Exclude    []string       `yaml:"exclude"`
+	When       hcl.Expression
+	WhenSource string
+	Exclude    []string
 }
 
 // Hooks defines lifecycle hooks for blueprint operations.
 type Hooks struct {
-	PostCreate []string `yaml:"post_create"`
+	PostCreate []string
 }
 
 // SyncConfig defines which files are managed for ongoing sync.
 type SyncConfig struct {
-	ManagedFiles []ManagedFile `yaml:"managed_files"`
-	Ignore       []string      `yaml:"ignore"`
+	ManagedFiles []ManagedFile
+	Ignore       []string
 }
 
 // ManagedFile represents a file tracked for sync with a specific strategy.
 type ManagedFile struct {
-	Path     string `yaml:"path"`
-	Strategy string `yaml:"strategy"`
+	Path     string
+	Strategy string
 }

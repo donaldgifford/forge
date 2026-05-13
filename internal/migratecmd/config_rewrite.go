@@ -29,10 +29,12 @@ import (
 // signal). Templated fields (variable.default, condition.when,
 // rename entries) round-trip as HCL templates / expressions.
 func RewriteBlueprintYAMLToHCL(src []byte) ([]byte, error) {
-	var bp config.Blueprint
-	if err := yaml.Unmarshal(src, &bp); err != nil {
+	var ybp yamlBlueprint
+	if err := yaml.Unmarshal(src, &ybp); err != nil {
 		return nil, fmt.Errorf("parsing YAML blueprint: %w", err)
 	}
+
+	bp := ybp.toBlueprint()
 
 	var b strings.Builder
 
@@ -63,10 +65,12 @@ func RewriteBlueprintYAMLToHCL(src []byte) ([]byte, error) {
 // Registry content is fully eager (no templates), so this rewriter is
 // simpler than the blueprint one.
 func RewriteRegistryYAMLToHCL(src []byte) ([]byte, error) {
-	var reg config.Registry
-	if err := yaml.Unmarshal(src, &reg); err != nil {
+	var yreg yamlRegistry
+	if err := yaml.Unmarshal(src, &yreg); err != nil {
 		return nil, fmt.Errorf("parsing YAML registry: %w", err)
 	}
+
+	reg := yreg.toRegistry()
 
 	var b strings.Builder
 
