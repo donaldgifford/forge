@@ -576,7 +576,7 @@ swap scaffolding emitters to HCL.
     `config.LoadRegistry` to prove the migrated tree is loadable
     end-to-end. Doc updates for MIGRATION.md land in D.3.
 
-- [ ] **C.9 Update integration tests for HCL fixtures.**
+- [x] **C.9 Update integration tests for HCL fixtures.**
   - Files:
     - `internal/create/cli_integration_test.go`
     - `internal/create/create_test.go`
@@ -588,6 +588,15 @@ swap scaffolding emitters to HCL.
     - `internal/defaults/resolver_test.go`
   - Point at the migrated `.hcl` fixtures. No assertion changes
     expected — rendered output should be identical to the YAML run.
+  - Done: most integration tests went green automatically via the
+    dispatcher's transparent .yaml→.hcl sibling upgrade in C.4. This
+    task tightened the production callers to use `.hcl` directly
+    (internal/registry/index.go, sync/engine.go, check/check.go,
+    create/create.go) and updated the CLI command Long descriptions
+    in cmd/{info,init,registry_init,registry_blueprint,
+    registry_update,migrate} to read `.hcl` instead of `.yaml`.
+    Comment cleanup in registrycmd, hooks, defaults, and registry
+    packages.
 
 #### Success Criteria
 
