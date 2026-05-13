@@ -2,6 +2,7 @@ package registry
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -9,11 +10,26 @@ import (
 )
 
 // LoadIndex reads registry.hcl from the given registry root directory
-// and returns the parsed registry config.
+// and returns the parsed registry config. If only registry.yaml exists
+// (un-migrated registry), the dispatcher surfaces the migration-pointer
+// error directing the user at `forge migrate config`.
 func LoadIndex(registryRoot string) (*config.Registry, error) {
-	indexPath := filepath.Join(registryRoot, "registry.hcl")
+	hclPath := filepath.Join(registryRoot, "registry.hcl")
+	if _, err := os.Stat(hclPath); err == nil {
+		reg, loadErr := config.LoadRegistry(hclPath)
+		if loadErr != nil {
+			return nil, fmt.Errorf("loading registry index from %s: %w", registryRoot, loadErr)
+		}
 
-	reg, err := config.LoadRegistry(indexPath)
+		return reg, nil
+	}
+
+	// No HCL — fall through to the YAML path so LoadRegistry can
+	// produce the migration-pointer error (or a clean "not found" if
+	// neither file exists).
+	yamlPath := filepath.Join(registryRoot, "registry.yaml")
+
+	reg, err := config.LoadRegistry(yamlPath)
 	if err != nil {
 		return nil, fmt.Errorf("loading registry index from %s: %w", registryRoot, err)
 	}
