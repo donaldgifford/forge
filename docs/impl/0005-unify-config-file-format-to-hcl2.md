@@ -656,12 +656,27 @@ open the fresh forge-registry migration PR.
 - [x] **D.5 Update DESIGN-0004 status.**
   - Flip status from `Draft` to `Implemented` once Phases A–C land.
 
-- [ ] **D.6 Fresh forge-registry migration PR.**
-  - Close the open PR (`donaldgifford/forge-registry#5`).
-  - Open a new branch against current `main` of forge-registry. Run
-    `forge migrate config` against it. Verify `forge create` works
-    end-to-end against the migrated tree.
-  - Open a PR; merge after the forge v0.4.0 release cuts.
+- [~] **D.6 Fresh forge-registry migration PR.** *(local verification
+  done; cross-repo PR transitions deferred to release-cut.)*
+  - [x] Local migration verified — `forge migrate config --path .`
+    cleanly rewrote all 7 YAML configs (registry + 6 blueprints) in
+    a worktree branched off `forge-registry`'s `main` at `dea9b8c`.
+  - [x] End-to-end verification — `forge create rust/std --defaults`
+    (26 files) and `forge create std --defaults` (11 files) succeed
+    against the migrated tree. `go/std` surfaces a pre-existing
+    template-authoring bug (`${signature}` undeclared in
+    `go/_defaults/.goreleaser.yml.tmpl`) that is **not** introduced
+    by this migration and should be fixed in the forge-registry PR.
+  - [x] Migration committed locally on branch `migrate/hcl-config`
+    in the worktree at `/tmp/forge-registry-hcl-config`. Ready to
+    push.
+  - [ ] **Release-cut tasks (require user confirmation):**
+    1. Close the open PR (`donaldgifford/forge-registry#5`, the
+       v1→v2 templates migration).
+    2. Push `migrate/hcl-config` to `origin` and open a PR.
+    3. Address the `${signature}` template bug in the same PR or a
+       follow-up.
+    4. Merge after the forge v0.4.0 release cuts.
 
 - [x] **D.7 Release notes for v0.4.0.**
   - File: `docs/release-notes/v0.4.0-hcl-config.md` (new).
