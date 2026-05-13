@@ -78,7 +78,7 @@ func LoadBlueprintHCL(path string) (*Blueprint, error) {
 		return nil, fmt.Errorf("decoding blueprint file %s: %w", path, err)
 	}
 
-	if err := validateBlueprintFields(bp); err != nil {
+	if err := ValidateBlueprint(bp); err != nil {
 		return nil, fmt.Errorf("validating blueprint %s: %w", path, err)
 	}
 
@@ -109,7 +109,7 @@ func LoadRegistryHCL(path string) (*Registry, error) {
 	reg := &Registry{}
 	assignRegistryFromCty(val, reg)
 
-	if err := validateRegistryFields(reg); err != nil {
+	if err := ValidateRegistry(reg); err != nil {
 		return nil, fmt.Errorf("validating registry %s: %w", path, err)
 	}
 

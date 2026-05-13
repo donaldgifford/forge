@@ -270,8 +270,9 @@ blueprint "go-api" {
 }
 
 // TestLoadBlueprint_PrefersHCLSibling verifies the dispatcher picks the
-// HCL file when both blueprint.yaml and blueprint.hcl exist in the
-// same directory. Phase A side-by-side: HCL wins.
+// HCL sibling when a caller passes the legacy blueprint.yaml path.
+// Important during the cutover window so callers that hardcoded the
+// YAML filename keep working transparently against migrated trees.
 func TestLoadBlueprint_PrefersHCLSibling(t *testing.T) {
 	t.Parallel()
 
@@ -279,36 +280,12 @@ func TestLoadBlueprint_PrefersHCLSibling(t *testing.T) {
 	yamlPath := filepath.Join(dir, "blueprint.yaml")
 	hclPath := filepath.Join(dir, "blueprint.hcl")
 
-	require.NoError(t, os.WriteFile(yamlPath, []byte(`
-apiVersion: v2
-name: from-yaml
-`), 0o600))
-
-	require.NoError(t, os.WriteFile(hclPath, []byte(`
-name = "from-hcl"
-`), 0o600))
+	require.NoError(t, os.WriteFile(yamlPath, []byte("name: from-yaml\n"), 0o600))
+	require.NoError(t, os.WriteFile(hclPath, []byte(`name = "from-hcl"`+"\n"), 0o600))
 
 	bp, err := config.LoadBlueprint(yamlPath)
 	require.NoError(t, err)
 	assert.Equal(t, "from-hcl", bp.Name, "HCL sibling must win over the YAML input")
-}
-
-// TestLoadBlueprint_FallsBackToYAML verifies the dispatcher uses the
-// YAML loader when no HCL sibling exists.
-func TestLoadBlueprint_FallsBackToYAML(t *testing.T) {
-	t.Parallel()
-
-	dir := t.TempDir()
-	yamlPath := filepath.Join(dir, "blueprint.yaml")
-
-	require.NoError(t, os.WriteFile(yamlPath, []byte(`
-apiVersion: v2
-name: yaml-only
-`), 0o600))
-
-	bp, err := config.LoadBlueprint(yamlPath)
-	require.NoError(t, err)
-	assert.Equal(t, "yaml-only", bp.Name)
 }
 
 // TestLoadRegistry_PrefersHCLSibling mirrors the blueprint check.
@@ -319,14 +296,8 @@ func TestLoadRegistry_PrefersHCLSibling(t *testing.T) {
 	yamlPath := filepath.Join(dir, "registry.yaml")
 	hclPath := filepath.Join(dir, "registry.hcl")
 
-	require.NoError(t, os.WriteFile(yamlPath, []byte(`
-apiVersion: v2
-name: from-yaml
-`), 0o600))
-
-	require.NoError(t, os.WriteFile(hclPath, []byte(`
-name = "from-hcl"
-`), 0o600))
+	require.NoError(t, os.WriteFile(yamlPath, []byte("name: from-yaml\n"), 0o600))
+	require.NoError(t, os.WriteFile(hclPath, []byte(`name = "from-hcl"`+"\n"), 0o600))
 
 	reg, err := config.LoadRegistry(yamlPath)
 	require.NoError(t, err)

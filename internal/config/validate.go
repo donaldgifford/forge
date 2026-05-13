@@ -20,28 +20,10 @@ var validSyncStrategies = map[string]bool{
 	"merge":     true,
 }
 
-// ValidateBlueprint checks a Blueprint loaded from YAML for required
-// fields and valid values, including the apiVersion gate that rejects
-// legacy v1 blueprints.
+// ValidateBlueprint checks a Blueprint for required fields and valid
+// values. Format gating (HCL-only) lives in LoadBlueprint, not here —
+// this validator runs against the in-memory shape and is encoding-agnostic.
 func ValidateBlueprint(bp *Blueprint) error {
-	if bp.APIVersion != "v2" {
-		return fmt.Errorf(
-			"blueprint.yaml: apiVersion %q is no longer supported; "+
-				"run `forge migrate templates --path <registry-or-blueprint>` "+
-				"to convert this blueprint to v2 (HCL2 templates); "+
-				"see docs/MIGRATION.md in the forge repository for the v1→v2 migration guide",
-			bp.APIVersion,
-		)
-	}
-
-	return validateBlueprintFields(bp)
-}
-
-// validateBlueprintFields covers everything ValidateBlueprint checks
-// except the apiVersion gate. The HCL loader uses this directly because
-// blueprint.hcl files don't carry an apiVersion field — the file
-// extension is the version signal (per IMPL-0005 OQ-2).
-func validateBlueprintFields(bp *Blueprint) error {
 	if strings.TrimSpace(bp.Name) == "" {
 		return fmt.Errorf("blueprint name is required")
 	}
@@ -70,25 +52,10 @@ func validateBlueprintFields(bp *Blueprint) error {
 	return nil
 }
 
-// ValidateRegistry checks a Registry loaded from YAML, including the
-// apiVersion gate that rejects legacy v1 registries.
+// ValidateRegistry checks a Registry for required fields and valid
+// values. Same rationale as ValidateBlueprint: format gating lives in
+// LoadRegistry, not here.
 func ValidateRegistry(reg *Registry) error {
-	if reg.APIVersion != "v2" {
-		return fmt.Errorf(
-			"registry.yaml: apiVersion %q is no longer supported; "+
-				"run `forge migrate templates --path <registry-root>` to convert "+
-				"this registry to v2 (HCL2 templates); "+
-				"see docs/MIGRATION.md in the forge repository for the v1→v2 migration guide",
-			reg.APIVersion,
-		)
-	}
-
-	return validateRegistryFields(reg)
-}
-
-// validateRegistryFields covers everything ValidateRegistry checks
-// except the apiVersion gate. Used by the HCL loader.
-func validateRegistryFields(reg *Registry) error {
 	if strings.TrimSpace(reg.Name) == "" {
 		return fmt.Errorf("registry name is required")
 	}
