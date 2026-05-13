@@ -4,7 +4,7 @@ A CLI tool that scaffolds projects from **blueprints** -- project templates stor
 
 ## Features
 
-- **Blueprint scaffolding** -- Create projects from templates with variable substitution via HCL2 (`${expr}` interpolation and `%{ if … ~}` directives — friendly to `{{ }}`-using tools like Helm and Argo CD)
+- **Blueprint scaffolding** -- Create projects from templates with variable substitution via HCL2 (`${expr}` interpolation and `%{ if … ~}` directives — friendly to `{{ }}`-using tools like Helm and Argo CD). Both blueprint configs (`blueprint.hcl`) and template files use the same HCL2 grammar.
 - **Layered defaults** -- Inherit config files through `_defaults/` directories (registry-wide, category, blueprint)
 - **Managed file sync** -- Keep files aligned with upstream blueprints using overwrite or three-way merge strategies
 - **Registry browsing** -- List, search, and inspect blueprints from Git-based registries
@@ -43,7 +43,7 @@ forge list --registry /path/to/registry
 forge search api --registry /path/to/registry
 
 # Inspect a blueprint
-forge info /path/to/blueprint.yaml
+forge info /path/to/blueprint.hcl
 
 # Check for drift against the source blueprint
 forge check
@@ -72,14 +72,15 @@ forge cache clean
 | `forge create <blueprint>` | Scaffold a new project from a blueprint |
 | `forge list` | List available blueprints in a registry |
 | `forge search <query>` | Search blueprints by name, description, or tags |
-| `forge info <blueprint.yaml>` | Show detailed blueprint information |
+| `forge info <blueprint.hcl>` | Show detailed blueprint information |
 | `forge check` | Check project for drift against the source blueprint |
 | `forge sync` | Sync project files with the latest blueprint version |
 | `forge init` | Initialize a new blueprint |
 | `forge registry init <path>` | Scaffold a new blueprint registry |
 | `forge registry blueprint` | Scaffold a new blueprint in a registry |
-| `forge registry update` | Sync blueprint metadata in registry.yaml |
-| `forge migrate templates` | Rewrite legacy v1 (`text/template`) blueprints to v2 (HCL2) — see [docs/MIGRATION.md](docs/MIGRATION.md) |
+| `forge registry update` | Sync blueprint metadata in `registry.hcl` |
+| `forge migrate templates` | Rewrite legacy v1 (`text/template`) blueprints to v2 (HCL2 templates) — see [docs/MIGRATION.md](docs/MIGRATION.md) |
+| `forge migrate config` | Convert legacy YAML configs (`blueprint.yaml`, `registry.yaml`) to HCL — see [docs/MIGRATION.md](docs/MIGRATION.md) |
 | `forge cache clean` | Clear cached registries |
 
 ## Documentation
@@ -87,19 +88,24 @@ forge cache clean
 - [DESIGN-0001 — Blueprint Authoring](docs/design/0001-blueprint-authoring.md) -- How to create blueprints
 - [DESIGN-0002 — Registry Layout & Defaults Inheritance](docs/design/0002-registry-layout-and-defaults-inheritance.md) -- How to set up a blueprint registry
 - [DESIGN-0003 — Migrate template engine to HCL2](docs/design/0003-migrate-template-engine-to-hcl2.md) -- Engine swap rationale
+- [DESIGN-0004 — Unify config file format after HCL2 cutover](docs/design/0004-unify-config-file-format-after-hcl2-cutover.md) -- Config-format unification
 - [ADR-0001 — Use HCL2 as the template engine](docs/adr/0001-use-hcl2-as-the-template-engine.md) -- Decision record
-- [docs/MIGRATION.md](docs/MIGRATION.md) -- v1 → v2 migration guide for existing registries
+- [docs/MIGRATION.md](docs/MIGRATION.md) -- v0.2.x/v0.3.x → v0.4.x migration guides
 - [RFC-0001 — Forge: Project Scaffolding CLI](docs/rfc/0001-forge-project-scaffolding-cli.md) -- High-level proposal and architecture
 
-## Migrating from v1
+## Migrating from older releases
 
-Earlier forge releases used Go `text/template` (`{{ .var }}`). Current releases require HCL2 (`apiVersion: v2`). Maintainers of v1 registries should run:
+Forge has had two on-disk format changes:
 
-```bash
-forge migrate templates --path /path/to/registry
-```
+- **v0.2.x → v0.3.x:** template syntax migrated from Go `text/template` to
+  HCL2 — run `forge migrate templates --path /path/to/registry`.
+- **v0.3.x → v0.4.x:** config files migrated from YAML
+  (`blueprint.yaml`, `registry.yaml`) to HCL (`blueprint.hcl`,
+  `registry.hcl`) — run `forge migrate config --path /path/to/registry`.
 
-See [docs/MIGRATION.md](docs/MIGRATION.md) for the complete walkthrough.
+Maintainers coming from v0.2.x or earlier should run **both** commands in
+order. See [docs/MIGRATION.md](docs/MIGRATION.md) for the complete
+walkthrough.
 
 ## Development
 

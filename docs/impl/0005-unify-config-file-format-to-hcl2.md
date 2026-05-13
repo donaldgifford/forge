@@ -645,7 +645,7 @@ open the fresh forge-registry migration PR.
   - Reference the existing v1→v2 section — users on v0.2.x or earlier
     need to run **both** migrations.
 
-- [ ] **D.4 Update CLAUDE.md and README.md.**
+- [x] **D.4 Update CLAUDE.md and README.md.**
   - `CLAUDE.md`: reflect HCL config files in the architecture notes
     (lines 49, 51, 85, 87, 91, 127 per the touch-point map). Add
     `forge migrate config` to the cmd list.

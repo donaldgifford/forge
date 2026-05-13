@@ -46,13 +46,14 @@ packages:
 - **cmd/forge/** — Entry point (`main.go`)
 - **cmd/** — Cobra command definitions (create, init, sync, check, list, search,
   info, migrate, registry init/blueprint/update, cache)
-- **internal/config/** — `blueprint.yaml` and `registry.yaml` parsing, validation
-  (requires `apiVersion: v2`), global config with multi-registry support. The
-  HCL loader (`loader_hcl.go`, `hcldec_spec.go`, `loader_hcl_helpers.go`) lives
-  alongside the YAML loader during the IMPL-0005 Phase A side-by-side window;
-  `Condition.When` is now `hcl.Expression` parsed at load time, with the
-  original source kept on `WhenSource`
-- **internal/registry/** — Registry index (`registry.yaml`), blueprint
+- **internal/config/** — `blueprint.hcl` and `registry.hcl` parsing, validation,
+  global config with multi-registry support. HCL is the only accepted format
+  (`loader.go` dispatches `.hcl` directly and rejects bare `.yaml` with a
+  pointer to `forge migrate config`). The HCL decode spec lives in
+  `hcldec_spec.go` and the emitter for registry round-trip in `hclemit.go`.
+  `Condition.When` is `hcl.Expression` parsed at load time, with the original
+  source kept on `WhenSource` for round-tripping
+- **internal/registry/** — Registry index (`registry.hcl`), blueprint
   resolution, local cache with TTL
 - **internal/defaults/** — `_defaults/` layered inheritance resolution
   (registry-wide → category → blueprint, last wins)
@@ -75,9 +76,14 @@ packages:
 - **internal/search/** — Blueprint search across name, description, tags
 - **internal/info/** — Blueprint inspection with text/JSON output
 - **internal/initcmd/** — Blueprint scaffolding (`init` is Go reserved keyword)
-- **internal/migratecmd/** — `forge migrate templates` one-shot v1→v2 rewriter
-  (only place in the tree that still imports `text/template`, used to parse
-  v1 input)
+- **internal/migratecmd/** — Two one-shot migrators:
+  `forge migrate templates` rewrites v1 (Go `text/template`) syntax to v2
+  (HCL2) inside `*.tmpl` files and the expression-bearing fields of legacy
+  `blueprint.yaml`/`registry.yaml`. `forge migrate config` then converts
+  those YAML files to `blueprint.hcl`/`registry.hcl`. Only place in the
+  tree that imports `text/template` (used to parse v1 input) and
+  `gopkg.in/yaml.v3` (used to parse legacy YAML configs via shadow types
+  in `yaml_types.go`)
 - **internal/registrycmd/** — Registry scaffolding (`forge registry init`),
   blueprint scaffolding (`forge registry blueprint`), and registry metadata
   update (`forge registry update`)
@@ -86,13 +92,13 @@ packages:
 
 ### Key Concepts
 
-- **Registry**: Git repo containing blueprints, a `registry.yaml` index, and
+- **Registry**: Git repo containing blueprints, a `registry.hcl` index, and
   `_defaults/` directories
-- **Blueprint**: Project template with `blueprint.yaml` config, templated files,
+- **Blueprint**: Project template with `blueprint.hcl` config, templated files,
   and variable prompts
 - **Layered Defaults**: Files inherit through `/_defaults/` → `/go/_defaults/` →
   `/go/api/` (last wins). Blueprints can exclude inherited defaults in
-  `blueprint.yaml`
+  `blueprint.hcl`
 - **Managed Files**: Declared in sync manifest; kept aligned with blueprint via
   overwrite or three-way merge
 
@@ -112,6 +118,13 @@ See `docs/impl/0002-mvp-cli-gap-closure.md` for the full history and rationale.
   `text/template` blueprints to v2 (HCL2) in place. Documented in
   [docs/MIGRATION.md](docs/MIGRATION.md); guarded by a dirty-worktree check
   (override with `--force`).
+- **`forge migrate config --path <registry>`** rewrites legacy v2 YAML
+  configs (`blueprint.yaml`, `registry.yaml`) as their HCL equivalents
+  (`blueprint.hcl`, `registry.hcl`). Drops the `apiVersion` field on emit
+  (the file extension is the version signal). Same dirty-worktree guard,
+  same `--dry-run` / `--strict` / `--force` flags. v0.2.x users run
+  `migrate templates` first, then `migrate config`. Comments in source
+  YAML are not preserved (per IMPL-0005 OQ-3).
 
 ## Code Style
 
@@ -128,7 +141,7 @@ See `docs/impl/0002-mvp-cli-gap-closure.md` for the full history and rationale.
 - Tests use `testify` for assertions; test helpers must call `t.Helper()`
 - Mocks generated with `mockery`
 - `nolint` directives require both an explanation and a specific linter name
-- **gosec baseline:** 5 inline `//nolint:gosec` directives intentionally annotate correct-by-design CLI behaviour (file writes to user-chosen output dirs, `git` against user registry dirs, hook execution from `blueprint.yaml`). They live in `internal/create/create.go`, `internal/sync/overwrite.go`, `internal/hooks/hooks.go`, `internal/registrycmd/registrycmd.go`, `internal/registrycmd/update.go`. Don't remove without a real fix — gosec reports them as G703/G204.
+- **gosec baseline:** 5 inline `//nolint:gosec` directives intentionally annotate correct-by-design CLI behaviour (file writes to user-chosen output dirs, `git` against user registry dirs, hook execution from `blueprint.hcl`). They live in `internal/create/create.go`, `internal/sync/overwrite.go`, `internal/hooks/hooks.go`, `internal/registrycmd/registrycmd.go`, `internal/registrycmd/update.go`. Don't remove without a real fix — gosec reports them as G703/G204.
 
 ## CI/CD
 
