@@ -482,7 +482,7 @@ swap scaffolding emitters to HCL.
     info_test, initcmd_test, registrycmd_test, walk_test, and
     integration_test.
 
-- [ ] **C.3 Update scaffolding emitters.**
+- [x] **C.3 Update scaffolding emitters.**
   - Files:
     - `internal/initcmd/initcmd.go:23,135` (blueprintTemplate +
       `APIVersion: "v1"` literal) — replace with HCL string. Rename the
@@ -496,6 +496,14 @@ swap scaffolding emitters to HCL.
       file-write paths.
   - Update fixtures any of these tests use (`internal/initcmd/*_test.go`,
     `internal/registrycmd/*_test.go`).
+  - Done: every scaffolder emits HCL. Added a new
+    `config.WriteRegistryHCL(io.Writer, *Registry)` helper
+    (`internal/config/hclemit.go`) built on hclwrite — used by
+    initcmd, registrycmd, and the registry update flow. Field renames
+    (`BlueprintYAML` → `BlueprintHCL`, `RegistryYAML` → `RegistryHCL`)
+    propagated to the cmd layer and test assertions. Round-trip check
+    after scaffold-template emit catches any malformed templates
+    before the user does.
 
 - [ ] **C.4 Migrate `testdata/` fixtures.**
   - Run `forge migrate config --path testdata/registry` and `--path
