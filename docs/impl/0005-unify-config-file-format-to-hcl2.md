@@ -264,7 +264,7 @@ guards. Validate against the forge-registry corpus before shipping.
 
 #### Tasks
 
-- [ ] **B.1 Define `MigrateConfigOpts` / `MigrateConfigResult` types.**
+- [x] **B.1 Define `MigrateConfigOpts` / `MigrateConfigResult` types.**
   - File: `internal/migratecmd/config.go` (new).
   - Decision (per Resolved Questions OQ-2): separate subcommands
     (`forge migrate templates`, `forge migrate config`). Reuse the
@@ -280,6 +280,11 @@ guards. Validate against the forge-registry corpus before shipping.
         Errors    []error
     }
     ```
+  - Done: `MigrateConfigResult` + `ConfigFileReport` defined; opts
+    type reuses `MigrateOpts`. Added `SkipReason` to
+    `ConfigFileReport` so the summary table can explain skip
+    decisions cleanly. `RunMigrateConfig` returns
+    `errMigrateConfigNotImplemented` until B.3 wires the walker.
 
 - [ ] **B.2 Implement the YAML→HCL encoder.**
   - File: `internal/migratecmd/config_rewrite.go` (new).
