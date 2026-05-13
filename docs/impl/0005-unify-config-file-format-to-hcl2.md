@@ -181,13 +181,19 @@ the load error in Phase C).
     parses `WhenSource` into `When` after `ValidateBlueprint` (so v1
     rejection still surfaces first).
 
-- [ ] **A.5 Dispatching loader.**
+- [x] **A.5 Dispatching loader.**
   - File: `internal/config/loader.go`.
   - In `LoadBlueprint(path)`: stat `<dir>/blueprint.hcl`; if present,
     delegate to `LoadBlueprintHCL`; else fall back to the YAML loader.
   - Parallel logic in `LoadRegistry(path)`.
   - Keep YAML loaders private (`loadBlueprintYAML`, `loadRegistryYAML`)
     so the public API doesn't grow.
+  - Done: `preferHCLSibling` helper checks `.hcl` siblings of `.yaml`
+    inputs (and accepts `.hcl` paths directly). YAML loaders extracted
+    into `loadBlueprintYAML` / `loadRegistryYAML`. Caller contract is
+    unchanged — production callers still pass `<dir>/blueprint.yaml`
+    and the dispatcher transparently upgrades to HCL when present.
+    Tests in `loader_hcl_test.go` cover both branches.
 
 - [ ] **A.6 Hermetic HCL fixture.**
   - Path: `testdata/hcl-registry/` (new).
