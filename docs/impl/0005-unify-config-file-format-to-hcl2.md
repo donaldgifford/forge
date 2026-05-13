@@ -537,10 +537,17 @@ swap scaffolding emitters to HCL.
     unreachable, and the `unused` linter would have failed CI if they
     stayed.
 
-- [ ] **C.6 Drop `yaml` struct tags.**
+- [x] **C.6 Drop `yaml` struct tags.**
   - Files: `internal/config/blueprint.go`, `internal/config/registry.go`.
   - Remove `yaml:"…"` tags from every field. HCL decoding goes through
     `hcldec` so tags are dead weight after Phase A.
+  - Done: tags removed from Blueprint, Registry, and every nested type
+    (Variable, Condition, Hooks, SyncConfig, ManagedFile, Defaults,
+    BlueprintEntry, Maintainer, RegistryDefaults). The `yaml:"-"`
+    exclusion on Condition.When also went. To keep the migrate-config
+    rewriter working without yaml tags on the live structs, added
+    `internal/migratecmd/yaml_types.go` with private yamlBlueprint /
+    yamlRegistry shadow types and toBlueprint/toRegistry conversions.
 
 - [x] **C.7 Update the rejection test.**
   - File: a new test under `internal/config/` that runs
