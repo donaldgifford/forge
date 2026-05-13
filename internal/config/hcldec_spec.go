@@ -124,14 +124,33 @@ var conditionBlockBodySchema = &hcl.BodySchema{
 var registrySpec = hcldec.ObjectSpec{
 	"name":        &hcldec.AttrSpec{Name: "name", Type: cty.String, Required: true},
 	"description": &hcldec.AttrSpec{Name: "description", Type: cty.String},
+	"maintainers": &hcldec.BlockListSpec{TypeName: "maintainer", Nested: maintainerSpec},
+	"defaults":    &hcldec.BlockSpec{TypeName: "defaults", Nested: registryDefaultsSpec},
 	"blueprints":  &hcldec.BlockListSpec{TypeName: "blueprint", Nested: blueprintEntrySpec},
+}
+
+// maintainerSpec covers each `maintainer { name = "...", email = "..." }`
+// block.
+var maintainerSpec = hcldec.ObjectSpec{
+	"name":  &hcldec.AttrSpec{Name: "name", Type: cty.String},
+	"email": &hcldec.AttrSpec{Name: "email", Type: cty.String},
+}
+
+// registryDefaultsSpec covers the registry-level `defaults { ... }`
+// block (sync_strategy + managed flag). Distinct from the per-blueprint
+// `defaults { exclude = ... }` shape used inside blueprint.hcl.
+var registryDefaultsSpec = hcldec.ObjectSpec{
+	"sync_strategy": &hcldec.AttrSpec{Name: "sync_strategy", Type: cty.String},
+	"managed":       &hcldec.AttrSpec{Name: "managed", Type: cty.Bool},
 }
 
 // blueprintEntrySpec covers the body of each registry-level
 // `blueprint "name" { ... }` block. The label becomes BlueprintEntry.Name.
 var blueprintEntrySpec = hcldec.ObjectSpec{
-	"name":        &hcldec.BlockLabelSpec{Index: 0, Name: "name"},
-	"path":        &hcldec.AttrSpec{Name: "path", Type: cty.String, Required: true},
-	"description": &hcldec.AttrSpec{Name: "description", Type: cty.String},
-	"tags":        &hcldec.AttrSpec{Name: "tags", Type: cty.List(cty.String)},
+	"name":          &hcldec.BlockLabelSpec{Index: 0, Name: "name"},
+	"path":          &hcldec.AttrSpec{Name: "path", Type: cty.String, Required: true},
+	"description":   &hcldec.AttrSpec{Name: "description", Type: cty.String},
+	"version":       &hcldec.AttrSpec{Name: "version", Type: cty.String},
+	"tags":          &hcldec.AttrSpec{Name: "tags", Type: cty.List(cty.String)},
+	"latest_commit": &hcldec.AttrSpec{Name: "latest_commit", Type: cty.String},
 }

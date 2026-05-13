@@ -195,13 +195,23 @@ the load error in Phase C).
     and the dispatcher transparently upgrades to HCL when present.
     Tests in `loader_hcl_test.go` cover both branches.
 
-- [ ] **A.6 Hermetic HCL fixture.**
+- [x] **A.6 Hermetic HCL fixture.**
   - Path: `testdata/hcl-registry/` (new).
   - Mirror `testdata/v2-registry/` shape but with `blueprint.hcl` /
     `registry.hcl` configs. Templates stay HCL2 (already are).
   - Include a `condition.when` block, a `variable.default` referencing
     an earlier var, and a `rename` block — every feature the loader
     needs to round-trip.
+  - Done: `testdata/hcl-registry/` mirrors `testdata/v2-registry/` —
+    `registry.hcl`, two blueprint dirs (go/api, helm/chart) each with
+    `blueprint.hcl` + `${project_name}/...` template trees, and a
+    `_defaults/.editorconfig`. The go/api blueprint exercises every
+    HCL feature: variables, templated default, condition.when, rename
+    block. Loader exercises this fixture in
+    `TestLoad{Blueprint,Registry}HCL_HermeticFixture` so the in-tree
+    corpus catches schema regressions. Spec + assignRegistryFromCty
+    extended in this commit to cover Maintainers, RegistryDefaults,
+    Version, LatestCommit (fields the original A.2 spec missed).
 
 - [ ] **A.7 Unit tests for the HCL loaders.**
   - File: `internal/config/loader_hcl_test.go` (new).

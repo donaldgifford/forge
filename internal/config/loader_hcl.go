@@ -343,22 +343,37 @@ func assignRegistryFromCty(val cty.Value, reg *Registry) {
 	reg.Name = ctyToString(val.GetAttr("name"))
 	reg.Description = ctyToString(val.GetAttr("description"))
 
+	if maint := val.GetAttr("maintainers"); !maint.IsNull() {
+		for it := maint.ElementIterator(); it.Next(); {
+			_, item := it.Element()
+			reg.Maintainers = append(reg.Maintainers, Maintainer{
+				Name:  ctyToString(item.GetAttr("name")),
+				Email: ctyToString(item.GetAttr("email")),
+			})
+		}
+	}
+
+	if def := val.GetAttr("defaults"); !def.IsNull() {
+		reg.Defaults = RegistryDefaults{
+			SyncStrategy: ctyToString(def.GetAttr("sync_strategy")),
+			Managed:      ctyToBool(def.GetAttr("managed")),
+		}
+	}
+
 	bps := val.GetAttr("blueprints")
 	if bps.IsNull() {
 		return
 	}
 
-	it := bps.ElementIterator()
-
-	for it.Next() {
+	for it := bps.ElementIterator(); it.Next(); {
 		_, item := it.Element()
-
-		entry := BlueprintEntry{
-			Name:        ctyToString(item.GetAttr("name")),
-			Path:        ctyToString(item.GetAttr("path")),
-			Description: ctyToString(item.GetAttr("description")),
-			Tags:        ctyToStringSlice(item.GetAttr("tags")),
-		}
-		reg.Blueprints = append(reg.Blueprints, entry)
+		reg.Blueprints = append(reg.Blueprints, BlueprintEntry{
+			Name:         ctyToString(item.GetAttr("name")),
+			Path:         ctyToString(item.GetAttr("path")),
+			Description:  ctyToString(item.GetAttr("description")),
+			Version:      ctyToString(item.GetAttr("version")),
+			Tags:         ctyToStringSlice(item.GetAttr("tags")),
+			LatestCommit: ctyToString(item.GetAttr("latest_commit")),
+		})
 	}
 }

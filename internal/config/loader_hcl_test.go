@@ -242,6 +242,52 @@ name = "from-hcl"
 	assert.Equal(t, "from-hcl", reg.Name)
 }
 
+// TestLoadBlueprintHCL_HermeticFixture exercises the loader against
+// the in-tree testdata/hcl-registry/ fixture. Acts as a regression
+// guard so future schema changes can't silently break the canonical
+// HCL config corpus.
+func TestLoadBlueprintHCL_HermeticFixture(t *testing.T) {
+	t.Parallel()
+
+	bp, err := config.LoadBlueprintHCL("../../testdata/hcl-registry/go/api/blueprint.hcl")
+	require.NoError(t, err)
+
+	assert.Equal(t, "go-api", bp.Name)
+	assert.Equal(t, "0.4.0", bp.Version)
+	assert.Equal(t, []string{"go", "api", "grpc"}, bp.Tags)
+
+	require.Len(t, bp.Variables, 3)
+	assert.Equal(t, "project_name", bp.Variables[0].Name)
+	assert.Equal(t, "github.com/example/${project_name}", bp.Variables[1].Default)
+
+	require.Len(t, bp.Conditions, 1)
+	assert.Equal(t, "!use_grpc", bp.Conditions[0].WhenSource)
+
+	assert.Equal(t, ".", bp.Rename["${project_name}/"])
+}
+
+// TestLoadRegistryHCL_HermeticFixture mirrors the blueprint fixture
+// test for the registry-level config.
+func TestLoadRegistryHCL_HermeticFixture(t *testing.T) {
+	t.Parallel()
+
+	reg, err := config.LoadRegistryHCL("../../testdata/hcl-registry/registry.hcl")
+	require.NoError(t, err)
+
+	assert.Equal(t, "test-blueprints-hcl", reg.Name)
+	require.Len(t, reg.Maintainers, 1)
+	assert.Equal(t, "Test Team", reg.Maintainers[0].Name)
+	assert.Equal(t, "overwrite", reg.Defaults.SyncStrategy)
+	assert.True(t, reg.Defaults.Managed)
+
+	require.Len(t, reg.Blueprints, 2)
+	assert.Equal(t, "go/api", reg.Blueprints[0].Name)
+	assert.Equal(t, "go/api", reg.Blueprints[0].Path)
+	assert.Equal(t, "0.4.0", reg.Blueprints[0].Version)
+	assert.Equal(t, []string{"go", "api", "grpc"}, reg.Blueprints[0].Tags)
+	assert.Equal(t, "hcl-fixture", reg.Blueprints[0].LatestCommit)
+}
+
 // TestLoadRegistryHCL covers happy-path registry decoding.
 func TestLoadRegistryHCL(t *testing.T) {
 	t.Parallel()

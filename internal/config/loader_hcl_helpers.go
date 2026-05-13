@@ -23,6 +23,16 @@ func ctyToString(v cty.Value) string {
 	return v.AsString()
 }
 
+// ctyToBool returns the underlying bool of a cty.Bool value, or false for
+// a null/unknown input.
+func ctyToBool(v cty.Value) bool {
+	if v.IsNull() || !v.IsKnown() {
+		return false
+	}
+
+	return v.True()
+}
+
 // ctyToStringSlice returns the elements of a cty.List(cty.String) value as
 // a []string. Returns nil for null/unknown inputs.
 func ctyToStringSlice(v cty.Value) []string {
