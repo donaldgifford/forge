@@ -663,7 +663,7 @@ open the fresh forge-registry migration PR.
     end-to-end against the migrated tree.
   - Open a PR; merge after the forge v0.4.0 release cuts.
 
-- [ ] **D.7 Release notes for v0.4.0.**
+- [x] **D.7 Release notes for v0.4.0.**
   - File: `docs/release-notes/v0.4.0-hcl-config.md` (new).
   - Mirror the shape of `v0.3.0-hcl2-cutover.md`:
     - Bold breaking-change block.

@@ -28,8 +28,9 @@ nav:
     - RFCs:
         - Overview: rfc/README.md
         - 'RFC-0001: Forge: Project Scaffolding CLI': rfc/0001-forge-project-scaffolding-cli.md
-    - Migrating forge blueprints from v1 to v2 (HCL2): MIGRATION.md
+    - Migrating forge blueprints: MIGRATION.md
     - Release Notes:
+        - Release notes — v0.4.0 HCL config-file unification: release-notes/v0.4.0-hcl-config.md
         - Release notes — v0.3.0 HCL2 template engine cutover: release-notes/v0.3.0-hcl2-cutover.md
 plugins:
     - techdocs-core
