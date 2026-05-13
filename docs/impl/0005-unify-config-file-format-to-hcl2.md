@@ -352,7 +352,7 @@ guards. Validate against the forge-registry corpus before shipping.
   - Done: `RunMigrateConfig` calls the same `checkCleanWorktree`
     helper as `RunMigrate`. Same `--force` override semantics.
 
-- [ ] **B.5 Wire the Cobra subcommand.**
+- [x] **B.5 Wire the Cobra subcommand.**
   - File: `cmd/migrate.go` (modify existing).
   - Add `migrateConfigCmd` under the existing `migrateCmd` parent. Same
     flag set: `--path` (default `.`), `--dry-run`, `--strict`, `--force`.
@@ -365,6 +365,10 @@ guards. Validate against the forge-registry corpus before shipping.
     python/fastapi/blueprint.hcl  skipped (hcl)  —
     ```
   - In `--strict`: exit non-zero on any error.
+  - Done: `forge migrate config` is wired with all four flags, summary
+    tabwriter output, and strict-mode error gating. Verified end-to-end
+    with `--dry-run --path <copy of testdata/v2-registry/>`: emits the
+    expected three-row plan.
 
 - [ ] **B.6 Unit tests for the rewriter.**
   - File: `internal/migratecmd/config_rewrite_test.go`.
