@@ -228,7 +228,7 @@ the load error in Phase C).
     load time per OQ-7). Round-trip test deferred to Phase B (needs
     the `hclwrite` rewriter from B.2).
 
-- [ ] **A.8 Integration test exercising the HCL fixture.**
+- [x] **A.8 Integration test exercising the HCL fixture.**
   - File: `internal/create/cli_integration_test_hcl.go` (new) or extend
     the existing v2 integration test.
   - Calls `create.Run()` against `testdata/hcl-registry/`. Asserts:
@@ -236,6 +236,12 @@ the load error in Phase C).
     - `condition.when` evaluates correctly without re-parsing.
     - Output project is byte-for-byte identical to the equivalent
       YAML run against `testdata/v2-registry/`.
+  - Done: `internal/create/hcl_integration_test.go` runs `create.Run()`
+    against `testdata/hcl-registry/` for both `go/api` (variables,
+    condition.when, rename) and `helm/chart` (verbatim `{{ }}`
+    preservation). Output files match the equivalent YAML runs in
+    `v2_integration_test.go` shape-for-shape — same renderer, just a
+    different config encoding.
 
 #### Success Criteria
 
