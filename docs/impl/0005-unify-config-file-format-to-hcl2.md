@@ -629,7 +629,7 @@ open the fresh forge-registry migration PR.
   - Add a "Last revised" line in the front-matter pointing at
     DESIGN-0004.
 
-- [ ] **D.2 Rewrite DESIGN-0002 examples in HCL.**
+- [x] **D.2 Rewrite DESIGN-0002 examples in HCL.**
   - File: `docs/design/0002-registry-layout-and-defaults-inheritance.md`.
   - Replace `registry.yaml` blocks with `registry.hcl` blocks.
   - Update the directory-structure tree diagram to show `.hcl`

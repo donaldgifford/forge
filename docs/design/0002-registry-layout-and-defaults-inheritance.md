@@ -4,7 +4,7 @@ title: "Registry Layout and Defaults Inheritance"
 status: Implemented
 author: Donald Gifford
 created: 2026-05-07
-updated: 2026-05-11
+updated: 2026-05-13
 ---
 <!-- markdownlint-disable-file MD025 MD041 -->
 
@@ -13,11 +13,16 @@ updated: 2026-05-11
 **Status:** Implemented
 **Author:** Donald Gifford
 **Date:** 2026-05-07
-**Last revised:** 2026-05-11 — bumped `apiVersion` examples to `v2`
-following the HCL2 cutover (see
-[ADR-0001](../adr/0001-use-hcl2-as-the-template-engine.md),
-[DESIGN-0003](0003-migrate-template-engine-to-hcl2.md), and the
-[migration guide](../MIGRATION.md)).
+**Last revised:** 2026-05-13 — config files moved from YAML to HCL
+per [DESIGN-0004](0004-unify-config-file-format-after-hcl2-cutover.md).
+The `apiVersion` field is gone; the file extension (`registry.hcl`) is
+now the version signal. The original YAML index schema is preserved
+for historical reference in
+[DESIGN-0003](0003-migrate-template-engine-to-hcl2.md). The decision
+record for the engine swap is
+[ADR-0001](../adr/0001-use-hcl2-as-the-template-engine.md).
+Maintainers upgrading from v0.2.x or v0.3.x should follow
+[docs/MIGRATION.md](../MIGRATION.md).
 
 <!--toc:start-->
 - [Overview](#overview)
@@ -27,7 +32,7 @@ following the HCL2 cutover (see
 - [Background](#background)
 - [Detailed Design](#detailed-design)
   - [Directory Structure](#directory-structure)
-  - [registry.yaml Schema](#registryyaml-schema)
+  - [registry.hcl Schema](#registryhcl-schema)
   - [Layered Defaults](#layered-defaults)
   - [Example](#example)
   - [Excluding Defaults](#excluding-defaults)
@@ -46,9 +51,15 @@ following the HCL2 cutover (see
 ## Overview
 
 This document specifies the registry contract: the directory layout, the
-`registry.yaml` index schema, the layered `_defaults/` inheritance model,
+`registry.hcl` index schema, the layered `_defaults/` inheritance model,
 and the registry maintenance commands (`forge registry init|blueprint|update`).
 It is the reference for anyone publishing or maintaining a forge registry.
+
+The current contract is **`registry.hcl`** — HCL2 (`hashicorp/hcl/v2`)
+for both the registry index and the blueprint configs it points at.
+Older formats (`apiVersion: v1`/`v2` YAML registries) are no longer
+accepted — load-time validation rejects them with a pointer to
+`forge migrate config`.
 
 ## Goals and Non-Goals
 
@@ -58,7 +69,7 @@ It is the reference for anyone publishing or maintaining a forge registry.
   organised by category.
 - Specify the `_defaults/` inheritance chain (registry-wide → category →
   blueprint).
-- Document the `registry.yaml` index schema and the lifecycle commands
+- Document the `registry.hcl` index schema and the lifecycle commands
   that keep it in sync with on-disk state.
 
 ### Non-Goals
@@ -80,7 +91,7 @@ templates, and standard scripts without each blueprint redeclaring them.
 
 ```
 my-registry/
-  registry.yaml              # Registry index
+  registry.hcl               # Registry index
   _defaults/                  # Registry-wide defaults
     .editorconfig
     .gitignore
@@ -91,48 +102,51 @@ my-registry/
       scripts/
         lint.sh
     api/                      # Blueprint: go/api
-      blueprint.yaml
+      blueprint.hcl
       go.mod.tmpl
       main.go.tmpl
       Makefile
     cli/                      # Blueprint: go/cli
-      blueprint.yaml
+      blueprint.hcl
       ...
   python/                     # Category: Python projects
     _defaults/
       pyproject.toml
     fastapi/
-      blueprint.yaml
+      blueprint.hcl
       ...
 ```
 
-### `registry.yaml` Schema
+### `registry.hcl` Schema
 
-```yaml
-apiVersion: v2
-name: my-registry
-description: Company blueprint registry
-blueprints:
-  - name: go-api
-    path: go/api
-    description: Go API service with standard tooling
-    tags:
-      - go
-      - api
-      - grpc
-  - name: go-cli
-    path: go/cli
-    description: Go CLI application
-    tags:
-      - go
-      - cli
-  - name: python-fastapi
-    path: python/fastapi
-    description: Python FastAPI service
-    tags:
-      - python
-      - api
+```hcl
+name        = "my-registry"
+description = "Company blueprint registry"
+
+blueprint "go-api" {
+  path        = "go/api"
+  description = "Go API service with standard tooling"
+  tags        = ["go", "api", "grpc"]
+}
+
+blueprint "go-cli" {
+  path        = "go/cli"
+  description = "Go CLI application"
+  tags        = ["go", "cli"]
+}
+
+blueprint "python-fastapi" {
+  path        = "python/fastapi"
+  description = "Python FastAPI service"
+  tags        = ["python", "api"]
+}
 ```
+
+There is no `apiVersion` field. The file extension (`.hcl` vs the
+legacy `.yaml`) is the version signal — see
+[DESIGN-0004](0004-unify-config-file-format-after-hcl2-cutover.md).
+Each blueprint is a labelled HCL block; the label becomes the
+`name` field on the in-memory `BlueprintEntry`.
 
 ### Layered Defaults
 
@@ -157,7 +171,7 @@ go/
     .golangci.yml        # All Go projects get this
     scripts/lint.sh      # Go-specific (overrides registry default)
   api/
-    blueprint.yaml
+    blueprint.hcl
     Makefile             # API-specific Makefile
 ```
 
@@ -173,13 +187,15 @@ my-project/
 
 ### Excluding Defaults
 
-Blueprints opt out of inherited files via `blueprint.yaml`:
+Blueprints opt out of inherited files via `blueprint.hcl`:
 
-```yaml
-defaults:
-  exclude:
-    - ".github/CODEOWNERS"
-    - "scripts/deploy.sh"
+```hcl
+defaults {
+  exclude = [
+    ".github/CODEOWNERS",
+    "scripts/deploy.sh",
+  ]
+}
 ```
 
 ## API / Interface Changes
@@ -204,20 +220,20 @@ forge registry blueprint \
 
 This creates:
 
-- `<category>/<name>/blueprint.yaml` — rich starter config with variables,
+- `<category>/<name>/blueprint.hcl` — rich starter config with variables,
   hooks, sync, and rename sections.
-- `<category>/<name>/{{project_name}}/README.md.tmpl` — starter template.
+- `<category>/<name>/${project_name}/README.md.tmpl` — starter template.
 - `<category>/_defaults/.gitkeep` — category defaults directory (if it
   doesn't already exist).
-- An entry appended to `registry.yaml`.
+- A `blueprint` block appended to `registry.hcl`.
 
 ### Keeping Metadata in Sync
 
 When a blueprint is modified (version bump, template changes, etc.), the
-`registry.yaml` index can become stale. Use `forge registry update`:
+`registry.hcl` index can become stale. Use `forge registry update`:
 
 ```bash
-# Update stale entries in registry.yaml
+# Update stale entries in registry.hcl
 forge registry update --registry-dir ./my-registry
 
 # Check-only mode (for CI): exits non-zero if stale
@@ -225,13 +241,13 @@ forge registry update --check --registry-dir ./my-registry
 ```
 
 The update command compares each blueprint's `version` from
-`blueprint.yaml` and the latest git commit hash against the values in
-`registry.yaml`. It reports one of five statuses for each entry:
+`blueprint.hcl` and the latest git commit hash against the values in
+`registry.hcl`. It reports one of five statuses for each entry:
 
 | Status | Meaning |
 |--------|---------|
 | `up-to-date` | Registry entry matches blueprint and git state |
-| `version-changed` | `blueprint.yaml` version differs from `registry.yaml` |
+| `version-changed` | `blueprint.hcl` version differs from `registry.hcl` |
 | `files-changed` | Git commit differs but version is unchanged |
 | `both-changed` | Both version and git commit differ |
 | `missing` | Blueprint path does not exist on disk (skipped) |
@@ -246,9 +262,12 @@ The update command compares each blueprint's `version` from
 
 ## Data Model
 
-The on-disk schema is YAML, parsed by `gopkg.in/yaml.v3`. Go struct
+The on-disk schema is HCL, parsed by `hashicorp/hcl/v2/hcldec` against
+the declarative spec in `internal/config/hcldec_spec.go`. Go struct
 definitions live in `internal/config/registry.go` (`Registry`,
-`BlueprintEntry`).
+`BlueprintEntry`, `Maintainer`, `RegistryDefaults`) and carry no
+encoding-specific tags. Each `blueprint "<name>" { … }` block decodes
+into a `BlueprintEntry` with the block label as `Name`.
 
 ## Testing Strategy
 
@@ -260,10 +279,17 @@ definitions live in `internal/config/registry.go` (`Registry`,
 
 ## Migration / Rollout Plan
 
-Schema versioned via `apiVersion`. Current accepted version is **v2**
-(post-HCL2 cutover). Existing v1 registries must be migrated using
-`forge migrate templates --path <registry-root>` — see
-[docs/MIGRATION.md](../MIGRATION.md).
+The schema is versioned via the file extension. The current accepted
+file is `registry.hcl`. Migration paths:
+
+- v0.3.x (v2 YAML registry) → v0.4.x (HCL):
+  `forge migrate config --path <registry-root>`
+- v0.2.x (v1 text/template) → v0.4.x (HCL): two steps —
+  `forge migrate templates` then `forge migrate config`.
+
+Both are documented in [docs/MIGRATION.md](../MIGRATION.md). After the
+cutover, `forge` rejects bare `registry.yaml` files at load time with
+a pointer to `forge migrate config`.
 
 ## Hosting
 
@@ -288,7 +314,14 @@ fetching, supporting Git, HTTP, and other protocols.
 
 - [RFC-0001 — Forge: Project Scaffolding CLI](../rfc/0001-forge-project-scaffolding-cli.md)
 - [DESIGN-0001 — Blueprint Authoring](0001-blueprint-authoring.md)
+- [DESIGN-0003 — Migrate template engine to HCL2](0003-migrate-template-engine-to-hcl2.md)
+- [DESIGN-0004 — Unify Config File Format After HCL2 Cutover](0004-unify-config-file-format-after-hcl2-cutover.md)
+- [ADR-0001 — Use HCL2 as the template engine](../adr/0001-use-hcl2-as-the-template-engine.md)
 - [PLAN-0001 — Registry Blueprint & Update Commands](../plan/0001-registry-blueprint-and-update-commands.md)
 - [IMPL-0003 — Registry Commands Implementation](../impl/0003-registry-commands.md)
+- [IMPL-0005 — Unify Config File Format to HCL2](../impl/0005-unify-config-file-format-to-hcl2.md)
+- [docs/MIGRATION.md](../MIGRATION.md) — v0.2.x/v0.3.x → v0.4.x migration guides.
+- `internal/config/registry.go` — Go struct definitions.
+- `internal/config/hcldec_spec.go` — HCL decoding schemas.
 - [hashicorp/go-getter](https://github.com/hashicorp/go-getter) — source
   fetching
