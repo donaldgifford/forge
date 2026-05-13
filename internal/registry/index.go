@@ -8,10 +8,10 @@ import (
 	"github.com/donaldgifford/forge/internal/config"
 )
 
-// LoadIndex reads registry.yaml from the given registry root directory and returns
-// the parsed registry config. It validates the registry contents.
+// LoadIndex reads registry.hcl from the given registry root directory
+// and returns the parsed registry config.
 func LoadIndex(registryRoot string) (*config.Registry, error) {
-	indexPath := filepath.Join(registryRoot, "registry.yaml")
+	indexPath := filepath.Join(registryRoot, "registry.hcl")
 
 	reg, err := config.LoadRegistry(indexPath)
 	if err != nil {

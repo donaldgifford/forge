@@ -34,10 +34,10 @@ var (
 var migrateTemplatesCmd = &cobra.Command{
 	Use:   "templates",
 	Short: "Rewrite v1 blueprints to v2 (HCL2)",
-	Long: `Walks every blueprint under --path and rewrites .tmpl files,
-blueprint.yaml expression fields, and the registry.yaml apiVersion to
-the v2 (HCL2) shape. The migration runs once per registry and is the
-required upgrade path before forge stops accepting v1 blueprints.
+	Long: `Walks every blueprint under --path and rewrites .tmpl files
+and blueprint.yaml expression fields to the v2 (HCL2) shape. This is
+step 1 of the v0.2.x → v0.4.x upgrade path: run ` + "`forge migrate config`" + `
+afterwards to convert the YAML config files to HCL.
 
 By default refuses to write inside a dirty git worktree; --force
 overrides. --dry-run prints what would change without writing.`,

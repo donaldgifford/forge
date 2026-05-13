@@ -12,25 +12,25 @@ import (
 	"github.com/donaldgifford/forge/internal/config"
 )
 
-// BlueprintStatus represents the sync state of a blueprint entry in registry.yaml.
+// BlueprintStatus represents the sync state of a blueprint entry in registry.hcl.
 type BlueprintStatus string
 
 const (
 	// StatusUpToDate means the registry entry matches the blueprint and git state.
 	StatusUpToDate BlueprintStatus = "up-to-date"
-	// StatusVersionChanged means the blueprint.yaml version differs from registry.yaml.
+	// StatusVersionChanged means the blueprint.hcl version differs from registry.hcl.
 	StatusVersionChanged BlueprintStatus = "version-changed"
 	// StatusFilesChanged means the git commit differs but the version is unchanged.
 	StatusFilesChanged BlueprintStatus = "files-changed"
 	// StatusBothChanged means both version and git commit differ.
 	StatusBothChanged BlueprintStatus = "both-changed"
-	// StatusMissing means the blueprint path in registry.yaml does not exist on disk.
+	// StatusMissing means the blueprint path in registry.hcl does not exist on disk.
 	StatusMissing BlueprintStatus = "missing"
 )
 
 // UpdateOpts configures the registry update operation.
 type UpdateOpts struct {
-	// RegistryDir is the registry root directory (must contain registry.yaml).
+	// RegistryDir is the registry root directory (must contain registry.hcl).
 	RegistryDir string
 	// Check enables check-only mode: no files are written, exit 1 if stale.
 	Check bool
@@ -42,11 +42,11 @@ type BlueprintReport struct {
 	Path string
 	// Status is the detected sync state.
 	Status BlueprintStatus
-	// RegistryVersion is the version currently in registry.yaml.
+	// RegistryVersion is the version currently in registry.hcl.
 	RegistryVersion string
-	// BlueprintVersion is the version currently in blueprint.yaml.
+	// BlueprintVersion is the version currently in blueprint.hcl.
 	BlueprintVersion string
-	// RegistryCommit is the commit hash currently in registry.yaml.
+	// RegistryCommit is the commit hash currently in registry.hcl.
 	RegistryCommit string
 	// LatestCommit is the actual latest git commit for the blueprint path.
 	LatestCommit string
@@ -63,7 +63,7 @@ type UpdateResult struct {
 }
 
 // RunUpdate walks all blueprints in a registry, detects metadata drift,
-// and updates registry.yaml (unless in check mode).
+// and updates registry.hcl (unless in check mode).
 func RunUpdate(opts *UpdateOpts) (*UpdateResult, error) {
 	if opts.RegistryDir == "" {
 		return nil, fmt.Errorf("registry directory is required")

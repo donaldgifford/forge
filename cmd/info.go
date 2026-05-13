@@ -13,12 +13,12 @@ import (
 var infoOutputFormat string
 
 var infoCmd = &cobra.Command{
-	Use:   "info <blueprint.yaml>",
+	Use:   "info <blueprint.hcl>",
 	Short: "Show detailed blueprint information",
 	Long: `Display detailed information about a blueprint including its description,
 variables, tools, managed files, and inherited defaults.
 
-Provide a path to a blueprint.yaml file to inspect.`,
+Provide a path to a blueprint.hcl file to inspect.`,
 	Args: cobra.ExactArgs(1),
 	RunE: runInfo,
 }

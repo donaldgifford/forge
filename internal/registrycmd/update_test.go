@@ -35,7 +35,7 @@ func setupGitRegistry(t *testing.T) string {
 
 	initGitRepo(t, dir)
 
-	// Run update once to seed latest_commit in registry.yaml, then commit.
+	// Run update once to seed latest_commit in registry.hcl, then commit.
 	result, err := registrycmd.RunUpdate(&registrycmd.UpdateOpts{
 		RegistryDir: dir,
 	})
@@ -97,7 +97,7 @@ func TestRunUpdate_VersionChanged(t *testing.T) {
 
 	dir := setupGitRegistry(t)
 
-	// Bump the version in blueprint.yaml.
+	// Bump the version in blueprint.hcl.
 	bpPath := filepath.Join(dir, "go", "api", "blueprint.hcl")
 	bpData, err := os.ReadFile(bpPath)
 	require.NoError(t, err)
@@ -129,7 +129,7 @@ func TestRunUpdate_VersionChanged(t *testing.T) {
 	assert.Equal(t, registrycmd.StatusBothChanged, report.Status)
 	assert.Equal(t, "0.2.0", report.BlueprintVersion)
 
-	// Verify registry.yaml was updated on disk.
+	// Verify registry.hcl was updated on disk.
 	reg, err := config.LoadRegistry(filepath.Join(dir, "registry.hcl"))
 	require.NoError(t, err)
 
@@ -172,7 +172,7 @@ func TestRunUpdate_FilesChanged(t *testing.T) {
 	require.NotNil(t, report)
 	assert.Equal(t, registrycmd.StatusFilesChanged, report.Status)
 
-	// Verify registry.yaml commit was updated but version unchanged.
+	// Verify registry.hcl commit was updated but version unchanged.
 	reg, err := config.LoadRegistry(filepath.Join(dir, "registry.hcl"))
 	require.NoError(t, err)
 
@@ -221,7 +221,7 @@ func TestRunUpdate_BothChanged(t *testing.T) {
 	assert.Equal(t, registrycmd.StatusBothChanged, report.Status)
 	assert.Equal(t, "1.0.0", report.BlueprintVersion)
 
-	// Verify both fields updated in registry.yaml.
+	// Verify both fields updated in registry.hcl.
 	reg, err := config.LoadRegistry(filepath.Join(dir, "registry.hcl"))
 	require.NoError(t, err)
 
@@ -293,7 +293,7 @@ func TestRunUpdate_CheckMode_Stale(t *testing.T) {
 
 	dir := setupGitRegistry(t)
 
-	// Record registry.yaml content before update.
+	// Record registry.hcl content before update.
 	regPath := filepath.Join(dir, "registry.hcl")
 	beforeData, err := os.ReadFile(regPath)
 	require.NoError(t, err)
@@ -317,10 +317,10 @@ func TestRunUpdate_CheckMode_Stale(t *testing.T) {
 	assert.Positive(t, result.Stale)
 	assert.Equal(t, 0, result.Updated, "check mode should not update any entries")
 
-	// Verify registry.yaml was NOT modified.
+	// Verify registry.hcl was NOT modified.
 	afterData, err := os.ReadFile(regPath)
 	require.NoError(t, err)
-	assert.Equal(t, string(beforeData), string(afterData), "registry.yaml should not be modified in check mode")
+	assert.Equal(t, string(beforeData), string(afterData), "registry.hcl should not be modified in check mode")
 }
 
 func TestRunUpdate_NotGitRepo(t *testing.T) {

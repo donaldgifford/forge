@@ -45,7 +45,7 @@ func TestRunBlueprint_BasicScaffold(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 
-	// Verify blueprint.yaml exists and is valid.
+	// Verify blueprint.hcl exists and is valid.
 	bp, err := config.LoadBlueprint(result.BlueprintHCL)
 	require.NoError(t, err)
 	assert.Equal(t, "go-grpc-service", bp.Name)

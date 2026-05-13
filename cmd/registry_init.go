@@ -18,7 +18,7 @@ var registryInitCmd = &cobra.Command{
 	Use:   "init <path>",
 	Short: "Initialize a new blueprint registry",
 	Long: `Initialize a new blueprint registry by creating the directory structure,
-registry.yaml, default files, and optionally initializing a git repository.`,
+registry.hcl, default files, and optionally initializing a git repository.`,
 	Args: cobra.ExactArgs(1),
 	RunE: runRegistryInit,
 }

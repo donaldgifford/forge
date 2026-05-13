@@ -12,7 +12,7 @@ import (
 
 // BlueprintOpts configures the blueprint scaffolding operation.
 type BlueprintOpts struct {
-	// RegistryDir is the registry root directory (must contain registry.yaml).
+	// RegistryDir is the registry root directory (must contain registry.hcl).
 	RegistryDir string
 	// Category is the blueprint category directory (e.g., "go").
 	Category string

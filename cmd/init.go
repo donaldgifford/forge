@@ -13,10 +13,10 @@ var initRegistryDir string
 var initCmd = &cobra.Command{
 	Use:   "init [blueprint-path]",
 	Short: "Initialize a new blueprint",
-	Long: `Initialize a new blueprint by creating a starter blueprint.yaml.
+	Long: `Initialize a new blueprint by creating a starter blueprint.hcl.
 
 Without --registry, creates a standalone blueprint in the given path (or current directory).
-With --registry, creates a blueprint within a registry repo and updates registry.yaml.`,
+With --registry, creates a blueprint within a registry repo and updates registry.hcl.`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: runInit,
 }

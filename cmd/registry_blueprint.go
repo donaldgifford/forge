@@ -18,8 +18,8 @@ var (
 var registryBlueprintCmd = &cobra.Command{
 	Use:   "blueprint [category/name]",
 	Short: "Scaffold a new blueprint in a registry",
-	Long: `Scaffold a new blueprint directory with a rich starter blueprint.yaml,
-template files, and automatic registry.yaml update.
+	Long: `Scaffold a new blueprint directory with a rich starter blueprint.hcl,
+template files, and automatic registry.hcl update.
 
 Provide the blueprint path as a positional argument (category/name) or
 use --category and --name flags.`,

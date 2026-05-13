@@ -29,7 +29,7 @@ func TestRun_BasicScaffold(t *testing.T) {
 	assert.Equal(t, dir, result.Dir)
 	assert.False(t, result.GitInitialized)
 
-	// Verify registry.yaml exists and is valid.
+	// Verify registry.hcl exists and is valid.
 	regPath := filepath.Join(dir, "registry.hcl")
 	assert.FileExists(t, regPath)
 
