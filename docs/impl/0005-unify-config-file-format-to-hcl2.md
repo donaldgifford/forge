@@ -123,7 +123,7 @@ the load error in Phase C).
     rationale at the top and stub `LoadBlueprintHCL` / `LoadRegistryHCL`
     signatures returning `errHCLNotImplemented`. A.3 fills these in.
 
-- [ ] **A.2 Define `Blueprint` and `Registry` HCL schemas.**
+- [x] **A.2 Define `Blueprint` and `Registry` HCL schemas.**
   - File: `internal/config/hcldec_spec.go` (new).
   - Build `hcldec.ObjectSpec` for each top-level type:
     `blueprintSpec`, `registrySpec`. Block specs for `variable`,
@@ -132,8 +132,16 @@ the load error in Phase C).
     `Condition`/`Hooks`/`Defaults`/`SyncConfig`/`BlueprintEntry`. The
     Go struct definitions don't change in Phase A — we map HCL into the
     same shape the YAML loader produces.
+  - Done: spec covers eager parts via `blueprintEagerSpec` /
+    `registrySpec`. Lazy blocks (`variable`, `condition`, `rename`)
+    use `hcl.BodySchema` body content with hand-decoders in the loader
+    so expressions and templated source text round-trip cleanly. The
+    `rename` syntax is now a `rename { entry { from = "...", to = "..." } }`
+    block (HCL block labels and attribute names reject template
+    sequences, so map literals don't fit). DESIGN-0004 updated to
+    match.
 
-- [ ] **A.3 Implement `LoadBlueprintHCL` and `LoadRegistryHCL`.**
+- [x] **A.3 Implement `LoadBlueprintHCL` and `LoadRegistryHCL`.**
   - File: `internal/config/loader_hcl.go` (new).
   - `LoadBlueprintHCL(path string) (*Blueprint, error)` — parse via
     `hclparse.NewParser`, decode with the spec from A.2, convert
@@ -144,8 +152,15 @@ the load error in Phase C).
     malformed expression surfaces with file/line/col.
   - For `Variable.Default`: stays as a string; the prompt-time path
     in `internal/prompt/` already parses it via the renderer.
+  - Done: full HCL loader in `loader_hcl.go` with cty→Go conversion
+    helpers in `loader_hcl_helpers.go`. `validateBlueprintFields` /
+    `validateRegistryFields` skip the apiVersion gate for HCL inputs
+    (HCL files don't carry apiVersion). Smoke tests in
+    `loader_hcl_test.go` cover happy-path decode for every block kind,
+    missing-required diagnostics, and condition.when round-trip
+    against a populated EvalContext.
 
-- [ ] **A.4 Change `Condition.When` field type.**
+- [x] **A.4 Change `Condition.When` field type.**
   - File: `internal/config/blueprint.go`.
   - Change `When string \`yaml:"when"\`` to `When hcl.Expression`.
   - **Parse-time, not eval-time** (per Resolved Questions OQ-7):
@@ -157,6 +172,14 @@ the load error in Phase C).
       direct `cond.When.Value(ctx)` call.
     - YAML loader (still in tree during Phase A) populates `When` by
       parsing the YAML string via `hclsyntax.ParseExpression`.
+  - Done: `Condition` struct now holds `When hcl.Expression` plus
+    `WhenSource string` (the original expression text retained for
+    diagnostics, lockfile snapshots, and `forge migrate config`
+    round-trip output). `Renderer` interface gained `EvaluateBoolExpr`
+    for callers that already hold a parsed expression;
+    `internal/create/conditions.go` switched over. The YAML loader
+    parses `WhenSource` into `When` after `ValidateBlueprint` (so v1
+    rejection still surfaces first).
 
 - [ ] **A.5 Dispatching loader.**
   - File: `internal/config/loader.go`.

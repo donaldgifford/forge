@@ -20,7 +20,9 @@ var validSyncStrategies = map[string]bool{
 	"merge":     true,
 }
 
-// ValidateBlueprint checks a Blueprint for required fields and valid values.
+// ValidateBlueprint checks a Blueprint loaded from YAML for required
+// fields and valid values, including the apiVersion gate that rejects
+// legacy v1 blueprints.
 func ValidateBlueprint(bp *Blueprint) error {
 	if bp.APIVersion != "v2" {
 		return fmt.Errorf(
@@ -32,6 +34,14 @@ func ValidateBlueprint(bp *Blueprint) error {
 		)
 	}
 
+	return validateBlueprintFields(bp)
+}
+
+// validateBlueprintFields covers everything ValidateBlueprint checks
+// except the apiVersion gate. The HCL loader uses this directly because
+// blueprint.hcl files don't carry an apiVersion field — the file
+// extension is the version signal (per IMPL-0005 OQ-2).
+func validateBlueprintFields(bp *Blueprint) error {
 	if strings.TrimSpace(bp.Name) == "" {
 		return fmt.Errorf("blueprint name is required")
 	}
@@ -60,7 +70,8 @@ func ValidateBlueprint(bp *Blueprint) error {
 	return nil
 }
 
-// ValidateRegistry checks a Registry for required fields and valid values.
+// ValidateRegistry checks a Registry loaded from YAML, including the
+// apiVersion gate that rejects legacy v1 registries.
 func ValidateRegistry(reg *Registry) error {
 	if reg.APIVersion != "v2" {
 		return fmt.Errorf(
@@ -72,6 +83,12 @@ func ValidateRegistry(reg *Registry) error {
 		)
 	}
 
+	return validateRegistryFields(reg)
+}
+
+// validateRegistryFields covers everything ValidateRegistry checks
+// except the apiVersion gate. Used by the HCL loader.
+func validateRegistryFields(reg *Registry) error {
 	if strings.TrimSpace(reg.Name) == "" {
 		return fmt.Errorf("registry name is required")
 	}

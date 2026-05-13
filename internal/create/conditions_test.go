@@ -3,6 +3,8 @@ package create_test
 import (
 	"testing"
 
+	"github.com/hashicorp/hcl/v2"
+	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zclconf/go-cty/cty"
@@ -27,6 +29,18 @@ func buildFileSet(paths ...string) *defaults.FileSet {
 	return fs
 }
 
+// parseWhenExpr parses an HCL bool expression for use in Condition.When.
+// Mirrors what config.LoadBlueprint does for YAML inputs and what the HCL
+// loader does directly.
+func parseWhenExpr(t *testing.T, src string) hcl.Expression {
+	t.Helper()
+
+	expr, diags := hclsyntax.ParseExpression([]byte(src), "test", hcl.InitialPos)
+	require.False(t, diags.HasErrors(), "parsing %q: %s", src, diags.Error())
+
+	return expr
+}
+
 func TestEvaluateConditions_ExcludeWhenTrue(t *testing.T) {
 	t.Parallel()
 
@@ -39,7 +53,7 @@ func TestEvaluateConditions_ExcludeWhenTrue(t *testing.T) {
 
 	conditions := []config.Condition{
 		{
-			When:    `!use_grpc`,
+			When:    parseWhenExpr(t, `!use_grpc`),
 			Exclude: []string{"proto/*", "internal/grpc/*"},
 		},
 	}
@@ -67,7 +81,7 @@ func TestEvaluateConditions_KeepWhenFalse(t *testing.T) {
 
 	conditions := []config.Condition{
 		{
-			When:    `!use_grpc`,
+			When:    parseWhenExpr(t, `!use_grpc`),
 			Exclude: []string{"proto/*", "internal/grpc/*"},
 		},
 	}
@@ -91,7 +105,7 @@ func TestEvaluateConditions_DirectoryPrefix(t *testing.T) {
 
 	conditions := []config.Condition{
 		{
-			When:    `!include_docs`,
+			When:    parseWhenExpr(t, `!include_docs`),
 			Exclude: []string{"docs/*"},
 		},
 	}
@@ -128,11 +142,11 @@ func TestEvaluateConditions_MultipleConditions(t *testing.T) {
 
 	conditions := []config.Condition{
 		{
-			When:    `!use_grpc`,
+			When:    parseWhenExpr(t, `!use_grpc`),
 			Exclude: []string{"proto/*"},
 		},
 		{
-			When:    `!use_docker`,
+			When:    parseWhenExpr(t, `!use_docker`),
 			Exclude: []string{"docker/*"},
 		},
 	}
@@ -150,14 +164,18 @@ func TestEvaluateConditions_MultipleConditions(t *testing.T) {
 	assert.NotNil(t, fs.Get("README.md"))
 }
 
-func TestEvaluateConditions_InvalidTemplate(t *testing.T) {
+func TestEvaluateConditions_EvaluationError(t *testing.T) {
 	t.Parallel()
 
 	fs := buildFileSet("cmd/main.go")
 
+	// `unknown_var` is syntactically valid HCL but undefined in the eval
+	// context, so EvaluateBoolExpr surfaces a diagnostic at evaluate time.
+	// Syntactic errors are now caught at LoadBlueprint time per OQ-7 and
+	// can't reach this code path.
 	conditions := []config.Condition{
 		{
-			When:    `!!!nonsense`,
+			When:    parseWhenExpr(t, `unknown_var`),
 			Exclude: []string{"*"},
 		},
 	}

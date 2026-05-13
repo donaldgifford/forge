@@ -37,7 +37,8 @@ func TestLoadBlueprint(t *testing.T) {
 	assert.Equal(t, "merge", bp.Defaults.OverrideStrategy["renovate.json"])
 
 	require.Len(t, bp.Conditions, 1)
-	assert.Equal(t, "!use_grpc", bp.Conditions[0].When)
+	assert.Equal(t, "!use_grpc", bp.Conditions[0].WhenSource)
+	assert.NotNil(t, bp.Conditions[0].When)
 	assert.Contains(t, bp.Conditions[0].Exclude, "proto/")
 
 	assert.Contains(t, bp.Hooks.PostCreate, "git init")

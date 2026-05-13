@@ -47,7 +47,11 @@ packages:
 - **cmd/** — Cobra command definitions (create, init, sync, check, list, search,
   info, migrate, registry init/blueprint/update, cache)
 - **internal/config/** — `blueprint.yaml` and `registry.yaml` parsing, validation
-  (requires `apiVersion: v2`), global config with multi-registry support
+  (requires `apiVersion: v2`), global config with multi-registry support. The
+  HCL loader (`loader_hcl.go`, `hcldec_spec.go`, `loader_hcl_helpers.go`) lives
+  alongside the YAML loader during the IMPL-0005 Phase A side-by-side window;
+  `Condition.When` is now `hcl.Expression` parsed at load time, with the
+  original source kept on `WhenSource`
 - **internal/registry/** — Registry index (`registry.yaml`), blueprint
   resolution, local cache with TTL
 - **internal/defaults/** — `_defaults/` layered inheritance resolution

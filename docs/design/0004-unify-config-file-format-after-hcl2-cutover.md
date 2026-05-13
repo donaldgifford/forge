@@ -151,7 +151,10 @@ defaults {
 }
 
 rename {
-  "${project_name}/" = "."
+  entry {
+    from = "${project_name}/"
+    to   = "."
+  }
 }
 
 hooks {

@@ -1,7 +1,18 @@
-// Package config handles parsing and validation of blueprint.yaml and registry.yaml files.
+// Package config handles parsing and validation of blueprint and
+// registry config files.
+//
+// The HCL loaders (LoadBlueprintHCL, LoadRegistryHCL in loader_hcl.go)
+// are the new primary path; the YAML loaders (LoadBlueprint,
+// LoadRegistry in loader.go) stay around during the IMPL-0005 Phase A
+// side-by-side window and are removed in Phase C.
 package config
 
-// Blueprint represents the configuration of a single blueprint (blueprint.yaml).
+import (
+	"github.com/hashicorp/hcl/v2"
+)
+
+// Blueprint represents the configuration of a single blueprint
+// (blueprint.hcl, or legacy blueprint.yaml).
 type Blueprint struct {
 	APIVersion  string            `yaml:"apiVersion"`
 	Name        string            `yaml:"name"`
@@ -33,10 +44,16 @@ type Variable struct {
 	Choices     []string `yaml:"choices"`
 }
 
-// Condition defines conditional file inclusion/exclusion based on template expressions.
+// Condition defines conditional file inclusion/exclusion based on
+// template expressions. `When` is a parsed-at-load-time HCL expression
+// (per IMPL-0005 OQ-7) so syntax errors surface at LoadBlueprint time
+// with file/line/column rather than on first evaluation. `WhenSource`
+// retains the original expression text for diagnostics, lockfile
+// snapshots, and round-trip output by `forge migrate config`.
 type Condition struct {
-	When    string   `yaml:"when"`
-	Exclude []string `yaml:"exclude"`
+	When       hcl.Expression `yaml:"-"`
+	WhenSource string         `yaml:"when"`
+	Exclude    []string       `yaml:"exclude"`
 }
 
 // Hooks defines lifecycle hooks for blueprint operations.
