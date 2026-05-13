@@ -439,7 +439,7 @@ swap scaffolding emitters to HCL.
 
 #### Tasks
 
-- [ ] **C.1 Replace validators with file-format rejection.**
+- [x] **C.1 Replace validators with file-format rejection.**
   - File: `internal/config/validate.go`.
   - Remove the `apiVersion != "v2"` checks at lines 25 and 65.
   - In `LoadBlueprint`/`LoadRegistry`: if `.hcl` is missing but `.yaml`
@@ -453,6 +453,14 @@ swap scaffolding emitters to HCL.
     ```
   - Parallel error for `registry.yaml`.
   - Update `internal/config/validate_test.go` accordingly.
+  - Done: `LoadBlueprint`/`LoadRegistry` now dispatch via the HCL
+    sibling check; bare `.yaml` paths return the migration-pointer
+    error. `ValidateBlueprint`/`ValidateRegistry` shed the apiVersion
+    gate (and the `validateBlueprintFields`/`validateRegistryFields`
+    split was folded back into the public funcs). C.5 (delete YAML
+    loaders + drop `gopkg.in/yaml.v3` import) folded in to keep the
+    `unused` linter happy. Loader tests rewritten around the new
+    rejection contract (also satisfies C.7).
 
 - [ ] **C.2 Drop the `apiVersion` field.**
   - File: `internal/config/blueprint.go` — delete `APIVersion`.
@@ -493,25 +501,36 @@ swap scaffolding emitters to HCL.
     migration steps behind current.
   - Update every test that references the old paths.
 
-- [ ] **C.5 Delete the YAML loaders.**
+- [x] **C.5 Delete the YAML loaders.**
   - File: `internal/config/loader.go` — remove
     `loadBlueprintYAML`/`loadRegistryYAML`. Keep the dispatching
     `LoadBlueprint`/`LoadRegistry` but they now only call the HCL
     implementation; the YAML codepath is gone.
   - Drop the `gopkg.in/yaml.v3` import from `internal/config/` (lockfile
     keeps it — that's a separate package).
+  - Done: folded into the C.1 commit. Once the dispatcher returns
+    rejection errors for bare `.yaml` paths the YAML loaders became
+    unreachable, and the `unused` linter would have failed CI if they
+    stayed.
 
 - [ ] **C.6 Drop `yaml` struct tags.**
   - Files: `internal/config/blueprint.go`, `internal/config/registry.go`.
   - Remove `yaml:"…"` tags from every field. HCL decoding goes through
     `hcldec` so tags are dead weight after Phase A.
 
-- [ ] **C.7 Update the rejection test.**
+- [x] **C.7 Update the rejection test.**
   - File: a new test under `internal/config/` that runs
     `LoadBlueprint()` against `testdata/v2-yaml-registry/go/api/`
     (with only `blueprint.yaml`, no `.hcl` sibling) and asserts the
     error string contains the migration command and
     `docs/MIGRATION.md`.
+  - Done: covered by `TestLoadBlueprint_RejectsBareYAML` /
+    `TestLoadRegistry_RejectsBareYAML` in
+    `internal/config/loader_test.go`. Uses a `t.TempDir()` fixture
+    rather than `testdata/v2-yaml-registry/` (the latter is created in
+    C.4 — circular if we waited). Both tests assert the canonical
+    error text including the migrate command, the
+    `docs/MIGRATION.md` pointer, and the `.hcl` sibling filename.
 
 - [ ] **C.8 Confirm `forge migrate templates` still works post-cutover.**
   - The legacy v1→v2 template-content rewriter doesn't depend on
