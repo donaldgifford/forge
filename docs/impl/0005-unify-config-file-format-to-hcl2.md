@@ -286,7 +286,7 @@ guards. Validate against the forge-registry corpus before shipping.
     decisions cleanly. `RunMigrateConfig` returns
     `errMigrateConfigNotImplemented` until B.3 wires the walker.
 
-- [ ] **B.2 Implement the YAML→HCL encoder.**
+- [x] **B.2 Implement the YAML→HCL encoder.**
   - File: `internal/migratecmd/config_rewrite.go` (new).
   - Top-level entry:
     ```go
@@ -311,6 +311,18 @@ guards. Validate against the forge-registry corpus before shipping.
     limitation and recommends re-adding any author comments by hand
     after migration. Follow-up issue to revisit if real authors hit
     this.
+  - Done: rewriter built directly on `strings.Builder` rather than
+    `hclwrite.SetAttributeValue`. The latter routes through
+    `cty.StringVal` which escapes `$` to `$$` to suppress template
+    interpolation — exactly the wrong thing for fields that *are*
+    templates. Two emitters separate the cases: `quoteHCLString`
+    escapes `$`/`%` for non-templated values; `quoteHCLTemplate`
+    preserves them for `variable.default`, `variable.validate`, and
+    `rename` entries. `condition.when` is written verbatim from the
+    YAML scalar (no quoting). Final output runs through
+    `hclwrite.Format` for canonical layout. Three round-trip tests
+    (blueprint, registry, apiVersion-drop) prove
+    rewrite → write → load roundtrips lossless.
 
 - [ ] **B.3 Implement the per-blueprint file walker.**
   - File: `internal/migratecmd/config_walk.go` (new).
