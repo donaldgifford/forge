@@ -13,6 +13,7 @@ import (
 	"github.com/zclconf/go-cty/cty"
 	"gopkg.in/yaml.v3"
 
+	"github.com/donaldgifford/forge/internal/config"
 	"github.com/donaldgifford/forge/internal/migratecmd"
 	tmpl "github.com/donaldgifford/forge/internal/template"
 )
@@ -115,12 +116,70 @@ func TestRunMigrate_AgainstV1RegistryFixture_Strict(t *testing.T) {
 	}
 }
 
+// TestRunMigrate_TwoStepEndToEnd is the C.8 regression: it walks the
+// full v1→v2-HCL upgrade path documented in MIGRATION.md.
+//  1. `forge migrate templates` rewrites the v1 corpus to v2 YAML.
+//  2. `forge migrate config` rewrites the v2 YAML to HCL.
+//  3. The resulting blueprint.hcl loads cleanly via the dispatcher
+//     and renders end-to-end through the v2 template engine.
+//
+// This pins the full upgrade path against future regressions in either
+// migration tool — if the templates migrator outputs YAML the config
+// migrator can no longer parse, this test surfaces it loudly.
+func TestRunMigrate_TwoStepEndToEnd(t *testing.T) {
+	t.Parallel()
+
+	dst := t.TempDir()
+	copyTree(t, v1RegistryFixture, dst)
+
+	ctx := context.Background()
+	for _, args := range [][]string{
+		{"init", "-q"},
+		{"add", "-A"},
+		{"-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "fixture"},
+	} {
+		cmd := exec.CommandContext(ctx, "git", append([]string{"-C", dst}, args...)...)
+		require.NoError(t, cmd.Run())
+	}
+
+	// Step 1: v1 → v2 YAML (template-content rewrite).
+	templatesResult, err := migratecmd.RunMigrate(&migratecmd.MigrateOpts{Path: dst})
+	require.NoError(t, err)
+	require.NotEmpty(t, templatesResult.Blueprints)
+
+	for _, bp := range templatesResult.Blueprints {
+		assert.True(t, bp.Migrated, "templates migrator should have rewritten %s", bp.Path)
+	}
+
+	// Step 2: v2 YAML → v2 HCL (config-file rewrite).
+	configResult, err := migratecmd.RunMigrateConfig(&migratecmd.MigrateOpts{
+		Path:  dst,
+		Force: true,
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, configResult.Files)
+
+	for _, f := range configResult.Files {
+		assert.True(t, f.Migrated, "config migrator should have rewritten %s", f.Path)
+		assert.Empty(t, f.Errors, "%s: %v", f.Path, f.Errors)
+	}
+
+	// Step 3: confirm the migrated tree loads end-to-end.
+	bp, err := config.LoadBlueprint(filepath.Join(dst, "go", "api", "blueprint.yaml"))
+	require.NoError(t, err, "post-two-step blueprint must load via the dispatcher")
+	assert.Equal(t, "go-api", bp.Name)
+
+	reg, err := config.LoadRegistry(filepath.Join(dst, "registry.yaml"))
+	require.NoError(t, err)
+	assert.NotEmpty(t, reg.Blueprints)
+}
+
 // TestRunMigrate_ParsesAfterMigration verifies the migrated
 // blueprint.yaml is still well-formed YAML and carries the expected
 // blueprint name. Post-OQ-4 the migrator output is YAML-shaped and
 // requires a second `forge migrate config` pass to reach the HCL
 // form the loader accepts — full two-step end-to-end coverage lives
-// in C.8.
+// in TestRunMigrate_TwoStepEndToEnd.
 func TestRunMigrate_ParsesAfterMigration(t *testing.T) {
 	t.Parallel()
 
