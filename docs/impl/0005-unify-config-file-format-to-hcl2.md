@@ -635,7 +635,7 @@ open the fresh forge-registry migration PR.
   - Update the directory-structure tree diagram to show `.hcl`
     filenames.
 
-- [ ] **D.3 Add the YAML→HCL section to `docs/MIGRATION.md`.**
+- [x] **D.3 Add the YAML→HCL section to `docs/MIGRATION.md`.**
   - File: `docs/MIGRATION.md`.
   - New section: "Migrating from v2 YAML to HCL config files (forge
     v0.3.x → v0.4.x)".
