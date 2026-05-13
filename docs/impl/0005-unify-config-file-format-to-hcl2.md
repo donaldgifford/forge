@@ -462,7 +462,7 @@ swap scaffolding emitters to HCL.
     `unused` linter happy. Loader tests rewritten around the new
     rejection contract (also satisfies C.7).
 
-- [ ] **C.2 Drop the `apiVersion` field.**
+- [x] **C.2 Drop the `apiVersion` field.**
   - File: `internal/config/blueprint.go` — delete `APIVersion`.
   - File: `internal/config/registry.go` — delete `APIVersion`.
   - Update every reader (`grep -rn APIVersion`):
@@ -473,6 +473,14 @@ swap scaffolding emitters to HCL.
       starting from v0.2.x or earlier run `forge migrate templates`
       then `forge migrate config` — a documented two-step path.
     - `internal/config/validate_test.go` — drop apiVersion assertions.
+  - Done: APIVersion fields removed from both structs;
+    `bumpRegistryAPIVersion` and the `rewriteScalar` helper deleted
+    (the latter was only used for the apiVersion bump). The
+    `AlreadyV2` short-circuit in the templates migrator stays as an
+    idempotence signal for re-runs (the apiVersion probe is internal
+    to the migrator, not the loader). Consumer assertions updated in
+    info_test, initcmd_test, registrycmd_test, walk_test, and
+    integration_test.
 
 - [ ] **C.3 Update scaffolding emitters.**
   - Files:
