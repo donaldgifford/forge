@@ -176,8 +176,8 @@ func collectFiles(dir string, fs *FileSet, layer SourceLayer) error {
 			return nil
 		}
 
-		// Skip blueprint.yaml — it's config, not output content.
-		if info.Name() == "blueprint.yaml" {
+		// Skip blueprint.hcl — it's config, not output content.
+		if info.Name() == "blueprint.hcl" {
 			return nil
 		}
 

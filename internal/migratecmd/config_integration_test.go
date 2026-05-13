@@ -14,15 +14,15 @@ import (
 )
 
 // TestMigrateConfig_FullV2Registry exercises the migrator end-to-end
-// against the in-tree testdata/v2-registry/ corpus. Confirms the
-// rewriter handles every field shape that fixture exercises (the
-// canonical post-IMPL-0004 v2 layout) and that `forge create` works
-// against the migrated tree.
+// against the frozen testdata/v2-yaml-registry/ corpus — the
+// pre-cutover YAML snapshot of the v2 layout. Confirms the rewriter
+// handles every field shape that fixture exercises and that
+// `forge create` works against the migrated tree.
 func TestMigrateConfig_FullV2Registry(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
-	copyTree(t, "../../testdata/v2-registry", root)
+	copyTree(t, "../../testdata/v2-yaml-registry", root)
 
 	result, err := migratecmd.RunMigrateConfig(&migratecmd.MigrateOpts{
 		Path:  root,
