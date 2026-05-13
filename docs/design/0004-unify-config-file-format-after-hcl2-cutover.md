@@ -1,17 +1,24 @@
 ---
 id: DESIGN-0004
 title: "Unify Config File Format After HCL2 Cutover"
-status: Draft
+status: Implemented
 author: Donald Gifford
 created: 2026-05-12
+updated: 2026-05-13
 ---
 <!-- markdownlint-disable-file MD025 MD041 -->
 
 # DESIGN 0004: Unify Config File Format After HCL2 Cutover
 
-**Status:** Draft
+**Status:** Implemented
 **Author:** Donald Gifford
 **Date:** 2026-05-12
+**Last revised:** 2026-05-13 — design realised by IMPL-0005. The HCL
+loader is the only accepted format; bare YAML configs are rejected at
+load time with a pointer to `forge migrate config`. See
+[IMPL-0005](../impl/0005-unify-config-file-format-to-hcl2.md) for the
+phased rollout and [docs/MIGRATION.md](../MIGRATION.md) for the
+authoring-side upgrade walkthrough.
 
 <!--toc:start-->
 - [Overview](#overview)

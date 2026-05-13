@@ -653,7 +653,7 @@ open the fresh forge-registry migration PR.
     to `.hcl`. Add `forge migrate config` to the Commands table. Add a
     "Migrating from v0.3.x" pointer to `docs/MIGRATION.md`.
 
-- [ ] **D.5 Update DESIGN-0004 status.**
+- [x] **D.5 Update DESIGN-0004 status.**
   - Flip status from `Draft` to `Implemented` once Phases A–C land.
 
 - [ ] **D.6 Fresh forge-registry migration PR.**
