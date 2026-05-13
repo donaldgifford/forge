@@ -213,12 +213,20 @@ the load error in Phase C).
     extended in this commit to cover Maintainers, RegistryDefaults,
     Version, LatestCommit (fields the original A.2 spec missed).
 
-- [ ] **A.7 Unit tests for the HCL loaders.**
+- [x] **A.7 Unit tests for the HCL loaders.**
   - File: `internal/config/loader_hcl_test.go` (new).
   - Cover happy-path decode, every block type, missing-required-field
     diagnostic, malformed `condition.when` diagnostic.
   - Round-trip test: decode → re-encode via `hclwrite` (Phase B's
     rewriter) → decode → assert deep-equal.
+  - Done: 11 test functions cover happy paths (blueprint + registry),
+    every block kind via the hermetic fixture, dispatcher branches
+    (HCL sibling preferred over YAML; YAML fallback when no sibling),
+    and four negative paths (missing required attr at top level,
+    inside variable, inside rename entry, missing required attr on
+    registry blueprint entry; malformed `condition.when` failing at
+    load time per OQ-7). Round-trip test deferred to Phase B (needs
+    the `hclwrite` rewriter from B.2).
 
 - [ ] **A.8 Integration test exercising the HCL fixture.**
   - File: `internal/create/cli_integration_test_hcl.go` (new) or extend

@@ -178,6 +178,97 @@ condition {
 	assert.True(t, v.True())
 }
 
+// TestLoadBlueprintHCL_MalformedConditionWhen verifies a syntactically
+// broken `condition.when` surfaces a parse diagnostic at load time
+// (per OQ-7) rather than waiting for the first evaluation.
+func TestLoadBlueprintHCL_MalformedConditionWhen(t *testing.T) {
+	t.Parallel()
+
+	const src = `
+name = "x"
+
+condition {
+  when    = use_grpc ==
+  exclude = ["proto/"]
+}
+`
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "blueprint.hcl")
+	require.NoError(t, os.WriteFile(path, []byte(src), 0o600))
+
+	_, err := config.LoadBlueprintHCL(path)
+	require.Error(t, err, "broken when expression must fail at load time")
+}
+
+// TestLoadBlueprintHCL_VariableMissingType exercises the field-level
+// validator (Variable.Type required) on the HCL path.
+func TestLoadBlueprintHCL_VariableMissingType(t *testing.T) {
+	t.Parallel()
+
+	const src = `
+name = "x"
+
+variable "missing_type" {
+  description = "no type set"
+}
+`
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "blueprint.hcl")
+	require.NoError(t, os.WriteFile(path, []byte(src), 0o600))
+
+	_, err := config.LoadBlueprintHCL(path)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "type is required")
+}
+
+// TestLoadBlueprintHCL_RenameEntryMissingTo confirms required-attr
+// diagnostics surface from inside lazy blocks too.
+func TestLoadBlueprintHCL_RenameEntryMissingTo(t *testing.T) {
+	t.Parallel()
+
+	const src = `
+name = "x"
+
+rename {
+  entry {
+    from = "src/"
+  }
+}
+`
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "blueprint.hcl")
+	require.NoError(t, os.WriteFile(path, []byte(src), 0o600))
+
+	_, err := config.LoadBlueprintHCL(path)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "to")
+}
+
+// TestLoadRegistryHCL_MissingPath confirms the field-level validator
+// runs on the HCL path.
+func TestLoadRegistryHCL_MissingPath(t *testing.T) {
+	t.Parallel()
+
+	const src = `
+name = "r"
+
+blueprint "go-api" {
+  description = "missing path"
+}
+`
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "registry.hcl")
+	require.NoError(t, os.WriteFile(path, []byte(src), 0o600))
+
+	_, err := config.LoadRegistryHCL(path)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `"path" is required`)
+}
+
 // TestLoadBlueprint_PrefersHCLSibling verifies the dispatcher picks the
 // HCL file when both blueprint.yaml and blueprint.hcl exist in the
 // same directory. Phase A side-by-side: HCL wins.
