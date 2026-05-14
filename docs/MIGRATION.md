@@ -14,7 +14,10 @@ shipped between releases. Forge has two cumulative migration steps:
 If you are coming from **v0.2.x or earlier**, run **both** steps in
 order — `forge migrate templates` first, then `forge migrate config`.
 If you are already on v0.3.x (HCL2 templates, YAML config), only the
-second step is required.
+second step is required. If you ran the steps **out of order** and
+ended up with v1 template syntax stranded in a `blueprint.hcl`-rooted
+registry, `forge migrate templates` (v0.4.1+) walks HCL-rooted
+blueprints too — re-run it against your registry to clean up.
 
 ## Migrating template syntax (v0.2.x → v0.3.x)
 

@@ -8,12 +8,15 @@ import (
 	"strings"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/donaldgifford/forge/internal/config"
 )
 
 const (
-	blueprintFileName = "blueprint.yaml"
-	registryFileName  = "registry.yaml"
-	tmplExtension     = ".tmpl"
+	blueprintFileName    = "blueprint.yaml"
+	blueprintHCLFileName = "blueprint.hcl"
+	registryFileName     = "registry.yaml"
+	tmplExtension        = ".tmpl"
 
 	apiVersionV2 = "v2"
 )
@@ -43,10 +46,20 @@ func runMigrate(opts *MigrateOpts) (*MigrateResult, error) {
 		return nil, fmt.Errorf("walking blueprints: %w", err)
 	}
 
+	// Collect the union of declared variables across all blueprints
+	// once, up front. The union scopes simple-field rewrites so the
+	// migrator doesn't mistakenly translate downstream-tool `{{ .X }}`
+	// patterns (goreleaser, Helm, etc.) that share v1's surface
+	// syntax. Per-blueprint scoping would be slightly more precise,
+	// but inherited `_defaults/` files commonly reference variables
+	// declared in only some blueprints, and the union avoids
+	// surprising "this is declared over there but not here" gaps.
+	declaredVars := collectDeclaredVars(blueprints)
+
 	covered := make(map[string]struct{})
 
 	for _, bpDir := range blueprints {
-		report, err := migrateBlueprint(bpDir, opts.DryRun)
+		report, err := migrateBlueprint(bpDir, declaredVars, opts.DryRun)
 		if err != nil {
 			return nil, fmt.Errorf("migrating %s: %w", bpDir, err)
 		}
@@ -60,7 +73,7 @@ func runMigrate(opts *MigrateOpts) (*MigrateResult, error) {
 
 	// 3. Migrate any .tmpl files under _defaults/ (registry-wide and
 	// category-level) that the per-blueprint walk didn't cover.
-	defaultHits, defaultFiles, err := migrateDefaults(abs, covered, opts.DryRun)
+	defaultHits, defaultFiles, err := migrateDefaults(abs, declaredVars, covered, opts.DryRun)
 	if err != nil {
 		return nil, fmt.Errorf("migrating _defaults: %w", err)
 	}
@@ -87,8 +100,10 @@ func runMigrate(opts *MigrateOpts) (*MigrateResult, error) {
 // migrateDefaults walks every _defaults/ directory under root and
 // rewrites .tmpl files the per-blueprint pass didn't already cover. The
 // covered set is used to dedupe — a _defaults dir nested *inside* a
-// blueprint already gets migrated by migrateBlueprint.
-func migrateDefaults(root string, covered map[string]struct{}, dryRun bool) ([]UntranslatedHit, []string, error) {
+// blueprint already gets migrated by migrateBlueprint. declared scopes
+// the rewriter to the union of declared variables across all
+// blueprints; nil means "translate every field" (legacy behavior).
+func migrateDefaults(root string, declared []string, covered map[string]struct{}, dryRun bool) ([]UntranslatedHit, []string, error) {
 	var (
 		hits  []UntranslatedHit
 		files []string
@@ -115,7 +130,7 @@ func migrateDefaults(root string, covered map[string]struct{}, dryRun bool) ([]U
 			return readErr
 		}
 
-		out, fileHits, rewriteErr := RewriteTemplate(path, string(src))
+		out, fileHits, rewriteErr := RewriteTemplateScoped(path, string(src), declared)
 		if rewriteErr != nil {
 			return fmt.Errorf("rewriting %s: %w", path, rewriteErr)
 		}
@@ -138,9 +153,116 @@ func migrateDefaults(root string, covered map[string]struct{}, dryRun bool) ([]U
 	return hits, files, err
 }
 
+// collectDeclaredVars returns the sorted union of declared variable
+// names across every blueprint in dirs. Blueprints with a
+// `blueprint.hcl` are loaded via config.LoadBlueprint; blueprints with
+// only a `blueprint.yaml` are parsed by hand from the YAML document
+// tree (since the v2 loader rejects YAML configs). Errors loading any
+// single blueprint are tolerated — the variable list just won't
+// include that blueprint's declarations. The result is used to scope
+// simple-field rewrites in .tmpl files so the migrator doesn't
+// translate downstream-tool `{{ .X }}` patterns (goreleaser,
+// Helm, etc.) that share v1's surface syntax.
+//
+// Returns nil when no declarations can be read from any blueprint,
+// which preserves the legacy "translate every field" behavior.
+func collectDeclaredVars(dirs []string) []string {
+	seen := make(map[string]struct{})
+
+	for _, dir := range dirs {
+		names := readDeclaredVars(dir)
+		for _, n := range names {
+			seen[n] = struct{}{}
+		}
+	}
+
+	if len(seen) == 0 {
+		return nil
+	}
+
+	out := make([]string, 0, len(seen))
+	for name := range seen {
+		out = append(out, name)
+	}
+
+	return out
+}
+
+// readDeclaredVars returns the declared variable names for a single
+// blueprint directory. Prefers blueprint.hcl when present; falls back
+// to a yaml.Node walk for blueprint.yaml (used during the v0.2.x →
+// v0.3.x migration before configs were moved to HCL).
+func readDeclaredVars(dir string) []string {
+	hclPath := filepath.Join(dir, blueprintHCLFileName)
+	if _, err := os.Stat(hclPath); err == nil {
+		bp, err := config.LoadBlueprint(hclPath)
+		if err != nil {
+			return nil
+		}
+
+		out := make([]string, 0, len(bp.Variables))
+		for _, v := range bp.Variables {
+			out = append(out, v.Name)
+		}
+
+		return out
+	}
+
+	yamlPath := filepath.Join(dir, blueprintFileName)
+
+	data, err := os.ReadFile(filepath.Clean(yamlPath))
+	if err != nil {
+		return nil
+	}
+
+	return extractYAMLVariableNames(data)
+}
+
+// extractYAMLVariableNames pulls variable names from a v1-shape
+// blueprint.yaml document via yaml.Node. The schema has a top-level
+// `variables:` sequence whose elements are mappings with a `name`
+// scalar. Returns nil on any parse failure — the migrator falls back
+// to "translate every field" in that case.
+func extractYAMLVariableNames(data []byte) []string {
+	var doc yaml.Node
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		return nil
+	}
+
+	root := documentRoot(&doc)
+	if root == nil {
+		return nil
+	}
+
+	vars := findMappingValue(root, "variables")
+	if vars == nil || vars.Kind != yaml.SequenceNode {
+		return nil
+	}
+
+	out := make([]string, 0, len(vars.Content))
+
+	for _, v := range vars.Content {
+		name := findMappingValue(v, "name")
+		if name == nil || name.Kind != yaml.ScalarNode || name.Value == "" {
+			continue
+		}
+
+		out = append(out, name.Value)
+	}
+
+	return out
+}
+
 // walkBlueprints returns every directory under root that contains a
-// blueprint.yaml file.
+// blueprint config file. Both v0.3.x `blueprint.yaml` and v0.4.x+
+// `blueprint.hcl` count as roots — registries that ran `forge migrate
+// config` before `forge migrate templates` (or that hand-authored an
+// HCL config from scratch) still need the per-blueprint .tmpl walks
+// applied even though no YAML config exists on disk. A directory with
+// both files (mid-migration) is reported once.
 func walkBlueprints(root string) ([]string, error) {
+	seen := make(map[string]struct{})
+
 	var out []string
 
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
@@ -148,11 +270,21 @@ func walkBlueprints(root string) ([]string, error) {
 			return err
 		}
 
-		if d.IsDir() || d.Name() != blueprintFileName {
+		if d.IsDir() {
 			return nil
 		}
 
-		out = append(out, filepath.Dir(path))
+		if d.Name() != blueprintFileName && d.Name() != blueprintHCLFileName {
+			return nil
+		}
+
+		dir := filepath.Dir(path)
+		if _, ok := seen[dir]; ok {
+			return nil
+		}
+
+		seen[dir] = struct{}{}
+		out = append(out, dir)
 
 		return nil
 	})
@@ -231,13 +363,89 @@ func renamePathShorthandDirs(root string, dryRun bool) ([]string, error) {
 	return out, nil
 }
 
-// migrateBlueprint runs the migration for one blueprint directory:
+// migrateBlueprint runs the migration for one blueprint directory.
+// Dispatches between the YAML and HCL paths: if `blueprint.yaml` is
+// present, the YAML path also rewrites the apiVersion check and the
+// expression fields (variable.default, condition.when, rename). The
+// HCL path only walks .tmpl files and renames template directories —
+// blueprint.hcl content is already HCL2. declared is the union of
+// declared variable names across the registry, used to scope
+// simple-field rewrites in .tmpl files.
+func migrateBlueprint(dir string, declared []string, dryRun bool) (*BlueprintReport, error) {
+	if _, err := os.Stat(filepath.Join(dir, blueprintFileName)); err == nil {
+		return migrateBlueprintYAML(dir, declared, dryRun)
+	}
+
+	return migrateBlueprintHCL(dir, declared, dryRun)
+}
+
+// migrateBlueprintHCL runs the .tmpl-only migration for a
+// blueprint.hcl-rooted blueprint. The HCL config itself is left
+// untouched (its expression fields are already HCL2). The `.tmpl`
+// rewrite logic is idempotent, so re-runs are safe: a fully-v2
+// `.tmpl` file rewrites to itself and the blueprint's status comes
+// back as "unchanged".
+func migrateBlueprintHCL(dir string, declared []string, dryRun bool) (*BlueprintReport, error) {
+	report := &BlueprintReport{Path: dir}
+
+	tmplFiles, err := findTemplateFiles(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	tmplOutputs := make(map[string][]byte, len(tmplFiles))
+
+	for _, tmplPath := range tmplFiles {
+		src, readErr := os.ReadFile(filepath.Clean(tmplPath))
+		if readErr != nil {
+			return nil, fmt.Errorf("reading %s: %w", tmplPath, readErr)
+		}
+
+		out, fileHits, rewriteErr := RewriteTemplateScoped(tmplPath, string(src), declared)
+		if rewriteErr != nil {
+			return nil, fmt.Errorf("rewriting %s: %w", tmplPath, rewriteErr)
+		}
+
+		tmplOutputs[tmplPath] = []byte(out)
+		report.UntranslatedHits = append(report.UntranslatedHits, fileHits...)
+
+		if string(src) != out {
+			report.FilesRewritten = append(report.FilesRewritten, tmplPath)
+		}
+	}
+
+	if dryRun {
+		return report, nil
+	}
+
+	for path, content := range tmplOutputs {
+		if err := os.WriteFile(path, content, 0o644); err != nil {
+			return nil, fmt.Errorf("writing %s: %w", path, err)
+		}
+	}
+
+	renamed, err := renamePathShorthandDirs(dir, dryRun)
+	if err != nil {
+		return nil, fmt.Errorf("renaming dirs: %w", err)
+	}
+
+	report.FilesRewritten = append(report.FilesRewritten, renamed...)
+
+	if len(report.FilesRewritten) > 0 {
+		report.Migrated = true
+	}
+
+	return report, nil
+}
+
+// migrateBlueprintYAML runs the legacy v0.2.x/v0.3.x migration path
+// for a blueprint.yaml-rooted blueprint:
 //  1. Read blueprint.yaml; if apiVersion is already v2, return AlreadyV2
 //     (the field still serves as an idempotence signal for re-runs of
 //     the templates migrator, even though the loader no longer reads it).
 //  2. Rewrite expression fields (variable.default, condition.when, rename).
 //  3. Rewrite all .tmpl files under the directory.
-func migrateBlueprint(dir string, dryRun bool) (*BlueprintReport, error) {
+func migrateBlueprintYAML(dir string, declared []string, dryRun bool) (*BlueprintReport, error) {
 	report := &BlueprintReport{Path: dir}
 	bpPath := filepath.Join(dir, blueprintFileName)
 
@@ -273,7 +481,7 @@ func migrateBlueprint(dir string, dryRun bool) (*BlueprintReport, error) {
 			return nil, fmt.Errorf("reading %s: %w", tmplPath, readErr)
 		}
 
-		out, fileHits, rewriteErr := RewriteTemplate(tmplPath, string(src))
+		out, fileHits, rewriteErr := RewriteTemplateScoped(tmplPath, string(src), declared)
 		if rewriteErr != nil {
 			return nil, fmt.Errorf("rewriting %s: %w", tmplPath, rewriteErr)
 		}

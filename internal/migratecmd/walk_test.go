@@ -187,3 +187,147 @@ func TestRunMigrate_AlreadyV2Skips(t *testing.T) {
 	assert.True(t, result.Blueprints[0].AlreadyV2)
 	assert.False(t, result.Blueprints[0].Migrated)
 }
+
+// TestRunMigrate_HCLRootedBlueprint covers the case where a registry
+// has already been through `forge migrate config` (so its config
+// files are blueprint.hcl, not blueprint.yaml) but still has v1
+// template syntax stranded in .tmpl files. Surfaced by
+// donaldgifford/forge-registry — running `migrate config` before
+// `migrate templates` left v1 `{{ .project_name }}` syntax in 15
+// files because the walker only matched `blueprint.yaml`-rooted
+// directories.
+func TestRunMigrate_HCLRootedBlueprint(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	bpDir := filepath.Join(root, "go", "api")
+	require.NoError(t, os.MkdirAll(filepath.Join(bpDir, "{{project_name}}"), 0o755))
+
+	hclConfig := []byte(`name        = "go-api"
+description = "Go API"
+version     = "1.0.0"
+
+variable "project_name" {
+  type = "string"
+}
+`)
+	require.NoError(t, os.WriteFile(filepath.Join(bpDir, "blueprint.hcl"), hclConfig, 0o644))
+
+	tmpl := []byte("# {{ .project_name }}\nmodule {{ .project_name }}\n")
+	require.NoError(t, os.WriteFile(
+		filepath.Join(bpDir, "{{project_name}}", "README.md.tmpl"),
+		tmpl, 0o644,
+	))
+
+	result, err := migratecmd.RunMigrate(&migratecmd.MigrateOpts{Path: root, Force: true})
+	require.NoError(t, err)
+	require.Len(t, result.Blueprints, 1)
+
+	report := result.Blueprints[0]
+	assert.True(t, report.Migrated, "HCL-rooted blueprint with v1 .tmpl content should migrate")
+	assert.False(t, report.AlreadyV2, "AlreadyV2 only applies to YAML configs with apiVersion: v2")
+
+	// Template content rewritten in place.
+	renamedTmpl := filepath.Join(bpDir, "${project_name}", "README.md.tmpl")
+	got, err := os.ReadFile(renamedTmpl)
+	require.NoError(t, err)
+	assert.Equal(t, "# ${project_name}\nmodule ${project_name}\n", string(got))
+
+	// blueprint.hcl is untouched — its expression fields are already
+	// HCL2; the migrator has no business rewriting them.
+	hclAfter, err := os.ReadFile(filepath.Join(bpDir, "blueprint.hcl"))
+	require.NoError(t, err)
+	assert.Equal(t, string(hclConfig), string(hclAfter), "blueprint.hcl should not be modified")
+
+	// Original {{project_name}} directory is gone.
+	_, err = os.Stat(filepath.Join(bpDir, "{{project_name}}"))
+	assert.True(t, os.IsNotExist(err), "v1-shape template directory should be renamed")
+}
+
+// TestRunMigrate_HCLRootedLeavesDownstreamSyntaxAlone pins the
+// variable-scoped rewriter: `{{ .ProjectName }}` and `{{ .Env.FOO }}`
+// in a .goreleaser-style template must pass through verbatim — they
+// are goreleaser variables, not forge variables. Forge variables
+// (single-level, snake_case identifiers declared in blueprint.hcl)
+// still rewrite normally.
+func TestRunMigrate_HCLRootedLeavesDownstreamSyntaxAlone(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	bpDir := filepath.Join(root, "go", "ext")
+	require.NoError(t, os.MkdirAll(bpDir, 0o755))
+
+	hclConfig := []byte(`name = "go-ext"
+
+variable "project_name" {
+  type = "string"
+}
+`)
+	require.NoError(t, os.WriteFile(filepath.Join(bpDir, "blueprint.hcl"), hclConfig, 0o644))
+
+	// .goreleaser.yml.tmpl-shaped content: forge vars are v1 dot-form
+	// (need migration); goreleaser's CamelCase fields and Env chain
+	// must be preserved as literal text.
+	goreleaserTmpl := []byte(`builds:
+  - id: {{ .project_name }}
+    binary: {{ .project_name }}
+
+archives:
+  - name_template: '{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}'
+
+signs:
+  - args: ['--local-user', '{{ .Env.GPG_FINGERPRINT }}']
+`)
+	require.NoError(t, os.WriteFile(filepath.Join(bpDir, ".goreleaser.yml.tmpl"), goreleaserTmpl, 0o644))
+
+	_, err := migratecmd.RunMigrate(&migratecmd.MigrateOpts{Path: root, Force: true})
+	require.NoError(t, err)
+
+	got, err := os.ReadFile(filepath.Join(bpDir, ".goreleaser.yml.tmpl"))
+	require.NoError(t, err)
+
+	want := `builds:
+  - id: ${project_name}
+    binary: ${project_name}
+
+archives:
+  - name_template: '{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}'
+
+signs:
+  - args: ['--local-user', '{{ .Env.GPG_FINGERPRINT }}']
+`
+	assert.Equal(t, want, string(got))
+}
+
+// TestRunMigrate_HCLRootedIdempotent covers re-running the migrator
+// against a fully-v2 HCL-rooted blueprint: the .tmpl rewriter is
+// idempotent so the run reports unchanged status.
+func TestRunMigrate_HCLRootedIdempotent(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	bpDir := filepath.Join(root, "go", "api")
+	require.NoError(t, os.MkdirAll(filepath.Join(bpDir, "${project_name}"), 0o755))
+
+	hclConfig := []byte(`name = "go-api"
+
+variable "project_name" {
+  type = "string"
+}
+`)
+	require.NoError(t, os.WriteFile(filepath.Join(bpDir, "blueprint.hcl"), hclConfig, 0o644))
+
+	tmpl := []byte("# ${project_name}\n")
+	require.NoError(t, os.WriteFile(
+		filepath.Join(bpDir, "${project_name}", "README.md.tmpl"),
+		tmpl, 0o644,
+	))
+
+	result, err := migratecmd.RunMigrate(&migratecmd.MigrateOpts{Path: root, Force: true})
+	require.NoError(t, err)
+	require.Len(t, result.Blueprints, 1)
+
+	report := result.Blueprints[0]
+	assert.False(t, report.Migrated, "fully-v2 HCL blueprint should report unchanged on re-run")
+	assert.Empty(t, report.FilesRewritten)
+}

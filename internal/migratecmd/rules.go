@@ -75,8 +75,42 @@ var knownFuncs = map[string]any{
 // source-line info so the author can fix them by hand; the offending
 // region is emitted verbatim into the output as a best-effort fallback.
 //
+// Every `{{ .X }}` is translated to `${X}` regardless of whether `X`
+// is a declared variable — appropriate for the v0.2.x → v0.3.x cutover
+// where every `{{ }}` in a .tmpl file was forge syntax. For v0.4.x+
+// registries that mix forge variables with downstream-tool `{{ }}`
+// syntax (goreleaser, Helm), use RewriteTemplateScoped instead.
+//
 // The function is pure: it never touches the filesystem or network.
 func RewriteTemplate(name, src string) (string, []UntranslatedHit, error) {
+	return rewriteTemplate(name, src, nil)
+}
+
+// RewriteTemplateScoped is the variable-aware variant of RewriteTemplate.
+// Simple `{{ .name }}` actions whose name isn't in declared are emitted
+// verbatim — they're treated as downstream-tool syntax (goreleaser's
+// `{{ .ProjectName }}`, Helm's `{{ .Values.replicas }}`, etc.) rather
+// than v1 forge references. Chained field access (`{{ .a.b }}`) is
+// always emitted verbatim regardless of the scope, since forge
+// variables are single-level. Function calls and pipes always migrate
+// because they have no downstream-tool analogue.
+//
+// Passing a nil declared slice yields the same behavior as
+// RewriteTemplate (translate every field).
+func RewriteTemplateScoped(name, src string, declared []string) (string, []UntranslatedHit, error) {
+	var scope map[string]struct{}
+
+	if declared != nil {
+		scope = make(map[string]struct{}, len(declared))
+		for _, v := range declared {
+			scope[v] = struct{}{}
+		}
+	}
+
+	return rewriteTemplate(name, src, scope)
+}
+
+func rewriteTemplate(name, src string, scope map[string]struct{}) (string, []UntranslatedHit, error) {
 	normalised := normalisePathShorthand(src)
 
 	tree, err := parse.New(name).Parse(normalised, "{{", "}}", map[string]*parse.Tree{}, knownFuncs)
@@ -84,7 +118,13 @@ func RewriteTemplate(name, src string) (string, []UntranslatedHit, error) {
 		return "", nil, fmt.Errorf("parsing v1 template %q: %w", name, err)
 	}
 
-	w := newWalker(name, normalised)
+	var w *walker
+	if scope == nil {
+		w = newWalker(name, normalised)
+	} else {
+		w = newWalkerScoped(name, normalised, scope)
+	}
+
 	w.walkList(tree.Root)
 
 	return w.out.String(), w.hits, nil
@@ -175,10 +215,22 @@ type walker struct {
 	src  string
 	out  strings.Builder
 	hits []UntranslatedHit
+	// allowedVars scopes single-field `{{ .X }}` rewrites to declared
+	// forge variables. A nil map means "translate every field" — the
+	// legacy v0.2.x → v0.3.x behavior where every `{{ }}` was forge
+	// syntax. A non-nil map means: simple `{{ .name }}` actions whose
+	// name is absent from the map are emitted verbatim (they're
+	// downstream-tool syntax like goreleaser's `{{ .ProjectName }}` or
+	// Helm's `{{ .Values.replicas }}`, not v1 forge references).
+	allowedVars map[string]struct{}
 }
 
 func newWalker(name, src string) *walker {
 	return &walker{name: name, src: src}
+}
+
+func newWalkerScoped(name, src string, allowed map[string]struct{}) *walker {
+	return &walker{name: name, src: src, allowedVars: allowed}
 }
 
 func (w *walker) walkList(list *parse.ListNode) {
@@ -221,7 +273,20 @@ func (w *walker) walkNode(node parse.Node) {
 // walkAction translates a `{{ … }}` action node into a `${ … }` HCL
 // interpolation. The wrapped PipeNode is decomposed into nested function
 // calls when more than one command is present.
+//
+// When the walker carries a non-nil allowedVars scope, simple
+// `{{ .name }}` actions whose name isn't in the scope (including any
+// chained `{{ .a.b }}` reference, since forge variables never chain)
+// are emitted verbatim — they're downstream-tool syntax (goreleaser's
+// `{{ .ProjectName }}`, Helm's `{{ .Values.replicas }}`, etc.) that
+// must pass through the renderer untouched.
 func (w *walker) walkAction(n *parse.ActionNode) {
+	if w.allowedVars != nil && simpleField(n) && !w.fieldIsAllowed(n) {
+		w.out.WriteString(w.actionSource(n))
+
+		return
+	}
+
 	expr, ok := w.translatePipe(n.Pipe)
 	if !ok {
 		w.out.WriteString(n.String())
@@ -232,6 +297,71 @@ func (w *walker) walkAction(n *parse.ActionNode) {
 	w.out.WriteString("${")
 	w.out.WriteString(expr)
 	w.out.WriteString("}")
+}
+
+// actionSource returns the original source text for an action,
+// preserving the author's whitespace inside the `{{ }}`. parse.Node's
+// String() method rebuilds from the parse tree and strips internal
+// spacing — that's irrelevant for actions we're translating, but
+// matters for actions we're passing through verbatim because they're
+// destined for a downstream tool (Helm, goreleaser) that may be
+// whitespace-sensitive in expression contexts.
+//
+// ActionNode.Pos in the Go parse package points at the action body
+// (the `.` in `{{ .X }}`), not at the opening `{{` delimiter, so we
+// scan backwards to find the `{{` before slicing.
+func (w *walker) actionSource(n *parse.ActionNode) string {
+	pos := int(n.Pos)
+	if pos >= len(w.src) {
+		return n.String()
+	}
+
+	start := strings.LastIndex(w.src[:pos], "{{")
+	if start < 0 {
+		return n.String()
+	}
+
+	i := strings.Index(w.src[start:], "}}")
+	if i < 0 {
+		return n.String()
+	}
+
+	return w.src[start : start+i+2]
+}
+
+// simpleField reports whether the action is shaped `{{ .X }}` or
+// `{{ .X.Y... }}` — a single command with a single FieldNode argument.
+// Function calls (`{{ snakeCase .x }}`), pipes (`{{ .x | upper }}`),
+// and multi-command actions return false.
+func simpleField(n *parse.ActionNode) bool {
+	if n == nil || n.Pipe == nil || len(n.Pipe.Cmds) != 1 {
+		return false
+	}
+
+	cmd := n.Pipe.Cmds[0]
+	if len(cmd.Args) != 1 {
+		return false
+	}
+
+	_, ok := cmd.Args[0].(*parse.FieldNode)
+
+	return ok
+}
+
+// fieldIsAllowed reports whether the root identifier of a simple-field
+// action is in the allowedVars scope. Callers must verify the action
+// is a simple-field action first (via simpleField). Chained field
+// references (`{{ .a.b }}`) always return false — forge variables are
+// single-level, so any chain is downstream syntax.
+func (w *walker) fieldIsAllowed(n *parse.ActionNode) bool {
+	field, ok := n.Pipe.Cmds[0].Args[0].(*parse.FieldNode)
+	if !ok || len(field.Ident) != 1 {
+		return false
+	}
+
+	_, allowed := w.allowedVars[field.Ident[0]]
+
+	return allowed
 }
 
 // walkIf translates `{{ if cond }} … {{ else }} … {{ end }}` to the
