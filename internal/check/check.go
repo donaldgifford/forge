@@ -62,9 +62,7 @@ func Run(opts *Opts) (*Result, error) {
 		projectDir = "."
 	}
 
-	lockPath := filepath.Join(projectDir, lockfile.FileName)
-
-	lock, err := lockfile.Read(lockPath)
+	lock, err := lockfile.LoadLockfile(projectDir)
 	if err != nil {
 		return nil, fmt.Errorf("reading lockfile: %w (is this a forge project?)", err)
 	}

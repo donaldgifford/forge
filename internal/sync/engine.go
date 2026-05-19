@@ -46,9 +46,9 @@ func Run(opts *Opts) (*Result, error) {
 		projectDir = "."
 	}
 
-	lockPath := filepath.Join(projectDir, lockfile.FileName)
+	lockPath := filepath.Join(projectDir, lockfile.HCLFileName)
 
-	lock, err := lockfile.Read(lockPath)
+	lock, err := lockfile.LoadLockfile(projectDir)
 	if err != nil {
 		return nil, fmt.Errorf("reading lockfile: %w", err)
 	}
@@ -96,7 +96,7 @@ func Run(opts *Opts) (*Result, error) {
 		// Recompute content hashes for synced files.
 		updateFileHashes(projectDir, lock)
 
-		if err := lockfile.Write(lockPath, lock); err != nil {
+		if err := lockfile.WriteHCL(lockPath, lock); err != nil {
 			return nil, fmt.Errorf("updating lockfile: %w", err)
 		}
 	}

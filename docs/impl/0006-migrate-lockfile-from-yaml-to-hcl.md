@@ -168,7 +168,7 @@ load-time rescaffold/pin error (per ADR-0002).
     IMPL-0007 deletes that package entirely. Once both this work
     and IMPL-0007 land, the yaml.v3 dependency can be dropped from
     `go.mod`.
-- [ ] **B.3 Update writers.**
+- [x] **B.3 Update writers.**
   - `internal/create/`, `internal/sync/`, `internal/check/` — every
     site that writes the lockfile switches from `WriteLockfile` (YAML)
     to `WriteLockfileHCL`.
@@ -176,7 +176,7 @@ load-time rescaffold/pin error (per ADR-0002).
   - Every `testdata/.../forge-lock.yaml` becomes `.forge-lock.hcl`.
     Frozen YAML fixture preserved at `testdata/v0-lockfile-yaml/`
     for the rejection-path test.
-- [ ] **B.5 Update integration tests.**
+- [x] **B.5 Update integration tests.**
   - `internal/create/`, `internal/sync/`, `internal/check/` —
     integration tests that assert lockfile contents now read HCL.
 - [x] **B.6 Add the rejection test.**
