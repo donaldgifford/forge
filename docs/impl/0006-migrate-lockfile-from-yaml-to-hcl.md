@@ -127,7 +127,7 @@ both exist).
   - File: `testdata/lockfile-hcl/.forge-lock.hcl` (new).
   - Covers all field shapes: BlueprintRef, Variables (string/bool/int),
     Defaults, ManagedFiles. Used by loader unit tests.
-- [ ] **A.6 Unit tests for the HCL loader.**
+- [x] **A.6 Unit tests for the HCL loader.**
   - File: `internal/lockfile/loader_hcl_test.go` (new).
   - Happy path, missing-fields, type-mismatch, unknown-attribute.
 - [ ] **A.7 Round-trip test.**
