@@ -101,12 +101,12 @@ both exist).
 
 #### Tasks
 
-- [ ] **A.1 Define `hcldec.ObjectSpec` for `Lockfile`.**
+- [x] **A.1 Define `hcldec.ObjectSpec` for `Lockfile`.**
   - File: `internal/lockfile/hcldec_spec.go` (new).
   - Mirrors `internal/config/hcldec_spec.go`. `BlueprintRef` is a
     single nested block; `Defaults` and `ManagedFiles` are
     `BlockListSpec`s with `path` as the block label.
-- [ ] **A.2 Implement `LoadLockfileHCL(path) (*Lockfile, error)`.**
+- [x] **A.2 Implement `LoadLockfileHCL(path) (*Lockfile, error)`.**
   - File: `internal/lockfile/loader_hcl.go` (new).
   - Uses `hashicorp/hcl/v2/hclparse` + `hcldec.Decode`.
   - `Variables` decodes as `cty.Value` of object type; conversion to
