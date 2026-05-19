@@ -108,10 +108,12 @@ func Read(path string) (*Lockfile, error) {
 	return &lock, nil
 }
 
-// LoadLockfile reads the lockfile from dir, preferring the HCL form
-// (.forge-lock.hcl) over the legacy YAML form (.forge-lock.yaml).
-// During the IMPL-0006 transition phase both are accepted; Phase B
-// will replace the YAML fallback with a rejection error.
+// LoadLockfile reads the lockfile from dir. Only the canonical HCL
+// form (.forge-lock.hcl) is supported from v0.5 onwards. A bare
+// .forge-lock.yaml triggers a rescaffold-or-pin error per ADR-0002.
+//
+// IMPL-0007 will further refine the error wording when the migrate
+// command is removed entirely.
 func LoadLockfile(dir string) (*Lockfile, error) {
 	hclPath := filepath.Join(dir, HCLFileName)
 
@@ -122,6 +124,15 @@ func LoadLockfile(dir string) (*Lockfile, error) {
 	}
 
 	yamlPath := filepath.Join(dir, FileName)
+	if _, err := os.Stat(yamlPath); err == nil {
+		return nil, fmt.Errorf(
+			"lockfile %s: YAML lockfiles are no longer supported in this "+
+				"version of forge; either rescaffold this project from the "+
+				"current blueprint, or pin forge to v0.4.x (see "+
+				"docs/MIGRATION.md)",
+			yamlPath,
+		)
+	}
 
-	return Read(yamlPath)
+	return nil, fmt.Errorf("no lockfile found in %s (expected %s)", dir, HCLFileName)
 }

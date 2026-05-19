@@ -207,7 +207,7 @@ forge_version = "0.5.0"
 	assert.Equal(t, "0.5.0", lock.ForgeVersion)
 }
 
-func TestLoadLockfile_FallsBackToYAML(t *testing.T) {
+func TestLoadLockfile_RejectsYAMLOnly(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
@@ -222,10 +222,12 @@ blueprint:
 		filepath.Join(dir, lockfile.FileName), []byte(yamlData), 0o644,
 	))
 
-	lock, err := lockfile.LoadLockfile(dir)
-	require.NoError(t, err)
-	assert.Equal(t, "y", lock.Blueprint.Name)
-	assert.Equal(t, "0.4.0", lock.ForgeVersion)
+	_, err := lockfile.LoadLockfile(dir)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "YAML lockfiles are no longer supported")
+	assert.Contains(t, err.Error(), "rescaffold")
+	assert.Contains(t, err.Error(), "pin forge to v0.4.x")
+	assert.Contains(t, err.Error(), "docs/MIGRATION.md")
 }
 
 func TestLoadLockfile_NeitherFormatPresent(t *testing.T) {
@@ -235,6 +237,7 @@ func TestLoadLockfile_NeitherFormatPresent(t *testing.T) {
 
 	_, err := lockfile.LoadLockfile(dir)
 	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no lockfile found")
 }
 
 func writeTempHCL(t *testing.T, src string) string {

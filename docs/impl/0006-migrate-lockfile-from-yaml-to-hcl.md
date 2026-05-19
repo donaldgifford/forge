@@ -150,7 +150,7 @@ load-time rescaffold/pin error (per ADR-0002).
 
 #### Tasks
 
-- [ ] **B.1 Replace the YAML loader with a rejection error.**
+- [x] **B.1 Replace the YAML loader with a rejection error.**
   - File: `internal/lockfile/lock.go` (modify).
   - `LoadLockfile(dir)` stats `.forge-lock.hcl` and loads it.
     If only `.forge-lock.yaml` exists, return:
@@ -179,7 +179,7 @@ load-time rescaffold/pin error (per ADR-0002).
 - [ ] **B.5 Update integration tests.**
   - `internal/create/`, `internal/sync/`, `internal/check/` —
     integration tests that assert lockfile contents now read HCL.
-- [ ] **B.6 Add the rejection test.**
+- [x] **B.6 Add the rejection test.**
   - `internal/lockfile/loader_hcl_test.go` — load a directory with
     only `.forge-lock.yaml` and assert the rescaffold/pin error.
 
