@@ -162,7 +162,7 @@ load-time rescaffold/pin error (per ADR-0002).
     has `forge migrate config` and writes YAML lockfiles. IMPL-0007
     will further refine this error when the rejection path becomes
     the only path.
-- [ ] **B.2 Drop `gopkg.in/yaml.v3` from `internal/lockfile/`.**
+- [x] **B.2 Drop `gopkg.in/yaml.v3` from `internal/lockfile/`.**
   - The only remaining YAML import in the package disappears.
   - The migratecmd shadow types still import yaml.v3 today, but
     IMPL-0007 deletes that package entirely. Once both this work
@@ -172,10 +172,15 @@ load-time rescaffold/pin error (per ADR-0002).
   - `internal/create/`, `internal/sync/`, `internal/check/` — every
     site that writes the lockfile switches from `WriteLockfile` (YAML)
     to `WriteLockfileHCL`.
-- [ ] **B.4 Migrate testdata fixtures.**
+- [x] **B.4 Migrate testdata fixtures.**
   - Every `testdata/.../forge-lock.yaml` becomes `.forge-lock.hcl`.
     Frozen YAML fixture preserved at `testdata/v0-lockfile-yaml/`
     for the rejection-path test.
+  - Result: no `forge-lock.yaml` files existed under `testdata/` to
+    migrate — the canonical HCL fixture at
+    `testdata/lockfile-hcl/.forge-lock.hcl` is the only on-disk
+    lockfile fixture, and the rejection test (B.6) writes its YAML
+    payload inline, so no frozen YAML fixture file was needed.
 - [x] **B.5 Update integration tests.**
   - `internal/create/`, `internal/sync/`, `internal/check/` —
     integration tests that assert lockfile contents now read HCL.
