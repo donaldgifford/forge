@@ -130,7 +130,7 @@ both exist).
 - [x] **A.6 Unit tests for the HCL loader.**
   - File: `internal/lockfile/loader_hcl_test.go` (new).
   - Happy path, missing-fields, type-mismatch, unknown-attribute.
-- [ ] **A.7 Round-trip test.**
+- [x] **A.7 Round-trip test.**
   - Load YAML fixture → re-emit as HCL → load HCL → assert struct
     equality with original. Pins format equivalence.
 
