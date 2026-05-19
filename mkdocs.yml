@@ -6,12 +6,14 @@ nav:
     - ADRs:
         - Overview: adr/README.md
         - 'ADR-0001: Use HCL2 as the Template Engine': adr/0001-use-hcl2-as-the-template-engine.md
+        - 'ADR-0002: Forge does not ship in-tool migrators': adr/0002-forge-does-not-ship-in-tool-migrators.md
     - Design:
         - Overview: design/README.md
         - 'DESIGN-0001: Blueprint Authoring': design/0001-blueprint-authoring.md
         - 'DESIGN-0002: Registry Layout and Defaults Inheritance': design/0002-registry-layout-and-defaults-inheritance.md
         - 'DESIGN-0003: Migrate Template Engine to HCL2': design/0003-migrate-template-engine-to-hcl2.md
         - 'DESIGN-0004: Unify Config File Format After HCL2 Cutover': design/0004-unify-config-file-format-after-hcl2-cutover.md
+        - 'DESIGN-0005: Variable input via vars file': design/0005-variable-input-via-vars-file.md
     - Implementation Plans:
         - Overview: impl/README.md
         - 'IMPL-0001: Forge Phased Build Plan': impl/0001-forge-phased-build-plan.md
@@ -19,6 +21,9 @@ nav:
         - 'IMPL-0003: Registry Commands': impl/0003-registry-commands.md
         - 'IMPL-0004: Migrate Template Engine to HCL2': impl/0004-migrate-template-engine-to-hcl2.md
         - 'IMPL-0005: Unify Config File Format to HCL2': impl/0005-unify-config-file-format-to-hcl2.md
+        - 'IMPL-0006: Migrate lockfile from YAML to HCL': impl/0006-migrate-lockfile-from-yaml-to-hcl.md
+        - 'IMPL-0007: Remove forge migrate command': impl/0007-remove-forge-migrate-command.md
+        - 'IMPL-0008: Variable input via vars file': impl/0008-variable-input-via-vars-file.md
     - Investigations:
         - Overview: investigation/README.md
         - 'INV-0001: Templating YAML Files and HCL2 Migration': investigation/0001-templating-yaml-files-and-hcl2-migration.md
@@ -28,10 +33,12 @@ nav:
     - RFCs:
         - Overview: rfc/README.md
         - 'RFC-0001: Forge: Project Scaffolding CLI': rfc/0001-forge-project-scaffolding-cli.md
+        - 'RFC-0002: Object and collection variable types': rfc/0002-object-and-collection-variable-types.md
+        - 'RFC-0003: Locals for derived values': rfc/0003-locals-for-derived-values.md
     - Migrating forge blueprints: MIGRATION.md
     - Release Notes:
-        - Release notes — v0.4.0 HCL config-file unification: release-notes/v0.4.0-hcl-config.md
         - Release notes — v0.3.0 HCL2 template engine cutover: release-notes/v0.3.0-hcl2-cutover.md
+        - Release notes — v0.4.0 HCL config-file unification: release-notes/v0.4.0-hcl-config.md
 plugins:
     - techdocs-core
 site_description: Documentation for forge

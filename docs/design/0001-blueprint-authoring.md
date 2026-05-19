@@ -36,6 +36,7 @@ upgrading from v0.2.x or v0.3.x should follow
   - [Variables](#variables)
   - [Template Files](#template-files)
     - [Why HCL2](#why-hcl2)
+    - [Emitting literal ${...} for downstream tools](#emitting-literal--for-downstream-tools)
   - [Conditions](#conditions)
   - [Hooks](#hooks)
   - [Managed Files](#managed-files)
