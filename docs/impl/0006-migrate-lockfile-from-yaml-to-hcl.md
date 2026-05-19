@@ -118,7 +118,7 @@ both exist).
   - Variables are emitted as a single `variables { ... }` block with
     one attribute per variable (see OQ-1 — block form is the
     decided shape); nested types serialise naturally.
-- [ ] **A.4 Dispatching loader.**
+- [x] **A.4 Dispatching loader.**
   - File: `internal/lockfile/lock.go` (modify).
   - `LoadLockfile(dir)` stats `.forge-lock.hcl` first; falls back to
     `.forge-lock.yaml` if absent. Preserves current behavior during
