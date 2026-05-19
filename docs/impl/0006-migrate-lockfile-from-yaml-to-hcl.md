@@ -112,7 +112,7 @@ both exist).
   - `Variables` decodes as `cty.Value` of object type; conversion to
     `map[string]any` happens at the boundary for backwards
     compatibility with existing consumers.
-- [ ] **A.3 Implement `WriteLockfileHCL(w io.Writer, lf *Lockfile) error`.**
+- [x] **A.3 Implement `WriteLockfileHCL(w io.Writer, lf *Lockfile) error`.**
   - File: `internal/lockfile/emit_hcl.go` (new).
   - Uses `hashicorp/hcl/v2/hclwrite` for canonical formatting.
   - Variables are emitted as a single `variables { ... }` block with
