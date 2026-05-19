@@ -203,25 +203,25 @@ load-time rescaffold/pin error (per ADR-0002).
 
 #### Tasks
 
-- [ ] **C.1 Update DESIGN-0004 references.**
+- [x] **C.1 Update DESIGN-0004 references.**
   - DESIGN-0004's scope was config files; add a "see also IMPL-0006"
     note for the lockfile follow-up.
-- [ ] **C.2 Update docs/MIGRATION.md.**
+- [x] **C.2 Update docs/MIGRATION.md.**
   - New section: "Migrating lockfiles from YAML to HCL (v0.4.x →
     v0.5.x)". Per ADR-0002, this describes the rescaffold or
     pin-to-v0.4.x paths — not an in-tool migrator. Include the
     `go install github.com/donaldgifford/forge@<v0.4.x-tag>`
     invocation for the pin path.
-- [ ] **C.3 Update CLAUDE.md.**
+- [x] **C.3 Update CLAUDE.md.**
   - Architecture entries for `internal/lockfile/` reflect the HCL
     loader/emitter.
   - Key Concepts updated where they mention `.forge-lock.yaml`.
   - **No new `forge migrate lockfile` entries** — that command is
     explicitly out of scope per ADR-0002.
-- [ ] **C.4 Update README.md.**
+- [x] **C.4 Update README.md.**
   - "Migrating from older releases" section adds the v0.4.x→v0.5.x
     step (rescaffold or pin).
-- [ ] **C.5 Release notes for v0.5.0.**
+- [x] **C.5 Release notes for v0.5.0.**
   - File: `docs/release-notes/v0.5.0-hcl-lockfile.md` (new).
   - Mirror IMPL-0005's release-notes shape: breaking-change block,
     rationale, upgrade steps (rescaffold/pin), behaviour changes,
