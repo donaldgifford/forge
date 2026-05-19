@@ -23,6 +23,7 @@ nav:
         - 'IMPL-0005: Unify Config File Format to HCL2': impl/0005-unify-config-file-format-to-hcl2.md
         - 'IMPL-0006: Migrate lockfile from YAML to HCL': impl/0006-migrate-lockfile-from-yaml-to-hcl.md
         - 'IMPL-0007: Remove forge migrate command': impl/0007-remove-forge-migrate-command.md
+        - 'IMPL-0008: Variable input via vars file': impl/0008-variable-input-via-vars-file.md
     - Investigations:
         - Overview: investigation/README.md
         - 'INV-0001: Templating YAML Files and HCL2 Migration': investigation/0001-templating-yaml-files-and-hcl2-migration.md

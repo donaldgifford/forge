@@ -39,4 +39,5 @@ docz create impl "Your Implementation Title"
 | IMPL-0005 | Unify Config File Format to HCL2 | Draft | 2026-05-12 | Donald Gifford | [0005-unify-config-file-format-to-hcl2.md](0005-unify-config-file-format-to-hcl2.md) |
 | IMPL-0006 | Migrate lockfile from YAML to HCL | Draft | 2026-05-18 | Donald Gifford | [0006-migrate-lockfile-from-yaml-to-hcl.md](0006-migrate-lockfile-from-yaml-to-hcl.md) |
 | IMPL-0007 | Remove forge migrate command | Draft | 2026-05-18 | Donald Gifford | [0007-remove-forge-migrate-command.md](0007-remove-forge-migrate-command.md) |
+| IMPL-0008 | Variable input via vars file | Draft | 2026-05-19 | Donald Gifford | [0008-variable-input-via-vars-file.md](0008-variable-input-via-vars-file.md) |
 <!-- END DOCZ AUTO-GENERATED -->
