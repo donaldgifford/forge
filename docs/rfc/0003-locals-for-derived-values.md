@@ -240,10 +240,10 @@ Cons:
 
 - **Breaking change to existing templates.** Every `${NAME}`
   reference in every blueprint template must become `${var.NAME}`
-  (or `${local.NAME}` if migrated to a local). Same scope of churn
-  as the v0.2→v0.3 template migration (IMPL-0004): mechanical,
-  tool-assisted via a new `forge migrate refs` command (see
-  Phase 4 below).
+  (or `${local.NAME}` if migrated to a local). Per ADR-0002 there
+  is no in-tool migrator — authors hand-port templates per the
+  [Migration](#migration) section. The pin-to-v0.6.x escape hatch
+  covers users who can't port immediately.
 - **More keystrokes per reference.** Real cost, but tiny — and
   paid back the first time a template reader doesn't have to
   bounce to `blueprint.hcl` to find out where a name comes from.
