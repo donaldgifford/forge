@@ -226,10 +226,18 @@ load-time rescaffold/pin error (per ADR-0002).
   - Mirror IMPL-0005's release-notes shape: breaking-change block,
     rationale, upgrade steps (rescaffold/pin), behaviour changes,
     "before you cut" checklist.
-- [ ] **C.6 Fresh forge-registry verification.**
+- [x] **C.6 Fresh forge-registry verification.**
   - Scaffold a fresh project from forge-registry, confirm the new
     lockfile loads/saves correctly through `forge sync` and
     `forge check`.
+  - Result: scaffolded `rust/std` against the local
+    `github.com/donaldgifford/forge-registry` checkout (26 files);
+    `.forge-lock.hcl` written with the expected `blueprint { … }`,
+    `variables { … }`, and labelled `default "<path>" { … }` blocks.
+    `forge check` reported every file `ok`; `forge sync` reran cleanly
+    and advanced `last_synced` (4 updated, 0 conflicts, 21 skipped).
+    A simulated v0.4.x project with only `.forge-lock.yaml` surfaced
+    the documented rescaffold/pin error.
 
 #### Success Criteria
 
