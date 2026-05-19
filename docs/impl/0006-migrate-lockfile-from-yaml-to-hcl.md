@@ -123,7 +123,7 @@ both exist).
   - `LoadLockfile(dir)` stats `.forge-lock.hcl` first; falls back to
     `.forge-lock.yaml` if absent. Preserves current behavior during
     transition.
-- [ ] **A.5 Hermetic HCL fixture.**
+- [x] **A.5 Hermetic HCL fixture.**
   - File: `testdata/lockfile-hcl/.forge-lock.hcl` (new).
   - Covers all field shapes: BlueprintRef, Variables (string/bool/int),
     Defaults, ManagedFiles. Used by loader unit tests.
