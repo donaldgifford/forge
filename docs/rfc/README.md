@@ -34,4 +34,6 @@ docz create rfc "Your RFC Title"
 | ID | Title | Status | Date | Author | Link |
 |----|-------|--------|------|--------|------|
 | RFC-0001 | Forge: Project Scaffolding CLI | Accepted | 2026-05-07 | Donald Gifford | [0001-forge-project-scaffolding-cli.md](0001-forge-project-scaffolding-cli.md) |
+| RFC-0002 | Object and collection variable types | Draft | 2026-05-18 | Donald Gifford | [0002-object-and-collection-variable-types.md](0002-object-and-collection-variable-types.md) |
+| RFC-0003 | Locals for derived values | Draft | 2026-05-18 | Donald Gifford | [0003-locals-for-derived-values.md](0003-locals-for-derived-values.md) |
 <!-- END DOCZ AUTO-GENERATED -->
