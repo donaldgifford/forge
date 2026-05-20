@@ -33,8 +33,19 @@ make build
 ## Quick Start
 
 ```bash
-# Create a project from a blueprint
+# Create a project from a blueprint, with ad-hoc CLI overrides
 forge create go/api --set project_name=my-service --set go_module=github.com/me/my-service
+
+# Or load variable values from an HCL vars file (preferred for non-trivial inputs)
+cat > my-svc.forge-vars.hcl <<'EOF'
+project_name = "my-service"
+go_module    = "github.com/me/my-service"
+replicas     = 3
+EOF
+forge create go/api --var-file ./my-svc.forge-vars.hcl
+
+# --var-file is repeatable; later files win on key collision.
+# --var-file and --set are mutually exclusive on a single invocation.
 
 # List available blueprints
 forge list --registry /path/to/registry
@@ -69,12 +80,12 @@ forge cache clean
 
 | Command | Description |
 |---------|-------------|
-| `forge create <blueprint>` | Scaffold a new project from a blueprint |
+| `forge create <blueprint>` | Scaffold a new project from a blueprint (`--set`, `--var-file`) |
 | `forge list` | List available blueprints in a registry |
 | `forge search <query>` | Search blueprints by name, description, or tags |
 | `forge info <blueprint.hcl>` | Show detailed blueprint information |
-| `forge check` | Check project for drift against the source blueprint |
-| `forge sync` | Sync project files with the latest blueprint version |
+| `forge check` | Check project for drift against the source blueprint (`--var-file` rejected) |
+| `forge sync` | Sync project files with the latest blueprint version (`--var-file` requires `--force`) |
 | `forge init` | Initialize a new blueprint |
 | `forge registry init <path>` | Scaffold a new blueprint registry |
 | `forge registry blueprint` | Scaffold a new blueprint in a registry |

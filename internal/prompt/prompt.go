@@ -20,16 +20,30 @@ var defaultRenderer = tmpl.NewRenderer()
 // PromptFn is a callback for interactive variable input.
 type PromptFn func(v *config.Variable, current map[string]any) (string, error)
 
-// CollectVariables resolves all blueprint variables using overrides, defaults, and
-// optional interactive prompting. Variables are processed in declaration order so
-// that later defaults can reference earlier variable values.
+// CollectVariables resolves all blueprint variables using vars-file inputs,
+// --set overrides, defaults, and optional interactive prompting. Variables
+// are processed in declaration order so that later defaults can reference
+// earlier variable values.
 //
-// If useDefaults is true, all variables use their default values without prompting.
-// The promptFn callback is called for variables that need interactive input; pass nil
-// to skip interactive prompting (useful in tests or CI with --defaults).
+// Resolution order per declared variable:
+//
+//  1. varsFileValues (IMPL-0008): a value loaded from `--var-file` short-circuits
+//     the override / default / prompt chain. These are already coerced to the
+//     declared blueprint type by varsfile.Load.
+//  2. overrides: a `--set key=value` value coerced and validated against the
+//     declared blueprint type.
+//  3. default: the blueprint-supplied default, rendered through the HCL2
+//     renderer so it can reference earlier variable values.
+//  4. prompt: the interactive callback (skipped when useDefaults is true or
+//     promptFn is nil).
+//
+// varsFileValues and overrides are mutually exclusive at the CLI layer;
+// CollectVariables accepts both for flexibility (tests may stub either
+// path) but does not enforce that exclusion itself.
 func CollectVariables(
 	vars []config.Variable,
 	overrides map[string]string,
+	varsFileValues map[string]cty.Value,
 	useDefaults bool,
 	promptFn PromptFn,
 ) (map[string]any, error) {
@@ -38,7 +52,7 @@ func CollectVariables(
 	for i := range vars {
 		v := &vars[i]
 
-		val, err := resolveVariable(v, overrides, result, useDefaults, promptFn)
+		val, err := resolveVariable(v, overrides, varsFileValues, result, useDefaults, promptFn)
 		if err != nil {
 			return nil, err
 		}
@@ -49,15 +63,22 @@ func CollectVariables(
 	return result, nil
 }
 
-// resolveVariable resolves a single variable value through the override → default → prompt chain.
+// resolveVariable resolves a single variable value through the
+// vars-file → override → default → prompt chain.
 func resolveVariable(
 	v *config.Variable,
 	overrides map[string]string,
+	varsFileValues map[string]cty.Value,
 	current map[string]any,
 	useDefaults bool,
 	promptFn PromptFn,
 ) (any, error) {
-	// Check for CLI override first.
+	// 1. Vars-file value short-circuits everything else (IMPL-0008).
+	if val, ok := varsFileValues[v.Name]; ok {
+		return resolveFromVarsFile(val, v)
+	}
+
+	// 2. --set override.
 	if raw, ok := overrides[v.Name]; ok {
 		return resolveFromOverride(raw, v)
 	}
@@ -75,6 +96,54 @@ func resolveVariable(
 
 	// Interactive prompt.
 	return resolveFromPrompt(v, current, defaultVal, promptFn)
+}
+
+// resolveFromVarsFile converts a cty.Value supplied via --var-file into
+// the `any` form used throughout the variable resolution chain. The
+// value is already coerced to the declared blueprint type by
+// varsfile.Load, so this is a straightforward Go-type unwrap with
+// validation applied against the string form.
+func resolveFromVarsFile(val cty.Value, v *config.Variable) (any, error) {
+	if !val.IsKnown() || val.IsNull() {
+		if v.Required {
+			return nil, fmt.Errorf("vars-file value for %q is null but variable is required", v.Name)
+		}
+
+		return zeroValue(v.Type), nil
+	}
+
+	goVal := ctyToGo(val)
+
+	// Apply the same regex-based validation overrides go through; the
+	// validate regex is defined against the string serialisation.
+	if err := validateValue(fmt.Sprintf("%v", goVal), v); err != nil {
+		return nil, fmt.Errorf("vars-file value for %q failed validation: %w", v.Name, err)
+	}
+
+	return goVal, nil
+}
+
+// ctyToGo converts a cty.Value to the Go `any` shape this package uses
+// for the resolution chain. Mirrors lockfile.FromCtyValues for the
+// primitive cty types; vars files are scalar-only in IMPL-0008 so
+// nested/structural types don't appear here.
+func ctyToGo(val cty.Value) any {
+	switch val.Type() {
+	case cty.String:
+		return val.AsString()
+	case cty.Bool:
+		return val.True()
+	case cty.Number:
+		if i, acc := val.AsBigFloat().Int64(); acc == 0 {
+			return i
+		}
+
+		f, _ := val.AsBigFloat().Float64()
+
+		return f
+	default:
+		return val.GoString()
+	}
 }
 
 // resolveFromOverride validates and coerces an override value.

@@ -482,6 +482,60 @@ There is no "downgrade" path from `.forge-lock.hcl` back to
 `.forge-lock.yaml` — pin the forge binary to v0.4.1 if you need to
 keep operating against legacy lockfiles.
 
+## Variable input: preferred pattern (v0.6+)
+
+> **No migration required** — this section is *guidance* for new
+> invocations on v0.6+, not a required upgrade step. Existing
+> `--set` users keep working unchanged.
+
+`--set key=value` is still supported for ad-hoc CLI overrides, but
+**non-trivial inputs should live in a `.forge-vars.hcl` file** loaded
+via `--var-file`. The file is plain HCL, plays nicely with version
+control and CI/CD pipelines, and supports the same scalar types
+declared in `blueprint.hcl` (string / number / bool / list / map).
+
+```hcl
+# ./my-svc.forge-vars.hcl
+project_name = "mockta-staging"
+replicas     = 3
+tags         = ["beta", "staging"]
+```
+
+```sh
+forge create go/ext --var-file ./my-svc.forge-vars.hcl
+```
+
+`--var-file` is repeatable; later files win on key collision. The
+flag is mutually exclusive with `--set` on any single invocation —
+the CLI rejects the combination with a clear message.
+
+**Inline overrides (tempfile pattern).** Process substitution is *not*
+supported (forge enforces a strict `.hcl` extension on the path).
+The supported escape hatch is a tempfile:
+
+```sh
+cat > /tmp/override.forge-vars.hcl <<EOF
+project_name = "mockta-staging"
+EOF
+forge create go/ext \
+  --var-file ./base.forge-vars.hcl \
+  --var-file /tmp/override.forge-vars.hcl
+```
+
+**On `forge sync`.** `--var-file` requires `--force` because it
+rewrites the lockfile with the new resolved values. Type-coercion
+errors abort the sync before any files are touched; unknown keys
+surface as a warning, not an error.
+
+**On `forge check`.** `--var-file` is rejected — `forge check` is a
+drift-detection command that reads variables from the lockfile only.
+Use `forge sync --var-file FILE --force --dry-run` to preview drift
+against alternative values.
+
+See [DESIGN-0005](design/0005-variable-input-via-vars-file.md) for
+the contract and [IMPL-0008](impl/0008-variable-input-via-vars-file.md)
+for the implementation details.
+
 ## Troubleshooting
 
 ### `apiVersion v1 is no longer supported`

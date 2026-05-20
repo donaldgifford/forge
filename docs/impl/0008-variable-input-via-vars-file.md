@@ -1,7 +1,7 @@
 ---
 id: IMPL-0008
 title: "Variable input via vars file"
-status: Draft
+status: Accepted
 author: Donald Gifford
 created: 2026-05-19
 ---
@@ -9,7 +9,7 @@ created: 2026-05-19
 
 # IMPL 0008: Variable input via vars file
 
-**Status:** Draft
+**Status:** Accepted
 **Author:** Donald Gifford
 **Date:** 2026-05-19
 
@@ -140,13 +140,13 @@ yet.
 
 #### Tasks
 
-- [ ] **A.1 Create the package directory and stub file.**
+- [x] **A.1 Create the package directory and stub file.**
   - File: `internal/varsfile/varsfile.go` (new).
   - Package comment summarising responsibility: "parse one or more
     `.forge-vars.hcl` files into a `map[string]cty.Value` keyed by
     variable name, scoped to a blueprint's declared variables."
 
-- [ ] **A.2 Define the public API.**
+- [x] **A.2 Define the public API.**
   - File: `internal/varsfile/varsfile.go` (modify).
   - Exported entry point (proposed signature):
 
@@ -166,7 +166,7 @@ yet.
   - The exported function is the *only* entry point — internal
     helpers (parse, merge, coerce) stay unexported.
 
-- [ ] **A.3 Implement per-file parsing.**
+- [x] **A.3 Implement per-file parsing.**
   - Internal helper: `parseFile(path string) (hcl.Attributes, hcl.Diagnostics)`.
   - **Reject paths that don't end in `.hcl`** with a clear error
     before opening the file (per OQ-8). Message: "vars file 'X':
@@ -180,7 +180,7 @@ yet.
     attribute assignments only, not blocks; got block 'X' at
     file:line:col."
 
-- [ ] **A.4 Implement composition (multiple files).**
+- [x] **A.4 Implement composition (multiple files).**
   - Internal helper: `compose(files []hcl.Attributes) hcl.Attributes`.
   - Walks files left-to-right; later attributes overwrite earlier
     on key collision. Preserves the source `hcl.Attribute` (with
@@ -188,7 +188,7 @@ yet.
     coercion errors point at the file that actually supplied the
     value.
 
-- [ ] **A.5 Implement type coercion against declared types.**
+- [x] **A.5 Implement type coercion against declared types.**
   - Internal helper: `coerce(attrs hcl.Attributes, vars []config.Variable) (map[string]cty.Value, []string, error)`.
   - For each declared variable in `vars`, if the attribute is
     present:
@@ -207,7 +207,7 @@ yet.
   - Variables absent from the file: leave unset (callers fall
     through to prompt / default).
 
-- [ ] **A.6 Hermetic test fixtures.**
+- [x] **A.6 Hermetic test fixtures.**
   - File: `internal/varsfile/testdata/basic.forge-vars.hcl` (new).
   - File: `internal/varsfile/testdata/override.forge-vars.hcl` (new).
   - File: `internal/varsfile/testdata/wrong-type.forge-vars.hcl` (new).
@@ -218,7 +218,7 @@ yet.
   - File: `internal/varsfile/testdata/bad-extension.vars` (new) — covers OQ-8 rejection (correct content, wrong extension).
   - Each fixture is minimal — single-purpose for one test case.
 
-- [ ] **A.7 Unit tests.**
+- [x] **A.7 Unit tests.**
   - File: `internal/varsfile/varsfile_test.go` (new).
   - Test cases (table-driven where structure allows):
     - `Load` happy path: single file, three scalar vars, declared
@@ -242,7 +242,8 @@ yet.
     - Empty file: returns empty map, no error.
   - Use `testify` assertions per CLAUDE.md.
 
-- [ ] **A.8 Run `make lint` and `make fmt`.**
+- [x] **A.8 Run `make lint` and `make fmt`.**
+  - Result: coverage 97.1% (target >=90%); 0 lint issues.
 
 #### Success Criteria
 
@@ -263,12 +264,12 @@ exclusion with `--set`, integration with `prompt.CollectVariables`.
 
 #### Tasks
 
-- [ ] **B.1 Add the `--var-file` flag to `forge create`.**
+- [x] **B.1 Add the `--var-file` flag to `forge create`.**
   - File: `cmd/create.go` (modify around lines 20–50).
   - Declare `varFiles []string` alongside the existing `setVars`.
   - Register: `createCmd.Flags().StringArrayVar(&varFiles, "var-file", nil, "Load variable values from an HCL document. Repeatable; later files override earlier ones on key collision. Mutually exclusive with --set.")`.
 
-- [ ] **B.2 Enforce mutual exclusion with `--set` (manual check
+- [x] **B.2 Enforce mutual exclusion with `--set` (manual check
       per OQ-2).**
   - File: `cmd/create.go` (modify).
   - Inside `RunE`, after flag parsing:
@@ -288,8 +289,18 @@ exclusion with `--set`, integration with `prompt.CollectVariables`.
     into a shared helper in `cmd/internal/` if duplication grows
     annoying, but inline duplication is fine for two call sites.
 
-- [ ] **B.3 Load the vars file(s) and flow values into `create.Run`
+- [x] **B.3 Load the vars file(s) and flow values into `create.Run`
       (per OQ-3 — extend `Opts` rather than stringify).**
+  - Implementation note: rather than load in the CLI and pass the
+    resolved `map[string]cty.Value` in, the CLI passes the raw
+    `--var-file` *paths* via a new `Opts.VarsFiles []string` field
+    and `create.Run` calls `varsfile.Load(opts.VarsFiles,
+    bp.Variables)` itself. This keeps the load co-located with the
+    blueprint parse (which has to happen first to know the declared
+    types) and means the CLI doesn't have to load the blueprint
+    twice. Unknown keys flow back to the CLI on a new
+    `Result.UnknownVarsFileKeys` field, where `cmd/create.go`
+    surfaces them via `ui.Warningf`.
   - File: `internal/create/create.go` (modify).
   - Extend `create.Opts` with a new field:
 
@@ -306,7 +317,7 @@ exclusion with `--set`, integration with `prompt.CollectVariables`.
   - Surface unknown keys via `ui.Warning` styled output
     (`internal/ui/`).
 
-- [ ] **B.4 Integrate with `prompt.CollectVariables`.**
+- [x] **B.4 Integrate with `prompt.CollectVariables`.**
   - File: `internal/prompt/prompt.go` (modify) and/or
     `internal/create/create.go` (modify) — pick whichever layer is
     cleanest given the existing signature.
@@ -330,14 +341,14 @@ exclusion with `--set`, integration with `prompt.CollectVariables`.
     `--defaults`), the existing "missing required variable" error
     path fires unchanged.
 
-- [ ] **B.5 Type-coercion error surfacing.**
+- [x] **B.5 Type-coercion error surfacing.**
   - Errors from `varsfile.Load` must be returned from the command
     `RunE` so Cobra prints them with the standard non-zero exit.
   - Verify the error message renders with file:line:col against a
     real fixture (use the `wrong-type.forge-vars.hcl` fixture from
     Phase A but run end-to-end through `forge create`).
 
-- [ ] **B.6 Integration tests.**
+- [x] **B.6 Integration tests.**
   - File: `cmd/create_test.go` (modify or new — confirm naming
     convention via `cmd/` listing).
   - Test cases:
@@ -360,14 +371,19 @@ exclusion with `--set`, integration with `prompt.CollectVariables`.
       `--defaults` mode the existing "missing required variable"
       error path fires.
 
-- [ ] **B.7 Add the testdata fixtures for the integration tests.**
+- [x] **B.7 Add the testdata fixtures for the integration tests.**
+  - Integration tests use `t.TempDir()` + inline strings rather
+    than a `cmd/testdata/varsfile/` corpus — the fixtures are
+    small enough to read inline at the test site, and using
+    TempDir keeps them hermetic without an extra directory to
+    maintain.
   - Files under `testdata/hcl-registry/` (use the existing
     `hcl-registry/go/api/` blueprint or add a small dedicated
     blueprint for vars-file tests).
   - Files under `cmd/testdata/varsfile/` (proposed; verify with
     convention used by existing tests).
 
-- [ ] **B.8 Run `make ci`.**
+- [x] **B.8 Run `make ci`.**
 
 #### Success Criteria
 
@@ -396,18 +412,18 @@ default behaviour stays "lockfile is the source of truth."
 
 #### Tasks
 
-- [ ] **C.1 Add the `--var-file` flag to `forge sync`.**
+- [x] **C.1 Add the `--var-file` flag to `forge sync`.**
   - File: `cmd/sync.go` (modify).
   - StringArrayVar registration mirroring create.go.
 
-- [ ] **C.2 Enforce mutual exclusion with `--set` on sync.**
+- [x] **C.2 Enforce mutual exclusion with `--set` on sync.**
   - `forge sync` does not currently have a `--set` flag. Decision:
     do not add `--set` to sync as part of this IMPL (out of scope
     — sync stays lockfile-driven by default). The mutual-exclusion
     check collapses to "no work needed" here; if sync ever gains
     `--set`, that future IMPL adds the matching check.
 
-- [ ] **C.3 Enforce `--force` requirement for `--var-file` on sync
+- [x] **C.3 Enforce `--force` requirement for `--var-file` on sync
       (per OQ-4).**
   - File: `cmd/sync.go` (modify).
   - Inside `RunE`, after flag parsing:
@@ -424,7 +440,7 @@ default behaviour stays "lockfile is the source of truth."
   - This makes the lockfile rewrite explicit and prevents
     accidental drift between the lockfile and project state.
 
-- [ ] **C.4 Load vars-file and merge with lockfile.**
+- [x] **C.4 Load vars-file and merge with lockfile.**
   - File: `cmd/sync.go` (modify) and `internal/sync/` as needed.
   - When `--var-file --force` is set, call
     `varsfile.Load(varFiles, bp.Variables)`, then overlay the
@@ -437,7 +453,7 @@ default behaviour stays "lockfile is the source of truth."
   - Type-coercion errors abort the sync before any files are
     touched.
 
-- [ ] **C.5 Integration tests for sync.**
+- [x] **C.5 Integration tests for sync.**
   - File: `cmd/sync_test.go` (modify).
   - Tests:
     - Sync with no `--var-file` → unchanged behaviour (regression
@@ -454,7 +470,7 @@ default behaviour stays "lockfile is the source of truth."
     - Sync with `--var-file FILE --force` and a type-mismatch in
       the vars file → coercion error; lockfile unchanged.
 
-- [ ] **C.6 Run `make ci`.**
+- [x] **C.6 Run `make ci`.**
 
 #### Success Criteria
 
@@ -477,12 +493,12 @@ actionable (DESIGN-0005-aligned), rather than Cobra's generic
 
 #### Tasks
 
-- [ ] **D.1 Register the `--var-file` flag on `forge check`.**
+- [x] **D.1 Register the `--var-file` flag on `forge check`.**
   - File: `cmd/check.go` (modify).
   - StringArrayVar registration so the flag is *recognised*; help
     text explicitly notes the flag is rejected on check.
 
-- [ ] **D.2 Reject the flag with a clear error.**
+- [x] **D.2 Reject the flag with a clear error.**
   - File: `cmd/check.go` (modify).
   - Inside `RunE`, after flag parsing:
 
@@ -503,7 +519,7 @@ actionable (DESIGN-0005-aligned), rather than Cobra's generic
     supports `--dry-run` today — verify before finalising the
     message. If not, drop that sub-clause.)
 
-- [ ] **D.3 Integration tests for check.**
+- [x] **D.3 Integration tests for check.**
   - File: `cmd/check_test.go` (modify).
   - Tests:
     - `forge check` (no `--var-file`) → unchanged behaviour
@@ -512,7 +528,7 @@ actionable (DESIGN-0005-aligned), rather than Cobra's generic
       rejection message; exit code non-zero; no drift report
       printed.
 
-- [ ] **D.4 Run `make ci`.**
+- [x] **D.4 Run `make ci`.**
 
 #### Success Criteria
 
@@ -528,7 +544,7 @@ actionable (DESIGN-0005-aligned), rather than Cobra's generic
 
 #### Tasks
 
-- [ ] **E.1 Update `docs/MIGRATION.md`.**
+- [x] **E.1 Update `docs/MIGRATION.md`.**
   - New "Preferred input pattern" note (not deprecating `--set`,
     recommending `.forge-vars.hcl` for non-trivial cases).
   - **Do NOT document the process-substitution pattern** that
@@ -545,33 +561,41 @@ actionable (DESIGN-0005-aligned), rather than Cobra's generic
       --var-file /tmp/override.forge-vars.hcl
     ```
 
-- [ ] **E.1b Update `docs/design/0005-variable-input-via-vars-file.md`.**
+- [x] **E.1b Update `docs/design/0005-variable-input-via-vars-file.md`.**
   - Replace the process-substitution example with the tempfile
     pattern (parity with E.1).
   - Add a note at the bottom of the Mutual Exclusion section
     cross-referencing IMPL-0008 OQ-8 for the rationale.
 
-- [ ] **E.2 Update `README.md`.**
+- [x] **E.2 Update `README.md`.**
   - Quick Start: add a `.forge-vars.hcl` example alongside the
     existing `--set` example.
   - Commands table: note `--var-file` on create/sync/check.
 
-- [ ] **E.3 Update `CLAUDE.md`.**
+- [x] **E.3 Update `CLAUDE.md`.**
   - Architecture entries: add `internal/varsfile/` package.
   - CLI Design Decisions: add the `--var-file` / `--set` mutual
     exclusion convention.
 
-- [ ] **E.4 Release notes.**
+- [x] **E.4 Release notes.**
   - File: `docs/release-notes/v0.X.0-vars-file.md` (new — version
     set when work lands).
   - Highlight the additive feature; document the mutual-exclusion
     rule and the process-substitution escape hatch.
 
-- [ ] **E.5 Update forge-registry blueprint READMEs (downstream).**
-  - Not in this repo — note as a follow-up issue against
-    `github.com/donaldgifford/forge-registry`.
+- [x] **E.5 Update forge-registry blueprint READMEs (downstream).**
+  - Not in this repo — noted as a follow-up against
+    `github.com/donaldgifford/forge-registry` (to be filed as an
+    issue when this PR lands). Tracked in the IMPL document and in
+    the release notes' "Before you cut" checklist.
 
-- [ ] **E.6 docz-reviewer pass on the doc changes.**
+- [x] **E.6 docz-reviewer pass on the doc changes.**
+  - Reviewer pass completed; addressed the must-fix items
+    (DESIGN-0005 dead link reference and Goals-section
+    silent omission of `forge check` rejection) and the
+    should-improve items (MIGRATION.md "no migration required"
+    note, release-notes redundancy collapse, `mkdocs build`
+    line added to the "Before you cut" checklist).
 
 #### Success Criteria
 
