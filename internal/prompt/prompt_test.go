@@ -23,7 +23,7 @@ func TestCollectVariables_Overrides(t *testing.T) {
 		"use_grpc":     "true",
 	}
 
-	result, err := prompt.CollectVariables(vars, overrides, false, nil)
+	result, err := prompt.CollectVariables(vars, overrides, nil, false, nil)
 	require.NoError(t, err)
 
 	assert.Equal(t, "my-api", result["project_name"])
@@ -39,7 +39,7 @@ func TestCollectVariables_Defaults(t *testing.T) {
 		{Name: "verbose", Type: "bool", Default: "false"},
 	}
 
-	result, err := prompt.CollectVariables(vars, nil, true, nil)
+	result, err := prompt.CollectVariables(vars, nil, nil, true, nil)
 	require.NoError(t, err)
 
 	assert.Equal(t, "default-project", result["project_name"])
@@ -55,7 +55,7 @@ func TestCollectVariables_TemplatedDefault(t *testing.T) {
 		{Name: "go_module", Type: "string", Default: "github.com/example/${project_name}"},
 	}
 
-	result, err := prompt.CollectVariables(vars, nil, true, nil)
+	result, err := prompt.CollectVariables(vars, nil, nil, true, nil)
 	require.NoError(t, err)
 
 	assert.Equal(t, "github.com/example/my-api", result["go_module"])
@@ -68,7 +68,7 @@ func TestCollectVariables_RequiredNoDefault(t *testing.T) {
 		{Name: "project_name", Type: "string", Required: true},
 	}
 
-	_, err := prompt.CollectVariables(vars, nil, true, nil)
+	_, err := prompt.CollectVariables(vars, nil, nil, true, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "required but has no default")
 }
@@ -84,7 +84,7 @@ func TestCollectVariables_OverrideValidation(t *testing.T) {
 		"project_name": "INVALID",
 	}
 
-	_, err := prompt.CollectVariables(vars, overrides, false, nil)
+	_, err := prompt.CollectVariables(vars, overrides, nil, false, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed validation")
 }
@@ -100,7 +100,7 @@ func TestCollectVariables_InvalidBoolOverride(t *testing.T) {
 		"flag": "not-a-bool",
 	}
 
-	_, err := prompt.CollectVariables(vars, overrides, false, nil)
+	_, err := prompt.CollectVariables(vars, overrides, nil, false, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid override")
 }
@@ -116,7 +116,7 @@ func TestCollectVariables_InvalidIntOverride(t *testing.T) {
 		"port": "not-a-number",
 	}
 
-	_, err := prompt.CollectVariables(vars, overrides, false, nil)
+	_, err := prompt.CollectVariables(vars, overrides, nil, false, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid override")
 }
@@ -140,7 +140,7 @@ func TestCollectVariables_PromptFn(t *testing.T) {
 		}
 	}
 
-	result, err := prompt.CollectVariables(vars, nil, false, promptFn)
+	result, err := prompt.CollectVariables(vars, nil, nil, false, promptFn)
 	require.NoError(t, err)
 
 	assert.Equal(t, "prompted-project", result["project_name"])
@@ -159,7 +159,7 @@ func TestCollectVariables_PromptFnUsesDefault(t *testing.T) {
 		return "", nil
 	}
 
-	result, err := prompt.CollectVariables(vars, nil, false, promptFn)
+	result, err := prompt.CollectVariables(vars, nil, nil, false, promptFn)
 	require.NoError(t, err)
 
 	assert.Equal(t, "default-name", result["name"])
@@ -179,7 +179,7 @@ func TestCollectVariables_OverrideTakesPrecedence(t *testing.T) {
 		return "prompted-name", nil
 	}
 
-	result, err := prompt.CollectVariables(vars, overrides, false, promptFn)
+	result, err := prompt.CollectVariables(vars, overrides, nil, false, promptFn)
 	require.NoError(t, err)
 
 	assert.Equal(t, "override-name", result["name"])
@@ -192,7 +192,7 @@ func TestCollectVariables_ChoiceType(t *testing.T) {
 		{Name: "license", Type: "choice", Choices: []string{"MIT", "Apache-2.0", "none"}, Default: "Apache-2.0"},
 	}
 
-	result, err := prompt.CollectVariables(vars, nil, true, nil)
+	result, err := prompt.CollectVariables(vars, nil, nil, true, nil)
 	require.NoError(t, err)
 
 	assert.Equal(t, "Apache-2.0", result["license"])
@@ -207,7 +207,7 @@ func TestCollectVariables_ZeroValues(t *testing.T) {
 		{Name: "count", Type: "int"},
 	}
 
-	result, err := prompt.CollectVariables(vars, nil, true, nil)
+	result, err := prompt.CollectVariables(vars, nil, nil, true, nil)
 	require.NoError(t, err)
 
 	assert.Empty(t, result["name"])

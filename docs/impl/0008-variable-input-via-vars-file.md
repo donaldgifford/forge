@@ -264,12 +264,12 @@ exclusion with `--set`, integration with `prompt.CollectVariables`.
 
 #### Tasks
 
-- [ ] **B.1 Add the `--var-file` flag to `forge create`.**
+- [x] **B.1 Add the `--var-file` flag to `forge create`.**
   - File: `cmd/create.go` (modify around lines 20–50).
   - Declare `varFiles []string` alongside the existing `setVars`.
   - Register: `createCmd.Flags().StringArrayVar(&varFiles, "var-file", nil, "Load variable values from an HCL document. Repeatable; later files override earlier ones on key collision. Mutually exclusive with --set.")`.
 
-- [ ] **B.2 Enforce mutual exclusion with `--set` (manual check
+- [x] **B.2 Enforce mutual exclusion with `--set` (manual check
       per OQ-2).**
   - File: `cmd/create.go` (modify).
   - Inside `RunE`, after flag parsing:
@@ -289,8 +289,18 @@ exclusion with `--set`, integration with `prompt.CollectVariables`.
     into a shared helper in `cmd/internal/` if duplication grows
     annoying, but inline duplication is fine for two call sites.
 
-- [ ] **B.3 Load the vars file(s) and flow values into `create.Run`
+- [x] **B.3 Load the vars file(s) and flow values into `create.Run`
       (per OQ-3 — extend `Opts` rather than stringify).**
+  - Implementation note: rather than load in the CLI and pass the
+    resolved `map[string]cty.Value` in, the CLI passes the raw
+    `--var-file` *paths* via a new `Opts.VarsFiles []string` field
+    and `create.Run` calls `varsfile.Load(opts.VarsFiles,
+    bp.Variables)` itself. This keeps the load co-located with the
+    blueprint parse (which has to happen first to know the declared
+    types) and means the CLI doesn't have to load the blueprint
+    twice. Unknown keys flow back to the CLI on a new
+    `Result.UnknownVarsFileKeys` field, where `cmd/create.go`
+    surfaces them via `ui.Warningf`.
   - File: `internal/create/create.go` (modify).
   - Extend `create.Opts` with a new field:
 
@@ -307,7 +317,7 @@ exclusion with `--set`, integration with `prompt.CollectVariables`.
   - Surface unknown keys via `ui.Warning` styled output
     (`internal/ui/`).
 
-- [ ] **B.4 Integrate with `prompt.CollectVariables`.**
+- [x] **B.4 Integrate with `prompt.CollectVariables`.**
   - File: `internal/prompt/prompt.go` (modify) and/or
     `internal/create/create.go` (modify) — pick whichever layer is
     cleanest given the existing signature.
@@ -331,14 +341,14 @@ exclusion with `--set`, integration with `prompt.CollectVariables`.
     `--defaults`), the existing "missing required variable" error
     path fires unchanged.
 
-- [ ] **B.5 Type-coercion error surfacing.**
+- [x] **B.5 Type-coercion error surfacing.**
   - Errors from `varsfile.Load` must be returned from the command
     `RunE` so Cobra prints them with the standard non-zero exit.
   - Verify the error message renders with file:line:col against a
     real fixture (use the `wrong-type.forge-vars.hcl` fixture from
     Phase A but run end-to-end through `forge create`).
 
-- [ ] **B.6 Integration tests.**
+- [x] **B.6 Integration tests.**
   - File: `cmd/create_test.go` (modify or new — confirm naming
     convention via `cmd/` listing).
   - Test cases:
@@ -361,14 +371,19 @@ exclusion with `--set`, integration with `prompt.CollectVariables`.
       `--defaults` mode the existing "missing required variable"
       error path fires.
 
-- [ ] **B.7 Add the testdata fixtures for the integration tests.**
+- [x] **B.7 Add the testdata fixtures for the integration tests.**
+  - Integration tests use `t.TempDir()` + inline strings rather
+    than a `cmd/testdata/varsfile/` corpus — the fixtures are
+    small enough to read inline at the test site, and using
+    TempDir keeps them hermetic without an extra directory to
+    maintain.
   - Files under `testdata/hcl-registry/` (use the existing
     `hcl-registry/go/api/` blueprint or add a small dedicated
     blueprint for vars-file tests).
   - Files under `cmd/testdata/varsfile/` (proposed; verify with
     convention used by existing tests).
 
-- [ ] **B.8 Run `make ci`.**
+- [x] **B.8 Run `make ci`.**
 
 #### Success Criteria
 

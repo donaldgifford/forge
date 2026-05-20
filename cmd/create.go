@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -19,6 +20,7 @@ import (
 
 var (
 	setVars     []string
+	varFiles    []string
 	outputDir   string
 	useDefault  bool
 	noHooks     bool
@@ -41,6 +43,10 @@ as the blueprint registry source.`,
 
 func init() {
 	createCmd.Flags().StringArrayVar(&setVars, "set", nil, "set a variable value (key=value, can be repeated)")
+	createCmd.Flags().StringArrayVar(&varFiles, "var-file", nil,
+		"load variable values from an HCL document (.hcl extension required). "+
+			"Repeatable; later files override earlier ones on key collision. "+
+			"Mutually exclusive with --set.")
 	createCmd.Flags().StringVarP(&outputDir, "output-dir", "o", "", "target output directory")
 	createCmd.Flags().StringVar(&registryDir, "registry-dir", "", "path or URL to the blueprint registry")
 	createCmd.Flags().BoolVar(&useDefault, "defaults", false, "use all default values without prompting")
@@ -50,6 +56,10 @@ func init() {
 }
 
 func runCreate(cmd *cobra.Command, args []string) error {
+	if err := requireSingleVarSource(setVars, varFiles); err != nil {
+		return err
+	}
+
 	overrides := parseOverrides(setVars)
 	logger := slog.Default()
 	blueprintRef := args[0]
@@ -91,6 +101,7 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		RegistryURL:        regURL,
 		DefaultRegistryURL: defaultURL,
 		Overrides:          overrides,
+		VarsFiles:          varFiles,
 		UseDefaults:        useDefault,
 		NoHooks:            noHooks,
 		ForceCreate:        forceCreate,
@@ -104,9 +115,33 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	w := ui.NewWriter(noColor)
+
+	if len(result.UnknownVarsFileKeys) > 0 {
+		w.Warningf(
+			"--var-file declared values for variable(s) not in this blueprint: %s",
+			strings.Join(result.UnknownVarsFileKeys, ", "),
+		)
+	}
+
 	w.Successf("Created project %q in %s (%d files)", result.Blueprint, result.OutputDir, result.FilesCreated)
 
 	return nil
+}
+
+// requireSingleVarSource enforces the IMPL-0008 OQ-2 mutual-exclusion
+// rule between --set and --var-file. Both can be empty; both being
+// non-empty is the only failure mode.
+func requireSingleVarSource(setFlags, varFilePaths []string) error {
+	if len(setFlags) == 0 || len(varFilePaths) == 0 {
+		return nil
+	}
+
+	return errors.New(
+		"--var-file and --set cannot be combined. " +
+			"Use one input source per invocation:\n" +
+			"  - For one-off overrides: forge create … --set k=v\n" +
+			"  - For multiple values:   forge create … --var-file path/to/foo.forge-vars.hcl",
+	)
 }
 
 // resolveFromConfig resolves a registry from global config when --registry-dir
