@@ -493,12 +493,12 @@ actionable (DESIGN-0005-aligned), rather than Cobra's generic
 
 #### Tasks
 
-- [ ] **D.1 Register the `--var-file` flag on `forge check`.**
+- [x] **D.1 Register the `--var-file` flag on `forge check`.**
   - File: `cmd/check.go` (modify).
   - StringArrayVar registration so the flag is *recognised*; help
     text explicitly notes the flag is rejected on check.
 
-- [ ] **D.2 Reject the flag with a clear error.**
+- [x] **D.2 Reject the flag with a clear error.**
   - File: `cmd/check.go` (modify).
   - Inside `RunE`, after flag parsing:
 
@@ -519,7 +519,7 @@ actionable (DESIGN-0005-aligned), rather than Cobra's generic
     supports `--dry-run` today — verify before finalising the
     message. If not, drop that sub-clause.)
 
-- [ ] **D.3 Integration tests for check.**
+- [x] **D.3 Integration tests for check.**
   - File: `cmd/check_test.go` (modify).
   - Tests:
     - `forge check` (no `--var-file`) → unchanged behaviour
@@ -528,7 +528,7 @@ actionable (DESIGN-0005-aligned), rather than Cobra's generic
       rejection message; exit code non-zero; no drift report
       printed.
 
-- [ ] **D.4 Run `make ci`.**
+- [x] **D.4 Run `make ci`.**
 
 #### Success Criteria
 

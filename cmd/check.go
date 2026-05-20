@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"os"
 
@@ -13,6 +14,7 @@ import (
 var (
 	checkOutputFormat string
 	checkRegistryDir  string
+	checkVarFiles     []string
 )
 
 var checkCmd = &cobra.Command{
@@ -32,10 +34,17 @@ upstream changes. Statuses: modified-locally, upstream-changed, both-changed.`,
 func init() {
 	checkCmd.Flags().StringVarP(&checkOutputFormat, "output", "o", "text", "output format (text, json)")
 	checkCmd.Flags().StringVar(&checkRegistryDir, "registry-dir", "", "registry source for upstream comparison")
+	checkCmd.Flags().StringArrayVar(&checkVarFiles, "var-file", nil,
+		"not supported on `forge check`; registered so the rejection error is actionable. "+
+			"Use `forge sync --var-file FILE --force --dry-run` to preview drift against alternative values.")
 	rootCmd.AddCommand(checkCmd)
 }
 
 func runCheck(cmd *cobra.Command, _ []string) error {
+	if err := rejectVarFileOnCheck(checkVarFiles); err != nil {
+		return err
+	}
+
 	logger := slog.Default()
 
 	resolvedRegistryDir, cleanup, err := resolveCheckRegistry(cmd.Context(), logger)
@@ -57,6 +66,24 @@ func runCheck(cmd *cobra.Command, _ []string) error {
 	_, err = check.Run(opts)
 
 	return err
+}
+
+// rejectVarFileOnCheck enforces the IMPL-0008 OQ-5 contract:
+// `forge check` is a drift-detection command that reads variables
+// from the lockfile only. Vars-file input has no meaningful semantic
+// here, so we reject early with an actionable message that points at
+// the supported workflow (`forge sync --var-file --force --dry-run`).
+func rejectVarFileOnCheck(varFilePaths []string) error {
+	if len(varFilePaths) == 0 {
+		return nil
+	}
+
+	return errors.New(
+		"--var-file is not supported on `forge check` " +
+			"(check is drift-detection and reads variables from the lockfile only); " +
+			"to preview drift against alternative values, use " +
+			"`forge sync --var-file FILE --force --dry-run`",
+	)
 }
 
 // resolveCheckRegistry resolves the --registry-dir flag for check.
