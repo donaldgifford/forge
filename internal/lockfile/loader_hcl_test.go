@@ -225,8 +225,9 @@ blueprint:
 	_, err := lockfile.LoadLockfile(dir)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "YAML lockfiles are no longer supported")
-	assert.Contains(t, err.Error(), "rescaffold")
-	assert.Contains(t, err.Error(), "pin forge to v0.4.x")
+	assert.Contains(t, err.Error(), "Rescaffold this project from the current blueprint")
+	assert.Contains(t, err.Error(), "Pin forge to v0.4.1")
+	assert.Contains(t, err.Error(), "go install github.com/donaldgifford/forge@v0.4.1")
 	assert.Contains(t, err.Error(), "docs/MIGRATION.md")
 }
 

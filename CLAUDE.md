@@ -45,11 +45,11 @@ packages:
 
 - **cmd/forge/** — Entry point (`main.go`)
 - **cmd/** — Cobra command definitions (create, init, sync, check, list, search,
-  info, migrate, registry init/blueprint/update, cache)
+  info, registry init/blueprint/update, cache)
 - **internal/config/** — `blueprint.hcl` and `registry.hcl` parsing, validation,
   global config with multi-registry support. HCL is the only accepted format
   (`loader.go` dispatches `.hcl` directly and rejects bare `.yaml` with a
-  pointer to `forge migrate config`). The HCL decode spec lives in
+  rescaffold-or-pin-to-v0.4.1 error per ADR-0002). The HCL decode spec lives in
   `hcldec_spec.go` and the emitter for registry round-trip in `hclemit.go`.
   `Condition.When` is `hcl.Expression` parsed at load time, with the original
   source kept on `WhenSource` for round-tripping
@@ -80,14 +80,6 @@ packages:
 - **internal/search/** — Blueprint search across name, description, tags
 - **internal/info/** — Blueprint inspection with text/JSON output
 - **internal/initcmd/** — Blueprint scaffolding (`init` is Go reserved keyword)
-- **internal/migratecmd/** — Two one-shot migrators:
-  `forge migrate templates` rewrites v1 (Go `text/template`) syntax to v2
-  (HCL2) inside `*.tmpl` files and the expression-bearing fields of legacy
-  `blueprint.yaml`/`registry.yaml`. `forge migrate config` then converts
-  those YAML files to `blueprint.hcl`/`registry.hcl`. Only place in the
-  tree that imports `text/template` (used to parse v1 input) and
-  `gopkg.in/yaml.v3` (used to parse legacy YAML configs via shadow types
-  in `yaml_types.go`)
 - **internal/registrycmd/** — Registry scaffolding (`forge registry init`),
   blueprint scaffolding (`forge registry blueprint`), and registry metadata
   update (`forge registry update`)
@@ -118,17 +110,14 @@ See `docs/impl/0002-mvp-cli-gap-closure.md` for the full history and rationale.
   upstream-changed, both-changed)
 - **`forge sync --ref`** pins to a specific registry version; outputs which ref
   is being synced against
-- **`forge migrate templates --path <registry>`** rewrites legacy v1
-  `text/template` blueprints to v2 (HCL2) in place. Documented in
-  [docs/MIGRATION.md](docs/MIGRATION.md); guarded by a dirty-worktree check
-  (override with `--force`).
-- **`forge migrate config --path <registry>`** rewrites legacy v2 YAML
-  configs (`blueprint.yaml`, `registry.yaml`) as their HCL equivalents
-  (`blueprint.hcl`, `registry.hcl`). Drops the `apiVersion` field on emit
-  (the file extension is the version signal). Same dirty-worktree guard,
-  same `--dry-run` / `--strict` / `--force` flags. v0.2.x users run
-  `migrate templates` first, then `migrate config`. Comments in source
-  YAML are not preserved (per IMPL-0005 OQ-3).
+- **`forge migrate` is gone (IMPL-0007 / ADR-0002).** The previous
+  `forge migrate templates` and `forge migrate config` commands were
+  removed from main in v0.5.x. Users on v0.2.x/v0.3.x format files
+  pin to v0.4.1, run the migrators there, then upgrade. The
+  load-time YAML-rejection errors in `internal/config/loader.go` and
+  `internal/lockfile/lock.go` surface this path inline — they include
+  the literal `go install github.com/donaldgifford/forge@v0.4.1`
+  invocation per IMPL-0007 OQ-3.
 
 ## Code Style
 
@@ -145,7 +134,7 @@ See `docs/impl/0002-mvp-cli-gap-closure.md` for the full history and rationale.
 - Tests use `testify` for assertions; test helpers must call `t.Helper()`
 - Mocks generated with `mockery`
 - `nolint` directives require both an explanation and a specific linter name
-- **gosec baseline:** Inline `//nolint:gosec` directives intentionally annotate correct-by-design CLI behaviour (file reads/writes against user-chosen output and registry dirs, `git` against user registry dirs, hook execution from `blueprint.hcl`, lockfile and template I/O from known project paths). Active sites: `internal/create/create.go`, `internal/sync/overwrite.go`, `internal/hooks/hooks.go`, `internal/registrycmd/registrycmd.go`, `internal/registrycmd/update.go`, `internal/config/loader_hcl.go`, `internal/lockfile/loader_hcl.go`, `internal/lockfile/emit_hcl.go`, `internal/template/renderer.go`, `internal/migratecmd/config_walk.go`, `internal/migratecmd/walk.go`, `internal/migratecmd/git.go`. Don't remove without a real fix — gosec reports them as G304/G703/G204/G306.
+- **gosec baseline:** Inline `//nolint:gosec` directives intentionally annotate correct-by-design CLI behaviour (file reads/writes against user-chosen output and registry dirs, `git` against user registry dirs, hook execution from `blueprint.hcl`, lockfile and template I/O from known project paths). Active sites: `internal/create/create.go`, `internal/sync/overwrite.go`, `internal/hooks/hooks.go`, `internal/registrycmd/registrycmd.go`, `internal/registrycmd/update.go`, `internal/config/loader_hcl.go`, `internal/lockfile/loader_hcl.go`, `internal/lockfile/emit_hcl.go`, `internal/template/renderer.go`. Don't remove without a real fix — gosec reports them as G304/G703/G204/G306.
 
 ## CI/CD
 

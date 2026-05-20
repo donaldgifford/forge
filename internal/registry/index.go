@@ -11,8 +11,9 @@ import (
 
 // LoadIndex reads registry.hcl from the given registry root directory
 // and returns the parsed registry config. If only registry.yaml exists
-// (un-migrated registry), the dispatcher surfaces the migration-pointer
-// error directing the user at `forge migrate config`.
+// (legacy v2 YAML registry), the dispatcher surfaces the
+// rescaffold-or-pin error written by config.LoadRegistry — the
+// in-tool migrator was removed in IMPL-0007 per ADR-0002.
 func LoadIndex(registryRoot string) (*config.Registry, error) {
 	hclPath := filepath.Join(registryRoot, "registry.hcl")
 	if _, err := os.Stat(hclPath); err == nil {
