@@ -227,16 +227,24 @@ Rationale:
   ordering on the command line.
 
 Users who want to override a single field of a vars-file-driven
-scaffold should compose with a second `--var-file`:
+scaffold should compose with a second `--var-file` pointed at a
+tempfile:
 
 ```sh
+cat > /tmp/override.forge-vars.hcl <<EOF
+project_name = "mockta-staging"
+EOF
 forge create go/ext \
   --var-file ./base.forge-vars.hcl \
-  --var-file <(echo 'project_name = "mockta-staging"')
+  --var-file /tmp/override.forge-vars.hcl
 ```
 
-The `<(...)` process substitution gives a clean inline override path
-for one-off cases without breaking the "files only" model.
+The tempfile pattern keeps the "files only" model intact while still
+giving a clean one-off override path. Process substitution
+(`<(...)`) is **not supported** — IMPL-0008 OQ-8 settled on a strict
+`.hcl` extension check, and `/dev/fd/63`-style paths from
+`<(...)` fail that check (see the
+[Mutual Exclusion](#mutual-exclusion-with---set) discussion below).
 
 ### Lockfile Integration
 
@@ -360,9 +368,14 @@ No release-notes pressure since the feature is additive.
   `<(echo 'k = v')` pattern works but isn't discoverable. Worth a
   README example, or do we revisit and allow a narrow `--set` +
   `--var-file` combination after all? **Decision: No combo.** Keep
-  the mutual exclusion clean. Document the process-substitution
-  pattern in the README; revisit only if real-world friction
-  surfaces.
+  the mutual exclusion clean. Document the override pattern in the
+  README; revisit only if real-world friction surfaces.
+  **Superseded by IMPL-0008 OQ-8:** process substitution does *not*
+  work — IMPL-0008 settled on a strict `.hcl` extension check on
+  the input path, and `/dev/fd/63`-style paths from `<(...)` fail
+  that check. The documented escape hatch is the *tempfile pattern*
+  (see [Mutual Exclusion](#mutual-exclusion-with---set) above and
+  the README example).
 
 ## References
 

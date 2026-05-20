@@ -74,6 +74,15 @@ packages:
   PartialContent on the eager fields and hand-decode the dynamic `variables`
   block; `cty.Value` in memory with typed coercion via `lockfile.ToCtyValues`
   using declared variable types
+- **internal/varsfile/** — `--var-file` input loading (IMPL-0008). Single
+  exported `Load(paths, declared)` that parses one or more `.forge-vars.hcl`
+  files (strict `.hcl` extension, attributes-only, no functions or
+  traversals), composes them left-to-right with last-wins semantics, and
+  coerces values against the blueprint's declared variable types via
+  `cty/convert`. Returns the resolved `map[string]cty.Value` plus an
+  `unknown` slice for keys not declared in `blueprint.hcl` (warning, not
+  error). Used by `create.Run` and `sync.Run`; `forge check` rejects the
+  flag outright with an actionable error.
 - **internal/check/** — Drift detection comparing lockfile vs local files
 - **internal/hooks/** — Post-create hook execution with context cancellation
 - **internal/list/** — Blueprint listing with tag filtering
@@ -118,6 +127,22 @@ See `docs/impl/0002-mvp-cli-gap-closure.md` for the full history and rationale.
   `internal/lockfile/lock.go` surface this path inline — they include
   the literal `go install github.com/donaldgifford/forge@v0.4.1`
   invocation per IMPL-0007 OQ-3.
+- **`--var-file` (IMPL-0008 / DESIGN-0005).** Repeatable flag on
+  `forge create` and `forge sync` that loads variable values from
+  one or more `.forge-vars.hcl` files; mutually exclusive with
+  `--set` on a single invocation (manual check in
+  `cmd/create.go::requireSingleVarSource`, not Cobra's generic
+  `MarkFlagsMutuallyExclusive` — see IMPL-0008 OQ-2 for the
+  rationale). On `forge sync`, `--var-file` requires `--force`
+  because it rewrites the lockfile with the new resolved values
+  (`cmd/sync.go::requireForceForVarFile`). `forge check` rejects
+  the flag outright with an actionable error pointing at
+  `forge sync --var-file FILE --force --dry-run`
+  (`cmd/check.go::rejectVarFileOnCheck`). Process substitution
+  (`<(...)`) is **not** supported — strict `.hcl` extension check
+  on the path (IMPL-0008 OQ-8); the documented escape hatch is the
+  tempfile pattern. Unknown keys surface as a warning, not an
+  error; type-coercion failures abort before any side effects.
 
 ## Code Style
 

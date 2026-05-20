@@ -544,7 +544,7 @@ actionable (DESIGN-0005-aligned), rather than Cobra's generic
 
 #### Tasks
 
-- [ ] **E.1 Update `docs/MIGRATION.md`.**
+- [x] **E.1 Update `docs/MIGRATION.md`.**
   - New "Preferred input pattern" note (not deprecating `--set`,
     recommending `.forge-vars.hcl` for non-trivial cases).
   - **Do NOT document the process-substitution pattern** that
@@ -561,31 +561,33 @@ actionable (DESIGN-0005-aligned), rather than Cobra's generic
       --var-file /tmp/override.forge-vars.hcl
     ```
 
-- [ ] **E.1b Update `docs/design/0005-variable-input-via-vars-file.md`.**
+- [x] **E.1b Update `docs/design/0005-variable-input-via-vars-file.md`.**
   - Replace the process-substitution example with the tempfile
     pattern (parity with E.1).
   - Add a note at the bottom of the Mutual Exclusion section
     cross-referencing IMPL-0008 OQ-8 for the rationale.
 
-- [ ] **E.2 Update `README.md`.**
+- [x] **E.2 Update `README.md`.**
   - Quick Start: add a `.forge-vars.hcl` example alongside the
     existing `--set` example.
   - Commands table: note `--var-file` on create/sync/check.
 
-- [ ] **E.3 Update `CLAUDE.md`.**
+- [x] **E.3 Update `CLAUDE.md`.**
   - Architecture entries: add `internal/varsfile/` package.
   - CLI Design Decisions: add the `--var-file` / `--set` mutual
     exclusion convention.
 
-- [ ] **E.4 Release notes.**
+- [x] **E.4 Release notes.**
   - File: `docs/release-notes/v0.X.0-vars-file.md` (new — version
     set when work lands).
   - Highlight the additive feature; document the mutual-exclusion
     rule and the process-substitution escape hatch.
 
-- [ ] **E.5 Update forge-registry blueprint READMEs (downstream).**
-  - Not in this repo — note as a follow-up issue against
-    `github.com/donaldgifford/forge-registry`.
+- [x] **E.5 Update forge-registry blueprint READMEs (downstream).**
+  - Not in this repo — noted as a follow-up against
+    `github.com/donaldgifford/forge-registry` (to be filed as an
+    issue when this PR lands). Tracked in the IMPL document and in
+    the release notes' "Before you cut" checklist.
 
 - [ ] **E.6 docz-reviewer pass on the doc changes.**
 
