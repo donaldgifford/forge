@@ -1,7 +1,7 @@
 ---
 id: IMPL-0007
 title: "Remove forge migrate command"
-status: Draft
+status: Implemented
 author: Donald Gifford
 created: 2026-05-18
 ---
@@ -9,7 +9,7 @@ created: 2026-05-18
 
 # IMPL 0007: Remove forge migrate command
 
-**Status:** Draft
+**Status:** Implemented (v0.5.0)
 **Author:** Donald Gifford
 **Date:** 2026-05-18
 
@@ -225,7 +225,7 @@ instructions and a MIGRATION.md link.
 
 #### Tasks
 
-- [ ] **3.1 Update `docs/MIGRATION.md`.**
+- [x] **3.1 Update `docs/MIGRATION.md`.**
   - Restructure the top-of-document guidance:
     - For v0.2.x users: "Install forge v0.4.x, run `forge migrate
       templates`, then `forge migrate config`, then upgrade to
@@ -237,22 +237,32 @@ instructions and a MIGRATION.md link.
       your project from the current blueprint."
   - Remove the in-tool `forge migrate` examples — they're now
     valid only against the pinned v0.4.x binary.
-- [ ] **3.2 Update `CLAUDE.md`.**
+- [x] **3.2 Update `CLAUDE.md`.**
   - Architecture entries for `internal/migratecmd/` deleted.
   - `cmd/` listing: drop the migrate subcommand entry.
   - "CLI Design Decisions" section: drop the
     `forge migrate templates --path <registry>` and
     `forge migrate config --path <registry>` bullets.
-- [ ] **3.3 Update `README.md`.**
+- [x] **3.3 Update `README.md`.**
   - Commands table: drop migrate rows.
   - "Migrating from older releases" section: replace migrate
     instructions with the "pin v0.4.x then upgrade" pattern.
-- [ ] **3.4 Release notes for v0.5.0** (or whichever release ships
+- [x] **3.4 Release notes for v0.5.0** (or whichever release ships
       this work).
   - Highlight the breaking change: the migrate command is gone.
   - Include the v0.4.x pinning instructions for stragglers.
-- [ ] **3.5 Update `mise.toml` references in MIGRATION.md** to
+  - Per OQ-1, ships together with IMPL-0006 in v0.5.0. Extended
+    `docs/release-notes/v0.5.0-hcl-lockfile.md` (rather than
+    creating a new file) with the "Also breaking: `forge migrate`
+    removed" section, the pin-then-migrate-then-upgrade snippet,
+    and links to IMPL-0007 + ADR-0002. Updated the file's title
+    and mkdocs nav label to reflect the broader scope.
+- [~] **3.5 Update `mise.toml` references in MIGRATION.md** to
       point at a known-good v0.4.x version.
+  - No `mise.toml` references in MIGRATION.md to update. The
+    `go install github.com/donaldgifford/forge@v0.4.1` invocations
+    pin via the Go toolchain (not mise) — that's the canonical
+    install path forge documents. Marking N/A.
 
 #### Success Criteria
 

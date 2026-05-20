@@ -79,8 +79,6 @@ forge cache clean
 | `forge registry init <path>` | Scaffold a new blueprint registry |
 | `forge registry blueprint` | Scaffold a new blueprint in a registry |
 | `forge registry update` | Sync blueprint metadata in `registry.hcl` |
-| `forge migrate templates` | Rewrite legacy v1 (`text/template`) blueprints to v2 (HCL2 templates) — see [docs/MIGRATION.md](docs/MIGRATION.md) |
-| `forge migrate config` | Convert legacy YAML configs (`blueprint.yaml`, `registry.yaml`) to HCL — see [docs/MIGRATION.md](docs/MIGRATION.md) |
 | `forge cache clean` | Clear cached registries |
 
 ## Documentation
@@ -95,24 +93,31 @@ forge cache clean
 
 ## Migrating from older releases
 
-Forge has had three on-disk format changes:
+Per [ADR-0002](docs/adr/0002-forge-does-not-ship-in-tool-migrators.md),
+forge no longer ships in-tool migrators. The `forge migrate` command
+was removed in v0.5.x (IMPL-0007). Users on legacy formats follow the
+**pin → migrate → upgrade** pattern instead:
 
-- **v0.2.x → v0.3.x:** template syntax migrated from Go `text/template` to
-  HCL2 — run `forge migrate templates --path /path/to/registry`.
-- **v0.3.x → v0.4.x:** config files migrated from YAML
-  (`blueprint.yaml`, `registry.yaml`) to HCL (`blueprint.hcl`,
-  `registry.hcl`) — run `forge migrate config --path /path/to/registry`.
-- **v0.4.x → v0.5.x:** project lockfiles migrated from YAML
-  (`.forge-lock.yaml`) to HCL (`.forge-lock.hcl`). Per
-  [ADR-0002](docs/adr/0002-forge-does-not-ship-in-tool-migrators.md)
-  there is **no `forge migrate lockfile` command** — rescaffold the
-  project from the current blueprint, or pin to `v0.4.x` with
-  `go install github.com/donaldgifford/forge@<v0.4.x-tag>`.
+```sh
+# Install the last release that ships `forge migrate`:
+go install github.com/donaldgifford/forge@v0.4.1
+```
 
-Maintainers coming from v0.2.x or earlier should run the first two
-commands in order; the lockfile step is per-project and handled by
-rescaffold or version pin. See [docs/MIGRATION.md](docs/MIGRATION.md)
-for the complete walkthrough.
+Then, with that pinned binary:
+
+- **v0.2.x → v0.3.x (templates):** `forge migrate templates --path /path/to/registry`
+- **v0.3.x → v0.4.x (configs):** `forge migrate config --path /path/to/registry`
+
+Coming from v0.2.x or earlier? Run **both** in order — templates
+first, then config. Once the registry is on the v0.4 format, upgrade
+to current forge.
+
+**v0.4.x → v0.5.x (lockfiles)** is per-project, not per-registry, and
+has no in-tool path: rescaffold the project from the current
+blueprint, or stay pinned to v0.4.1.
+
+See [docs/MIGRATION.md](docs/MIGRATION.md) for the complete
+walkthrough.
 
 ## Development
 
