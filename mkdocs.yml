@@ -39,6 +39,7 @@ nav:
     - Release Notes:
         - Release notes — v0.3.0 HCL2 template engine cutover: release-notes/v0.3.0-hcl2-cutover.md
         - Release notes — v0.4.0 HCL config-file unification: release-notes/v0.4.0-hcl-config.md
+        - Release notes — v0.5.0 HCL lockfile cutover: release-notes/v0.5.0-hcl-lockfile.md
 plugins:
     - techdocs-core
 site_description: Documentation for forge

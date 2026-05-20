@@ -67,9 +67,13 @@ packages:
   render, conditions, lockfile)
 - **internal/sync/** — Three-way merge sync engine for managed files
   (overwrite/merge strategies), conflict detection and resolution
-- **internal/lockfile/** — `.forge-lock.yaml` state tracking for scaffolded
-  projects; YAML scalars on disk, `cty.Value` in memory (typed coercion via
-  `lockfile.ToCtyValues` using declared variable types)
+- **internal/lockfile/** — `.forge-lock.hcl` state tracking for scaffolded
+  projects (HCL is the only accepted on-disk format from v0.5+; bare
+  `.forge-lock.yaml` files trigger a rescaffold-or-pin error per ADR-0002).
+  Loader/emitter pair in `loader_hcl.go` + `emit_hcl.go` use `hcldec`
+  PartialContent on the eager fields and hand-decode the dynamic `variables`
+  block; `cty.Value` in memory with typed coercion via `lockfile.ToCtyValues`
+  using declared variable types
 - **internal/check/** — Drift detection comparing lockfile vs local files
 - **internal/hooks/** — Post-create hook execution with context cancellation
 - **internal/list/** — Blueprint listing with tag filtering
@@ -141,7 +145,7 @@ See `docs/impl/0002-mvp-cli-gap-closure.md` for the full history and rationale.
 - Tests use `testify` for assertions; test helpers must call `t.Helper()`
 - Mocks generated with `mockery`
 - `nolint` directives require both an explanation and a specific linter name
-- **gosec baseline:** 5 inline `//nolint:gosec` directives intentionally annotate correct-by-design CLI behaviour (file writes to user-chosen output dirs, `git` against user registry dirs, hook execution from `blueprint.hcl`). They live in `internal/create/create.go`, `internal/sync/overwrite.go`, `internal/hooks/hooks.go`, `internal/registrycmd/registrycmd.go`, `internal/registrycmd/update.go`. Don't remove without a real fix — gosec reports them as G703/G204.
+- **gosec baseline:** Inline `//nolint:gosec` directives intentionally annotate correct-by-design CLI behaviour (file reads/writes against user-chosen output and registry dirs, `git` against user registry dirs, hook execution from `blueprint.hcl`, lockfile and template I/O from known project paths). Active sites: `internal/create/create.go`, `internal/sync/overwrite.go`, `internal/hooks/hooks.go`, `internal/registrycmd/registrycmd.go`, `internal/registrycmd/update.go`, `internal/config/loader_hcl.go`, `internal/lockfile/loader_hcl.go`, `internal/lockfile/emit_hcl.go`, `internal/template/renderer.go`, `internal/migratecmd/config_walk.go`, `internal/migratecmd/walk.go`, `internal/migratecmd/git.go`. Don't remove without a real fix — gosec reports them as G304/G703/G204/G306.
 
 ## CI/CD
 

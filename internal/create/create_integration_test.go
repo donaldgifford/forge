@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/donaldgifford/forge/internal/create"
+	"github.com/donaldgifford/forge/internal/lockfile"
 )
 
 func TestRun_EmptyBlueprintRef(t *testing.T) {
@@ -97,7 +98,7 @@ func TestRun_MultipleCreatesInDifferentDirs(t *testing.T) {
 		assert.Positive(t, result.FilesCreated)
 
 		// Each project should have its own lockfile.
-		assert.FileExists(t, filepath.Join(outputDir, ".forge-lock.yaml"))
+		assert.FileExists(t, filepath.Join(outputDir, lockfile.HCLFileName))
 	}
 }
 

@@ -58,7 +58,7 @@ func TestSync_FullCycle(t *testing.T) {
 		},
 		Variables: map[string]any{},
 	}
-	require.NoError(t, lockfile.Write(filepath.Join(projectDir, lockfile.FileName), lock))
+	require.NoError(t, lockfile.WriteHCL(filepath.Join(projectDir, lockfile.HCLFileName), lock))
 
 	// Simulate upstream registry update.
 	require.NoError(t, os.WriteFile(
@@ -92,7 +92,7 @@ func TestSync_FullCycle(t *testing.T) {
 	assert.Contains(t, string(makeContent), "go test")
 
 	// Verify lockfile was updated.
-	updatedLock, err := lockfile.Read(filepath.Join(projectDir, lockfile.FileName))
+	updatedLock, err := lockfile.LoadLockfile(projectDir)
 	require.NoError(t, err)
 	assert.False(t, updatedLock.LastSynced.IsZero())
 }
@@ -138,7 +138,7 @@ func TestSync_MergeWithConflict_FullCycle(t *testing.T) {
 		},
 		Variables: map[string]any{},
 	}
-	require.NoError(t, lockfile.Write(filepath.Join(projectDir, lockfile.FileName), lock))
+	require.NoError(t, lockfile.WriteHCL(filepath.Join(projectDir, lockfile.HCLFileName), lock))
 
 	opts := &forgesync.Opts{
 		ProjectDir:  projectDir,
@@ -185,7 +185,7 @@ func TestSync_NewFileCreated(t *testing.T) {
 		},
 		Variables: map[string]any{},
 	}
-	require.NoError(t, lockfile.Write(filepath.Join(projectDir, lockfile.FileName), lock))
+	require.NoError(t, lockfile.WriteHCL(filepath.Join(projectDir, lockfile.HCLFileName), lock))
 
 	opts := &forgesync.Opts{
 		ProjectDir:  projectDir,

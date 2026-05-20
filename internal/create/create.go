@@ -130,11 +130,11 @@ func Run(opts *Opts) (*Result, error) {
 	}
 
 	// 10. Generate lockfile with content hashes.
-	lockPath := filepath.Join(outputDir, lockfile.FileName)
+	lockPath := filepath.Join(outputDir, lockfile.HCLFileName)
 	lock := buildLockfile(resolved, bp, ctyVars, fileSet, opts.ForgeVersion, opts.RegistryURL)
 	computeFileHashes(outputDir, lock)
 
-	if err := lockfile.Write(lockPath, lock); err != nil {
+	if err := lockfile.WriteHCL(lockPath, lock); err != nil {
 		return nil, fmt.Errorf("writing lockfile: %w", err)
 	}
 

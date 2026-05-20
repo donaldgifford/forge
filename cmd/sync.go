@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 
@@ -49,9 +48,7 @@ func runSync(cmd *cobra.Command, _ []string) error {
 	w := ui.NewWriter(noColor)
 	projectDir := "."
 
-	lockPath := filepath.Join(projectDir, lockfile.FileName)
-
-	lock, err := lockfile.Read(lockPath)
+	lock, err := lockfile.LoadLockfile(projectDir)
 	if err != nil {
 		return fmt.Errorf("reading lockfile: %w (is this a forge project?)", err)
 	}

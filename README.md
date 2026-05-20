@@ -90,22 +90,29 @@ forge cache clean
 - [DESIGN-0003 — Migrate template engine to HCL2](docs/design/0003-migrate-template-engine-to-hcl2.md) -- Engine swap rationale
 - [DESIGN-0004 — Unify config file format after HCL2 cutover](docs/design/0004-unify-config-file-format-after-hcl2-cutover.md) -- Config-format unification
 - [ADR-0001 — Use HCL2 as the template engine](docs/adr/0001-use-hcl2-as-the-template-engine.md) -- Decision record
-- [docs/MIGRATION.md](docs/MIGRATION.md) -- v0.2.x/v0.3.x → v0.4.x migration guides
+- [docs/MIGRATION.md](docs/MIGRATION.md) -- v0.2.x → v0.5.x migration guides
 - [RFC-0001 — Forge: Project Scaffolding CLI](docs/rfc/0001-forge-project-scaffolding-cli.md) -- High-level proposal and architecture
 
 ## Migrating from older releases
 
-Forge has had two on-disk format changes:
+Forge has had three on-disk format changes:
 
 - **v0.2.x → v0.3.x:** template syntax migrated from Go `text/template` to
   HCL2 — run `forge migrate templates --path /path/to/registry`.
 - **v0.3.x → v0.4.x:** config files migrated from YAML
   (`blueprint.yaml`, `registry.yaml`) to HCL (`blueprint.hcl`,
   `registry.hcl`) — run `forge migrate config --path /path/to/registry`.
+- **v0.4.x → v0.5.x:** project lockfiles migrated from YAML
+  (`.forge-lock.yaml`) to HCL (`.forge-lock.hcl`). Per
+  [ADR-0002](docs/adr/0002-forge-does-not-ship-in-tool-migrators.md)
+  there is **no `forge migrate lockfile` command** — rescaffold the
+  project from the current blueprint, or pin to `v0.4.x` with
+  `go install github.com/donaldgifford/forge@<v0.4.x-tag>`.
 
-Maintainers coming from v0.2.x or earlier should run **both** commands in
-order. See [docs/MIGRATION.md](docs/MIGRATION.md) for the complete
-walkthrough.
+Maintainers coming from v0.2.x or earlier should run the first two
+commands in order; the lockfile step is per-project and handled by
+rescaffold or version pin. See [docs/MIGRATION.md](docs/MIGRATION.md)
+for the complete walkthrough.
 
 ## Development
 

@@ -1,7 +1,8 @@
 # Migrating forge blueprints
 
-This guide walks blueprint authors through the on-disk format changes
-shipped between releases. Forge has two cumulative migration steps:
+This guide walks blueprint authors and project consumers through the
+on-disk format changes shipped between releases. Forge has three
+cumulative migration steps:
 
 1. **v1 → v2 (template engine):** `text/template` → HCL2. The tool is
    `forge migrate templates`. See
@@ -10,14 +11,22 @@ shipped between releases. Forge has two cumulative migration steps:
    `registry.yaml` → `blueprint.hcl` / `registry.hcl`. The tool is
    `forge migrate config`. See
    [Migrating config files from YAML to HCL (v0.3.x → v0.4.x)](#migrating-config-files-from-yaml-to-hcl-v03x--v04x).
+3. **YAML lockfile → HCL lockfile (project state):** `.forge-lock.yaml`
+   → `.forge-lock.hcl`. There is **no in-tool migrator** per
+   [ADR-0002](adr/0002-forge-does-not-ship-in-tool-migrators.md);
+   rescaffold or pin. See
+   [Migrating lockfiles from YAML to HCL (v0.4.x → v0.5.x)](#migrating-lockfiles-from-yaml-to-hcl-v04x--v05x).
 
-If you are coming from **v0.2.x or earlier**, run **both** steps in
-order — `forge migrate templates` first, then `forge migrate config`.
-If you are already on v0.3.x (HCL2 templates, YAML config), only the
-second step is required. If you ran the steps **out of order** and
-ended up with v1 template syntax stranded in a `blueprint.hcl`-rooted
-registry, `forge migrate templates` (v0.4.1+) walks HCL-rooted
-blueprints too — re-run it against your registry to clean up.
+If you are coming from **v0.2.x or earlier**, run **both** of the
+first two steps in order — `forge migrate templates` first, then
+`forge migrate config`. If you are already on v0.3.x (HCL2 templates,
+YAML config), only step 2 is required. If you ran the first two steps
+**out of order** and ended up with v1 template syntax stranded in a
+`blueprint.hcl`-rooted registry, `forge migrate templates` (v0.4.1+)
+walks HCL-rooted blueprints too — re-run it against your registry to
+clean up. **Step 3 is independent of steps 1 and 2:** it affects
+*projects scaffolded from* a registry, not the registry itself, and is
+handled by rescaffold or version pin rather than by a CLI command.
 
 ## Migrating template syntax (v0.2.x → v0.3.x)
 
@@ -359,6 +368,97 @@ Older forge releases (the last YAML-config versions) continue to
 load `blueprint.yaml` / `registry.yaml` — pin to v0.3.x if you need
 to delay the cutover.
 
+## Migrating lockfiles from YAML to HCL (v0.4.x → v0.5.x)
+
+The third — and final — format cut: `.forge-lock.yaml` becomes
+`.forge-lock.hcl`. With templates already on HCL2 (v0.3.0) and
+configs on HCL (v0.4.0), the lockfile was the last YAML touchpoint
+in a forge-managed project. v0.5.0 brings it into the same syntax.
+
+### Why the change
+
+- **Format parity.** `blueprint.hcl`, `registry.hcl`, and the
+  rendered templates all speak HCL2. A YAML lockfile sitting at the
+  project root broke that uniformity for no operational gain.
+- **Typed variables round-trip cleanly.** HCL natively carries
+  numbers, bools, lists, and maps — the YAML lockfile lost some of
+  that type information on disk and had to recover it via inference
+  on read. HCL keeps the declared types intact.
+- **Diffability.** HCL block syntax (one `default "path" { … }`
+  block per file) reviews more clearly than a YAML list of
+  identically-keyed objects.
+
+### No in-tool migrator
+
+Per [ADR-0002](adr/0002-forge-does-not-ship-in-tool-migrators.md),
+there is **no `forge migrate lockfile` command**. The lockfile is a
+generated artifact, not authored content — converting it does not
+preserve user intent. You have two supported paths:
+
+#### Path A: Rescaffold (recommended)
+
+The cleanest option for actively-maintained projects:
+
+```sh
+forge create <blueprint> --output-dir <new-dir>
+# Move / merge the new tree into your existing project.
+# Diff and resolve any local edits as you would on any `forge sync`.
+git add . && git commit -m "chore: rescaffold from blueprint on forge v0.5"
+```
+
+A rescaffold produces a fresh `.forge-lock.hcl` whose blueprint
+reference matches the current registry state. From there `forge
+sync` and `forge check` behave normally.
+
+#### Path B: Pin to v0.4.x
+
+If you need to delay the cutover (e.g. mid-release, frozen project),
+pin to the last YAML-lockfile release:
+
+```sh
+go install github.com/donaldgifford/forge@v0.4.x
+```
+
+Replace `v0.4.x` with the most recent v0.4 tag. That release will
+continue to read and write `.forge-lock.yaml` indefinitely.
+
+### What changes on disk
+
+| Before (v0.4.x) | After (v0.5.x) |
+|-----------------|----------------|
+| `.forge-lock.yaml` | `.forge-lock.hcl` |
+| YAML mapping with sequence values | HCL `blueprint { … }` block + labeled `default "<path>" { … }` / `managed_file "<path>" { … }` blocks |
+| Variables encoded as YAML scalars | Variables encoded as native HCL primitives (string / number / bool / list / map) |
+
+The file is generated by forge; you don't author it. The
+on-disk layout is documented for review and diffing purposes only.
+
+### Verifying the lockfile migration
+
+After rescaffolding:
+
+```sh
+forge check          # surfaces drift between project state and the new lockfile
+forge sync           # picks up registry changes; lockfile timestamps update
+```
+
+Both commands operate against `.forge-lock.hcl` exclusively in
+v0.5+. A bare `.forge-lock.yaml` produces the rescaffold-or-pin
+error described under Troubleshooting below.
+
+### Rolling back the lockfile migration
+
+```sh
+# If you've already committed v0.5 lockfile output:
+git revert <commit>             # or
+git reset --hard <pre-v0.5-sha>
+go install github.com/donaldgifford/forge@v0.4.x
+```
+
+There is no "downgrade" path from `.forge-lock.hcl` back to
+`.forge-lock.yaml` — pin the forge binary to the last YAML-era
+release if you need to keep operating against legacy lockfiles.
+
 ## Troubleshooting
 
 ### `apiVersion v1 is no longer supported`
@@ -382,6 +482,23 @@ You're on a forge release that requires HCL config files but the
 registry still has YAML. Run the suggested `forge migrate config`
 command, commit the result, retry. The same applies to bare
 `registry.yaml` files.
+
+### `YAML lockfiles are no longer supported`
+
+The full message reads:
+
+```text
+lockfile .forge-lock.yaml: YAML lockfiles are no longer supported in
+this version of forge; either rescaffold this project from the current
+blueprint, or pin forge to v0.4.x (see docs/MIGRATION.md)
+```
+
+You're on forge v0.5+ but the project still has a v0.4-era
+`.forge-lock.yaml`. Follow one of the paths in
+[Migrating lockfiles from YAML to HCL](#migrating-lockfiles-from-yaml-to-hcl-v04x--v05x):
+rescaffold the project (preferred), or pin to v0.4.x while you plan
+the cutover. There is no in-tool converter per
+[ADR-0002](adr/0002-forge-does-not-ship-in-tool-migrators.md).
 
 ### `parsing template "..." Unknown variable`
 
@@ -414,3 +531,5 @@ needed.
 - [DESIGN-0004](design/0004-unify-config-file-format-after-hcl2-cutover.md) — Config-format unification.
 - [IMPL-0004](impl/0004-migrate-template-engine-to-hcl2.md) — Engine cutover implementation.
 - [IMPL-0005](impl/0005-unify-config-file-format-to-hcl2.md) — Config-format cutover implementation.
+- [ADR-0002](adr/0002-forge-does-not-ship-in-tool-migrators.md) — Why forge no longer ships in-tool migrators.
+- [IMPL-0006](impl/0006-migrate-lockfile-from-yaml-to-hcl.md) — Lockfile cutover implementation (v0.5.0).

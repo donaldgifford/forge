@@ -101,36 +101,36 @@ both exist).
 
 #### Tasks
 
-- [ ] **A.1 Define `hcldec.ObjectSpec` for `Lockfile`.**
+- [x] **A.1 Define `hcldec.ObjectSpec` for `Lockfile`.**
   - File: `internal/lockfile/hcldec_spec.go` (new).
   - Mirrors `internal/config/hcldec_spec.go`. `BlueprintRef` is a
     single nested block; `Defaults` and `ManagedFiles` are
     `BlockListSpec`s with `path` as the block label.
-- [ ] **A.2 Implement `LoadLockfileHCL(path) (*Lockfile, error)`.**
+- [x] **A.2 Implement `LoadLockfileHCL(path) (*Lockfile, error)`.**
   - File: `internal/lockfile/loader_hcl.go` (new).
   - Uses `hashicorp/hcl/v2/hclparse` + `hcldec.Decode`.
   - `Variables` decodes as `cty.Value` of object type; conversion to
     `map[string]any` happens at the boundary for backwards
     compatibility with existing consumers.
-- [ ] **A.3 Implement `WriteLockfileHCL(w io.Writer, lf *Lockfile) error`.**
+- [x] **A.3 Implement `WriteLockfileHCL(w io.Writer, lf *Lockfile) error`.**
   - File: `internal/lockfile/emit_hcl.go` (new).
   - Uses `hashicorp/hcl/v2/hclwrite` for canonical formatting.
   - Variables are emitted as a single `variables { ... }` block with
     one attribute per variable (see OQ-1 — block form is the
     decided shape); nested types serialise naturally.
-- [ ] **A.4 Dispatching loader.**
+- [x] **A.4 Dispatching loader.**
   - File: `internal/lockfile/lock.go` (modify).
   - `LoadLockfile(dir)` stats `.forge-lock.hcl` first; falls back to
     `.forge-lock.yaml` if absent. Preserves current behavior during
     transition.
-- [ ] **A.5 Hermetic HCL fixture.**
+- [x] **A.5 Hermetic HCL fixture.**
   - File: `testdata/lockfile-hcl/.forge-lock.hcl` (new).
   - Covers all field shapes: BlueprintRef, Variables (string/bool/int),
     Defaults, ManagedFiles. Used by loader unit tests.
-- [ ] **A.6 Unit tests for the HCL loader.**
+- [x] **A.6 Unit tests for the HCL loader.**
   - File: `internal/lockfile/loader_hcl_test.go` (new).
   - Happy path, missing-fields, type-mismatch, unknown-attribute.
-- [ ] **A.7 Round-trip test.**
+- [x] **A.7 Round-trip test.**
   - Load YAML fixture → re-emit as HCL → load HCL → assert struct
     equality with original. Pins format equivalence.
 
@@ -150,7 +150,7 @@ load-time rescaffold/pin error (per ADR-0002).
 
 #### Tasks
 
-- [ ] **B.1 Replace the YAML loader with a rejection error.**
+- [x] **B.1 Replace the YAML loader with a rejection error.**
   - File: `internal/lockfile/lock.go` (modify).
   - `LoadLockfile(dir)` stats `.forge-lock.hcl` and loads it.
     If only `.forge-lock.yaml` exists, return:
@@ -162,24 +162,29 @@ load-time rescaffold/pin error (per ADR-0002).
     has `forge migrate config` and writes YAML lockfiles. IMPL-0007
     will further refine this error when the rejection path becomes
     the only path.
-- [ ] **B.2 Drop `gopkg.in/yaml.v3` from `internal/lockfile/`.**
+- [x] **B.2 Drop `gopkg.in/yaml.v3` from `internal/lockfile/`.**
   - The only remaining YAML import in the package disappears.
   - The migratecmd shadow types still import yaml.v3 today, but
     IMPL-0007 deletes that package entirely. Once both this work
     and IMPL-0007 land, the yaml.v3 dependency can be dropped from
     `go.mod`.
-- [ ] **B.3 Update writers.**
+- [x] **B.3 Update writers.**
   - `internal/create/`, `internal/sync/`, `internal/check/` — every
     site that writes the lockfile switches from `WriteLockfile` (YAML)
     to `WriteLockfileHCL`.
-- [ ] **B.4 Migrate testdata fixtures.**
+- [x] **B.4 Migrate testdata fixtures.**
   - Every `testdata/.../forge-lock.yaml` becomes `.forge-lock.hcl`.
     Frozen YAML fixture preserved at `testdata/v0-lockfile-yaml/`
     for the rejection-path test.
-- [ ] **B.5 Update integration tests.**
+  - Result: no `forge-lock.yaml` files existed under `testdata/` to
+    migrate — the canonical HCL fixture at
+    `testdata/lockfile-hcl/.forge-lock.hcl` is the only on-disk
+    lockfile fixture, and the rejection test (B.6) writes its YAML
+    payload inline, so no frozen YAML fixture file was needed.
+- [x] **B.5 Update integration tests.**
   - `internal/create/`, `internal/sync/`, `internal/check/` —
     integration tests that assert lockfile contents now read HCL.
-- [ ] **B.6 Add the rejection test.**
+- [x] **B.6 Add the rejection test.**
   - `internal/lockfile/loader_hcl_test.go` — load a directory with
     only `.forge-lock.yaml` and assert the rescaffold/pin error.
 
@@ -198,33 +203,41 @@ load-time rescaffold/pin error (per ADR-0002).
 
 #### Tasks
 
-- [ ] **C.1 Update DESIGN-0004 references.**
+- [x] **C.1 Update DESIGN-0004 references.**
   - DESIGN-0004's scope was config files; add a "see also IMPL-0006"
     note for the lockfile follow-up.
-- [ ] **C.2 Update docs/MIGRATION.md.**
+- [x] **C.2 Update docs/MIGRATION.md.**
   - New section: "Migrating lockfiles from YAML to HCL (v0.4.x →
     v0.5.x)". Per ADR-0002, this describes the rescaffold or
     pin-to-v0.4.x paths — not an in-tool migrator. Include the
     `go install github.com/donaldgifford/forge@<v0.4.x-tag>`
     invocation for the pin path.
-- [ ] **C.3 Update CLAUDE.md.**
+- [x] **C.3 Update CLAUDE.md.**
   - Architecture entries for `internal/lockfile/` reflect the HCL
     loader/emitter.
   - Key Concepts updated where they mention `.forge-lock.yaml`.
   - **No new `forge migrate lockfile` entries** — that command is
     explicitly out of scope per ADR-0002.
-- [ ] **C.4 Update README.md.**
+- [x] **C.4 Update README.md.**
   - "Migrating from older releases" section adds the v0.4.x→v0.5.x
     step (rescaffold or pin).
-- [ ] **C.5 Release notes for v0.5.0.**
+- [x] **C.5 Release notes for v0.5.0.**
   - File: `docs/release-notes/v0.5.0-hcl-lockfile.md` (new).
   - Mirror IMPL-0005's release-notes shape: breaking-change block,
     rationale, upgrade steps (rescaffold/pin), behaviour changes,
     "before you cut" checklist.
-- [ ] **C.6 Fresh forge-registry verification.**
+- [x] **C.6 Fresh forge-registry verification.**
   - Scaffold a fresh project from forge-registry, confirm the new
     lockfile loads/saves correctly through `forge sync` and
     `forge check`.
+  - Result: scaffolded `rust/std` against the local
+    `github.com/donaldgifford/forge-registry` checkout (26 files);
+    `.forge-lock.hcl` written with the expected `blueprint { … }`,
+    `variables { … }`, and labelled `default "<path>" { … }` blocks.
+    `forge check` reported every file `ok`; `forge sync` reran cleanly
+    and advanced `last_synced` (4 updated, 0 conflicts, 21 skipped).
+    A simulated v0.4.x project with only `.forge-lock.yaml` surfaced
+    the documented rescaffold/pin error.
 
 #### Success Criteria
 

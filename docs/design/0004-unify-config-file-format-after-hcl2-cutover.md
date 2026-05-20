@@ -57,7 +57,7 @@ After the v0.3.0 HCL2 cutover ([ADR-0001](../adr/0001-use-hcl2-as-the-template-e
 
 - Re-litigating the engine choice. HCL2 won in ADR-0001 and the engine is in production.
 - Inventing a third syntax (e.g. TOML, JSON, a custom forge DSL).
-- Designing the lockfile format. `.forge-lock.yaml` stays YAML for human-grep-ability; that decision was already taken in IMPL-0004 OQ-6 (part c) and is independent of this.
+- Designing the lockfile format. `.forge-lock.yaml` is out of scope here; that decision was deferred in IMPL-0004 OQ-6 (part c) and is independent of this work. **Update (v0.5.0):** [IMPL-0006](../impl/0006-migrate-lockfile-from-yaml-to-hcl.md) revisits and reverses that decision — the lockfile is now `.forge-lock.hcl` so authoring, configs, and project state all speak HCL2.
 - Maintaining a YAML compatibility shim. The v2 YAML loader gets deleted, not deprecated.
 
 ## Background
@@ -289,6 +289,7 @@ All four open questions are resolved as of 2026-05-12:
 - [DESIGN-0002 — Registry Layout & Defaults Inheritance](0002-registry-layout-and-defaults-inheritance.md)
 - [DESIGN-0003 — Migrate template engine to HCL2](0003-migrate-template-engine-to-hcl2.md)
 - [IMPL-0004 — Migrate template engine to HCL2](../impl/0004-migrate-template-engine-to-hcl2.md) (OQ-6 captures the YAML-stays decision being reconsidered here)
+- [IMPL-0006 — Migrate lockfile from YAML to HCL](../impl/0006-migrate-lockfile-from-yaml-to-hcl.md) — follow-up that brings `.forge-lock` into HCL alongside the config files unified here
 - [docs/MIGRATION.md](../MIGRATION.md) — current v1 → v2 migration guide; this design adds a "YAML → HCL config" section
 - [forge-registry PR #5](https://github.com/donaldgifford/forge-registry/pull/5)
 - `internal/config/blueprint.go` — current loader
