@@ -68,12 +68,18 @@ func ContentHash(content []byte) string {
 	return "sha256:" + hex.EncodeToString(h[:])
 }
 
+// pinTag is the most recent v0.4.x release — the last forge version
+// that shipped `forge migrate`. The rejection error and
+// docs/MIGRATION.md both reference this tag. Mirrors the const of
+// the same name in internal/config/loader.go.
+const pinTag = "v0.4.1"
+
 // LoadLockfile reads the lockfile from dir. Only the canonical HCL
 // form (.forge-lock.hcl) is supported from v0.5 onwards. A bare
-// .forge-lock.yaml triggers a rescaffold-or-pin error per ADR-0002.
-//
-// IMPL-0007 will further refine the error wording when the migrate
-// command is removed entirely.
+// .forge-lock.yaml triggers the rescaffold-or-pin error per
+// ADR-0002 — the in-tool `forge migrate` command was removed in
+// IMPL-0007, so the message points at the pinned-v0.4.x rescue
+// path (IMPL-0007 OQ-3).
 func LoadLockfile(dir string) (*Lockfile, error) {
 	hclPath := filepath.Join(dir, HCLFileName)
 
@@ -86,11 +92,17 @@ func LoadLockfile(dir string) (*Lockfile, error) {
 	yamlPath := filepath.Join(dir, FileName)
 	if _, err := os.Stat(yamlPath); err == nil {
 		return nil, fmt.Errorf(
-			"lockfile %s: YAML lockfiles are no longer supported in this "+
-				"version of forge; either rescaffold this project from the "+
-				"current blueprint, or pin forge to v0.4.x (see "+
-				"docs/MIGRATION.md)",
+			"lockfile %s: YAML lockfiles are no longer supported in this version of forge.\n"+
+				"\n"+
+				"To upgrade:\n"+
+				"  - Rescaffold this project from the current blueprint, OR\n"+
+				"  - Pin forge to %s:\n"+
+				"      go install github.com/donaldgifford/forge@%s\n"+
+				"\n"+
+				"See docs/MIGRATION.md",
 			yamlPath,
+			pinTag,
+			pinTag,
 		)
 	}
 

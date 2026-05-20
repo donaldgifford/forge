@@ -44,8 +44,8 @@ type Variable struct {
 // template expressions. `When` is a parsed-at-load-time HCL expression
 // (per IMPL-0005 OQ-7) so syntax errors surface at LoadBlueprint time
 // with file/line/column rather than on first evaluation. `WhenSource`
-// retains the original expression text for diagnostics, lockfile
-// snapshots, and round-trip output by `forge migrate config`.
+// retains the original expression text for diagnostics and lockfile
+// snapshots.
 type Condition struct {
 	When       hcl.Expression
 	WhenSource string

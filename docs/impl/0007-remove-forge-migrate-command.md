@@ -98,7 +98,7 @@ tests.
 
 #### Tasks
 
-- [ ] **1.1 Delete `internal/migratecmd/` in full.**
+- [x] **1.1 Delete `internal/migratecmd/` in full.**
   - Removes: `walk.go`, `rules.go`, `walk_test.go`, `rules_test.go`,
     `lockfile.go` (if landed via IMPL-0006 Phase B before this
     work — confirm not present), `yaml_types.go`, all related
@@ -106,19 +106,39 @@ tests.
   - The fixture directories (`testdata/v1-template/`,
     `testdata/v2-yaml-registry/`) are deleted along with the
     package.
-- [ ] **1.2 Delete `cmd/migrate.go`.**
-- [ ] **1.3 Drop the migrate subcommand registration in `cmd/root.go`.**
-- [ ] **1.4 Remove migrate-related references in test helpers.**
+  - Result: deleted all 15 `internal/migratecmd/*.go` files plus
+    `testdata/v2-yaml-registry/`. `testdata/v1-registry/` was
+    preserved — `internal/config/loader_test.go` still uses it for
+    the v1-shape YAML-rejection assertion.
+- [x] **1.2 Delete `cmd/migrate.go`.**
+- [x] **1.3 Drop the migrate subcommand registration in `cmd/root.go`.**
+  - The migrate subcommand self-registered via an `init()` block in
+    `cmd/migrate.go` — deleting that file removed the registration
+    automatically. `cmd/root.go` never referenced migrate directly,
+    so no edits there.
+- [x] **1.4 Remove migrate-related references in test helpers.**
   - Audit `cmd/*_test.go` and `internal/*_test.go` for any
     fixtures or test cases that exercise `forge migrate` flows.
     Delete those tests outright (they're testing a deleted
     feature).
-- [ ] **1.5 Drop `gopkg.in/yaml.v3` from `go.mod` and `go.sum`.**
+  - No surviving migrate-test references outside migratecmd itself
+    (which was deleted wholesale). The remaining `forge migrate`
+    strings live in `internal/config/loader.go`'s rejection error
+    and its test; Phase 2 owns that rewrite.
+- [~] **1.5 Drop `gopkg.in/yaml.v3` from `go.mod` and `go.sum`.**
   - Conditional on IMPL-0006 having landed first; otherwise the
     lockfile loader still imports yaml.v3 and the dependency stays
     until that work ships.
   - Run `go mod tidy` to confirm.
-- [ ] **1.6 `make ci` passes with the package deleted.**
+  - **Not achievable in this work.** Two non-legacy callers still
+    import `gopkg.in/yaml.v3`: `internal/config/global.go` (global
+    forge config) and `internal/registry/cache.go` (registry cache
+    metadata). Those YAML files are current state, not legacy
+    formats — converting them is out of scope for IMPL-0007.
+    `go mod tidy` kept yaml.v3 in `go.mod` after the migratecmd
+    deletion. A future RFC can pick up "drop yaml.v3 entirely" if
+    desired.
+- [x] **1.6 `make ci` passes with the package deleted.**
   - Any remaining import-cycle or unused-import failures are
     surfaced as part of this task and fixed.
 
@@ -141,7 +161,7 @@ instructions and a MIGRATION.md link.
 
 #### Tasks
 
-- [ ] **2.1 Update `internal/config/loader.go` rejection error.**
+- [x] **2.1 Update `internal/config/loader.go` rejection error.**
   - Old: "blueprint.yaml: YAML configs are no longer supported.
     Run `forge migrate config --path .` to convert. See
     docs/MIGRATION.md."
@@ -157,7 +177,7 @@ instructions and a MIGRATION.md link.
     > See docs/MIGRATION.md for the full upgrade guide."
   - The `v0.4.x` placeholder is replaced with the most recent
     v0.4.x tag at the time of the v0.5.0 cut.
-- [ ] **2.2 Update `internal/lockfile/lock.go` rejection error
+- [x] **2.2 Update `internal/lockfile/lock.go` rejection error
       (IMPL-0006 Phase B output).**
   - Old (IMPL-0006 as-was): "lockfile .forge-lock.yaml: YAML
     lockfiles are no longer supported. Run `forge migrate
@@ -172,14 +192,27 @@ instructions and a MIGRATION.md link.
     >       go install github.com/donaldgifford/forge@v0.4.x
     >
     > See docs/MIGRATION.md."
-- [ ] **2.3 Update unit tests** in
+- [x] **2.3 Update unit tests** in
       `internal/config/loader_test.go` and
       `internal/lockfile/lock_test.go` to assert the new error
       strings.
-- [ ] **2.4 Audit `internal/ui/` and `cmd/` for any other
+  - Note: `internal/lockfile/lock_test.go` was deleted in IMPL-0006
+    B.2 (YAML round-trip tests retired). The lockfile rejection
+    test now lives in `internal/lockfile/loader_hcl_test.go`
+    (`TestLoadLockfile_RejectsYAMLOnly`) and was updated here to
+    assert the new rescaffold/pin-with-go-install error string.
+- [x] **2.4 Audit `internal/ui/` and `cmd/` for any other
       migrate-pointer strings.**
   - `grep -r "forge migrate" .` should return zero hits in
     runtime code (only in docs).
+  - Result: cleaned three stale comments in
+    `internal/config/blueprint.go`, `internal/config/hclemit.go`,
+    and `internal/registry/index.go`. The remaining `forge
+    migrate` occurrences in runtime code are intentional — they
+    live inside the rejection-error format strings (OQ-3 says the
+    error tells the user to "Pin forge to v0.4.1 and run `forge
+    migrate config`") and in doc comments explaining the IMPL-0007
+    rationale.
 
 #### Success Criteria
 

@@ -3,9 +3,13 @@ package config
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 )
+
+// pinTag is the most recent v0.4.x release — the last forge version
+// that shipped `forge migrate`. Rejection-error messages and
+// docs/MIGRATION.md both reference this tag.
+const pinTag = "v0.4.1"
 
 // LoadBlueprint reads and parses a blueprint config file. HCL is the
 // only supported format post-IMPL-0005:
@@ -15,8 +19,8 @@ import (
 //     the HCL sibling (callers that hardcoded the legacy filename keep
 //     working without code changes — important for the dispatcher path
 //     into existing tests/fixtures during the cutover window).
-//   - Any other `.yaml` path returns a migration-pointer error directing
-//     the user to `forge migrate config` and docs/MIGRATION.md.
+//   - Any other `.yaml` path returns a rescaffold-or-pin error (the
+//     `forge migrate` command was removed in IMPL-0007 per ADR-0002).
 func LoadBlueprint(path string) (*Blueprint, error) {
 	if hclPath, ok := preferHCLSibling(path); ok {
 		return LoadBlueprintHCL(hclPath)
@@ -78,15 +82,24 @@ func preferHCLSibling(path string) (string, bool) {
 // a caller asks for a YAML config file with no HCL sibling on disk.
 // The kind argument is used in the message ("blueprint" or "registry")
 // so the error reads naturally for both code paths.
+//
+// Per IMPL-0007 OQ-3, the message includes the literal `go install`
+// command (pinned to the most recent v0.4.x tag) so a v0.2.x/v0.3.x
+// user can fix the failure with a single copy-paste rather than
+// reading docs first.
 func yamlNoLongerSupportedError(kind, path string) error {
 	return fmt.Errorf(
-		"%s file %s: YAML config files are no longer supported. "+
-			"Run `forge migrate config --path %s` to convert this "+
-			"file to %s. See docs/MIGRATION.md in the forge repository "+
-			"for the YAML→HCL migration guide",
+		"%s file %s: YAML config files are no longer supported in this version of forge.\n"+
+			"\n"+
+			"To upgrade:\n"+
+			"  - Rescaffold from the current blueprint, OR\n"+
+			"  - Pin forge to %s and run `forge migrate config`:\n"+
+			"      go install github.com/donaldgifford/forge@%s\n"+
+			"\n"+
+			"See docs/MIGRATION.md for the full upgrade guide",
 		kind,
 		path,
-		filepath.Dir(path),
-		strings.TrimSuffix(filepath.Base(path), ".yaml")+".hcl",
+		pinTag,
+		pinTag,
 	)
 }
