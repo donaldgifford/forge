@@ -412,18 +412,18 @@ default behaviour stays "lockfile is the source of truth."
 
 #### Tasks
 
-- [ ] **C.1 Add the `--var-file` flag to `forge sync`.**
+- [x] **C.1 Add the `--var-file` flag to `forge sync`.**
   - File: `cmd/sync.go` (modify).
   - StringArrayVar registration mirroring create.go.
 
-- [ ] **C.2 Enforce mutual exclusion with `--set` on sync.**
+- [x] **C.2 Enforce mutual exclusion with `--set` on sync.**
   - `forge sync` does not currently have a `--set` flag. Decision:
     do not add `--set` to sync as part of this IMPL (out of scope
     — sync stays lockfile-driven by default). The mutual-exclusion
     check collapses to "no work needed" here; if sync ever gains
     `--set`, that future IMPL adds the matching check.
 
-- [ ] **C.3 Enforce `--force` requirement for `--var-file` on sync
+- [x] **C.3 Enforce `--force` requirement for `--var-file` on sync
       (per OQ-4).**
   - File: `cmd/sync.go` (modify).
   - Inside `RunE`, after flag parsing:
@@ -440,7 +440,7 @@ default behaviour stays "lockfile is the source of truth."
   - This makes the lockfile rewrite explicit and prevents
     accidental drift between the lockfile and project state.
 
-- [ ] **C.4 Load vars-file and merge with lockfile.**
+- [x] **C.4 Load vars-file and merge with lockfile.**
   - File: `cmd/sync.go` (modify) and `internal/sync/` as needed.
   - When `--var-file --force` is set, call
     `varsfile.Load(varFiles, bp.Variables)`, then overlay the
@@ -453,7 +453,7 @@ default behaviour stays "lockfile is the source of truth."
   - Type-coercion errors abort the sync before any files are
     touched.
 
-- [ ] **C.5 Integration tests for sync.**
+- [x] **C.5 Integration tests for sync.**
   - File: `cmd/sync_test.go` (modify).
   - Tests:
     - Sync with no `--var-file` → unchanged behaviour (regression
@@ -470,7 +470,7 @@ default behaviour stays "lockfile is the source of truth."
     - Sync with `--var-file FILE --force` and a type-mismatch in
       the vars file → coercion error; lockfile unchanged.
 
-- [ ] **C.6 Run `make ci`.**
+- [x] **C.6 Run `make ci`.**
 
 #### Success Criteria
 

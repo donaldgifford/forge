@@ -3,6 +3,7 @@ package sync
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/donaldgifford/forge/internal/config"
 	"github.com/donaldgifford/forge/internal/lockfile"
 	tmpl "github.com/donaldgifford/forge/internal/template"
+	"github.com/donaldgifford/forge/internal/varsfile"
 )
 
 // Opts configures the sync operation.
@@ -25,10 +27,17 @@ type Opts struct {
 	BaseDir string
 	// DryRun prints what would change without writing.
 	DryRun bool
-	// Force skips confirmation prompts.
+	// Force skips confirmation prompts. When VarsFiles is non-empty,
+	// the CLI requires Force=true before reaching this point (per
+	// IMPL-0008 OQ-4) — sync trusts its caller to have enforced that.
 	Force bool
 	// FileFilter limits sync to a single file path.
 	FileFilter string
+	// VarsFiles is the ordered list of `--var-file` paths supplied at
+	// the CLI (IMPL-0008). When non-empty, sync.Run overlays the
+	// loaded values onto the lockfile-derived variable map and
+	// rewrites the lockfile with the merged result.
+	VarsFiles []string
 }
 
 // Result holds the outcome of a sync operation.
@@ -37,6 +46,11 @@ type Result struct {
 	Skipped       []string
 	Conflicts     []string
 	ConflictFiles []ConflictFile
+
+	// UnknownVarsFileKeys lists keys declared in any --var-file input
+	// that don't correspond to a declared blueprint variable. The CLI
+	// surfaces these as a warning (IMPL-0008 OQ-7).
+	UnknownVarsFileKeys []string
 }
 
 // Run executes the sync workflow.
@@ -61,6 +75,13 @@ func Run(opts *Opts) (*Result, error) {
 	ctyVars, err := lockfile.ToCtyValues(lock.Variables, bpVars)
 	if err != nil {
 		return nil, fmt.Errorf("converting lockfile variables to cty: %w", err)
+	}
+
+	// IMPL-0008 Phase C: overlay --var-file values onto the
+	// lockfile-derived map. The CLI enforces the --force requirement
+	// before reaching here; sync just needs to merge and persist.
+	if err := applyVarsFileOverlay(opts.VarsFiles, bpVars, ctyVars, result); err != nil {
+		return nil, err
 	}
 
 	// Sync defaults.
@@ -89,19 +110,69 @@ func Run(opts *Opts) (*Result, error) {
 		}
 	}
 
-	// Update lockfile if not dry-run.
-	if !opts.DryRun && len(result.Updated) > 0 {
-		lock.LastSynced = time.Now().UTC()
-
-		// Recompute content hashes for synced files.
-		updateFileHashes(projectDir, lock)
-
-		if err := lockfile.WriteHCL(lockPath, lock); err != nil {
-			return nil, fmt.Errorf("updating lockfile: %w", err)
-		}
+	if err := persistLockfile(opts, lockPath, lock, ctyVars, result); err != nil {
+		return nil, err
 	}
 
 	return result, nil
+}
+
+// persistLockfile rewrites the lockfile to record updated timestamps,
+// content hashes, and (when --var-file was used) the overlaid
+// variable values. No-op when DryRun is set or there's nothing to
+// record. Vars-file overlays force a rewrite even when no managed
+// files changed — the new variable values themselves are persistent
+// state worth recording.
+func persistLockfile(
+	opts *Opts,
+	lockPath string,
+	lock *lockfile.Lockfile,
+	ctyVars map[string]cty.Value,
+	result *Result,
+) error {
+	varsFileChanged := len(opts.VarsFiles) > 0
+	if opts.DryRun || (len(result.Updated) == 0 && !varsFileChanged) {
+		return nil
+	}
+
+	lock.LastSynced = time.Now().UTC()
+
+	updateFileHashes(opts.ProjectDir, lock)
+
+	if varsFileChanged {
+		lock.Variables = lockfile.FromCtyValues(ctyVars)
+	}
+
+	if err := lockfile.WriteHCL(lockPath, lock); err != nil {
+		return fmt.Errorf("updating lockfile: %w", err)
+	}
+
+	return nil
+}
+
+// applyVarsFileOverlay loads any --var-file inputs and merges the
+// resolved values into ctyVars in place. Unknown keys land on
+// result.UnknownVarsFileKeys for the caller to surface. Returns nil
+// (no-op) when no vars-file paths were supplied.
+func applyVarsFileOverlay(
+	paths []string,
+	bpVars []config.Variable,
+	ctyVars map[string]cty.Value,
+	result *Result,
+) error {
+	if len(paths) == 0 {
+		return nil
+	}
+
+	overlay, unknown, err := varsfile.Load(paths, bpVars)
+	if err != nil {
+		return fmt.Errorf("loading vars file: %w", err)
+	}
+
+	maps.Copy(ctyVars, overlay)
+	result.UnknownVarsFileKeys = unknown
+
+	return nil
 }
 
 func syncDefault(
@@ -123,7 +194,9 @@ func syncDefault(
 		return err
 	}
 
-	localPath := filepath.Join(opts.ProjectDir, d.Path)
+	// The lockfile stores the source path (e.g. "greet.txt.tmpl"), but
+	// the rendered output lives at the stripped name ("greet.txt").
+	localPath := filepath.Join(opts.ProjectDir, tmpl.StripTemplateExtension(d.Path))
 
 	return applyOverwrite(localPath, sourceContent, opts.DryRun, result)
 }
