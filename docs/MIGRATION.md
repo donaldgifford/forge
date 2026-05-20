@@ -484,6 +484,10 @@ keep operating against legacy lockfiles.
 
 ## Variable input: preferred pattern (v0.6+)
 
+> **No migration required** — this section is *guidance* for new
+> invocations on v0.6+, not a required upgrade step. Existing
+> `--set` users keep working unchanged.
+
 `--set key=value` is still supported for ad-hoc CLI overrides, but
 **non-trivial inputs should live in a `.forge-vars.hcl` file** loaded
 via `--var-file`. The file is plain HCL, plays nicely with version

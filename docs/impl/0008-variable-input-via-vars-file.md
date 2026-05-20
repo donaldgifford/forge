@@ -1,7 +1,7 @@
 ---
 id: IMPL-0008
 title: "Variable input via vars file"
-status: Draft
+status: Accepted
 author: Donald Gifford
 created: 2026-05-19
 ---
@@ -9,7 +9,7 @@ created: 2026-05-19
 
 # IMPL 0008: Variable input via vars file
 
-**Status:** Draft
+**Status:** Accepted
 **Author:** Donald Gifford
 **Date:** 2026-05-19
 
@@ -589,7 +589,13 @@ actionable (DESIGN-0005-aligned), rather than Cobra's generic
     issue when this PR lands). Tracked in the IMPL document and in
     the release notes' "Before you cut" checklist.
 
-- [ ] **E.6 docz-reviewer pass on the doc changes.**
+- [x] **E.6 docz-reviewer pass on the doc changes.**
+  - Reviewer pass completed; addressed the must-fix items
+    (DESIGN-0005 dead link reference and Goals-section
+    silent omission of `forge check` rejection) and the
+    should-improve items (MIGRATION.md "no migration required"
+    note, release-notes redundancy collapse, `mkdocs build`
+    line added to the "Before you cut" checklist).
 
 #### Success Criteria
 

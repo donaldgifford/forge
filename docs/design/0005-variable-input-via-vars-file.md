@@ -48,7 +48,9 @@ groundwork for object/list/map variable types (see RFC-0002).
 ### Goals
 
 - Provide a file-based alternative to `--set` for passing variable
-  values into `forge create` / `forge sync` / `forge check`.
+  values into `forge create` and `forge sync`. (`forge check`
+  registers the flag solely to emit a clear rejection error — see
+  OQ-5 for the rationale.)
 - Use HCL2 as the file format so the input grammar matches the rest
   of forge (blueprint.hcl, registry.hcl) and naturally handles nested
   structures when object/list/map types eventually land.
@@ -374,8 +376,10 @@ No release-notes pressure since the feature is additive.
   work — IMPL-0008 settled on a strict `.hcl` extension check on
   the input path, and `/dev/fd/63`-style paths from `<(...)` fail
   that check. The documented escape hatch is the *tempfile pattern*
-  (see [Mutual Exclusion](#mutual-exclusion-with---set) above and
-  the README example).
+  (see the tempfile example in
+  [Mutual Exclusion](#mutual-exclusion-with---set) above, plus
+  [MIGRATION.md § Variable input: preferred pattern](../MIGRATION.md#variable-input-preferred-pattern-v06)
+  for the user-facing walkthrough).
 
 ## References
 
