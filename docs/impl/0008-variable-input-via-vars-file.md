@@ -140,13 +140,13 @@ yet.
 
 #### Tasks
 
-- [ ] **A.1 Create the package directory and stub file.**
+- [x] **A.1 Create the package directory and stub file.**
   - File: `internal/varsfile/varsfile.go` (new).
   - Package comment summarising responsibility: "parse one or more
     `.forge-vars.hcl` files into a `map[string]cty.Value` keyed by
     variable name, scoped to a blueprint's declared variables."
 
-- [ ] **A.2 Define the public API.**
+- [x] **A.2 Define the public API.**
   - File: `internal/varsfile/varsfile.go` (modify).
   - Exported entry point (proposed signature):
 
@@ -166,7 +166,7 @@ yet.
   - The exported function is the *only* entry point — internal
     helpers (parse, merge, coerce) stay unexported.
 
-- [ ] **A.3 Implement per-file parsing.**
+- [x] **A.3 Implement per-file parsing.**
   - Internal helper: `parseFile(path string) (hcl.Attributes, hcl.Diagnostics)`.
   - **Reject paths that don't end in `.hcl`** with a clear error
     before opening the file (per OQ-8). Message: "vars file 'X':
@@ -180,7 +180,7 @@ yet.
     attribute assignments only, not blocks; got block 'X' at
     file:line:col."
 
-- [ ] **A.4 Implement composition (multiple files).**
+- [x] **A.4 Implement composition (multiple files).**
   - Internal helper: `compose(files []hcl.Attributes) hcl.Attributes`.
   - Walks files left-to-right; later attributes overwrite earlier
     on key collision. Preserves the source `hcl.Attribute` (with
@@ -188,7 +188,7 @@ yet.
     coercion errors point at the file that actually supplied the
     value.
 
-- [ ] **A.5 Implement type coercion against declared types.**
+- [x] **A.5 Implement type coercion against declared types.**
   - Internal helper: `coerce(attrs hcl.Attributes, vars []config.Variable) (map[string]cty.Value, []string, error)`.
   - For each declared variable in `vars`, if the attribute is
     present:
@@ -207,7 +207,7 @@ yet.
   - Variables absent from the file: leave unset (callers fall
     through to prompt / default).
 
-- [ ] **A.6 Hermetic test fixtures.**
+- [x] **A.6 Hermetic test fixtures.**
   - File: `internal/varsfile/testdata/basic.forge-vars.hcl` (new).
   - File: `internal/varsfile/testdata/override.forge-vars.hcl` (new).
   - File: `internal/varsfile/testdata/wrong-type.forge-vars.hcl` (new).
@@ -218,7 +218,7 @@ yet.
   - File: `internal/varsfile/testdata/bad-extension.vars` (new) — covers OQ-8 rejection (correct content, wrong extension).
   - Each fixture is minimal — single-purpose for one test case.
 
-- [ ] **A.7 Unit tests.**
+- [x] **A.7 Unit tests.**
   - File: `internal/varsfile/varsfile_test.go` (new).
   - Test cases (table-driven where structure allows):
     - `Load` happy path: single file, three scalar vars, declared
@@ -242,7 +242,8 @@ yet.
     - Empty file: returns empty map, no error.
   - Use `testify` assertions per CLAUDE.md.
 
-- [ ] **A.8 Run `make lint` and `make fmt`.**
+- [x] **A.8 Run `make lint` and `make fmt`.**
+  - Result: coverage 97.1% (target >=90%); 0 lint issues.
 
 #### Success Criteria
 
