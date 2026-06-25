@@ -28,7 +28,7 @@ created: 2026-05-19
   - [Phase C: --var-file on forge sync](#phase-c---var-file-on-forge-sync)
     - [Tasks](#tasks-2)
     - [Success Criteria](#success-criteria-2)
-  - [Phase D: --var-file on forge check](#phase-d---var-file-on-forge-check)
+  - [Phase D: --var-file on forge check (rejection)](#phase-d---var-file-on-forge-check-rejection)
     - [Tasks](#tasks-3)
     - [Success Criteria](#success-criteria-3)
   - [Phase E: Documentation and release prep](#phase-e-documentation-and-release-prep)

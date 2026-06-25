@@ -99,6 +99,7 @@ forge cache clean
 - [DESIGN-0003 — Migrate template engine to HCL2](docs/design/0003-migrate-template-engine-to-hcl2.md) -- Engine swap rationale
 - [DESIGN-0004 — Unify config file format after HCL2 cutover](docs/design/0004-unify-config-file-format-after-hcl2-cutover.md) -- Config-format unification
 - [ADR-0001 — Use HCL2 as the template engine](docs/adr/0001-use-hcl2-as-the-template-engine.md) -- Decision record
+- [docs/REFERENCE.md](docs/REFERENCE.md) -- Canonical HCL reference for `blueprint.hcl`, `registry.hcl`, `.forge-lock.hcl`, `.forge-vars.hcl`
 - [docs/MIGRATION.md](docs/MIGRATION.md) -- v0.2.x → v0.5.x migration guides
 - [RFC-0001 — Forge: Project Scaffolding CLI](docs/rfc/0001-forge-project-scaffolding-cli.md) -- High-level proposal and architecture
 
