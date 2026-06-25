@@ -27,6 +27,7 @@ nav:
     - Investigations:
         - Overview: investigation/README.md
         - 'INV-0001: Templating YAML Files and HCL2 Migration': investigation/0001-templating-yaml-files-and-hcl2-migration.md
+        - 'INV-0002: auto-generate HCL reference doc': investigation/0002-auto-generate-hcl-reference-doc.md
     - Plans:
         - Overview: plan/README.md
         - 'PLAN-0001: Registry Blueprint and Update Commands': plan/0001-registry-blueprint-and-update-commands.md
@@ -39,7 +40,9 @@ nav:
     - Release Notes:
         - Release notes — v0.3.0 HCL2 template engine cutover: release-notes/v0.3.0-hcl2-cutover.md
         - Release notes — v0.4.0 HCL config-file unification: release-notes/v0.4.0-hcl-config.md
-        - Release notes — v0.5.0 HCL lockfile + forge migrate removed: release-notes/v0.5.0-hcl-lockfile.md
+        - Release notes — v0.5.0 HCL lockfile cutover + `forge migrate` removed: release-notes/v0.5.0-hcl-lockfile.md
+        - Release notes — v0.6.0 `--var-file` variable input: release-notes/v0.6.0-vars-file.md
+    - Forge HCL reference: REFERENCE.md
 plugins:
     - techdocs-core
 site_description: Documentation for forge
