@@ -16,12 +16,12 @@ import (
 
 // declaredVars is the standard variable declaration set used across
 // table-driven tests. project_name is required string, use_grpc is
-// bool with default false, port is int with default 8080.
+// bool with default false, port is number with default 8080.
 func declaredVars() []config.Variable {
 	return []config.Variable{
-		{Name: "project_name", Type: "string", Required: true},
-		{Name: "use_grpc", Type: "bool", Default: "false"},
-		{Name: "port", Type: "int", Default: "8080"},
+		{Name: "project_name", Type: cty.String, Required: true},
+		{Name: "use_grpc", Type: cty.Bool, DefaultSource: "false"},
+		{Name: "port", Type: cty.Number, DefaultSource: "8080"},
 	}
 }
 

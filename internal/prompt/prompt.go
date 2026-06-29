@@ -3,7 +3,6 @@ package prompt
 
 import (
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -40,6 +39,10 @@ type PromptFn func(v *config.Variable, current map[string]any) (string, error)
 // varsFileValues and overrides are mutually exclusive at the CLI layer;
 // CollectVariables accepts both for flexibility (tests may stub either
 // path) but does not enforce that exclusion itself.
+//
+// IMPL-0009 Phase B: this function still operates on the legacy
+// scalar-only resolution shape. Structured-type (object / list / map)
+// support and validation-block evaluation land in Phases C and E.
 func CollectVariables(
 	vars []config.Variable,
 	overrides map[string]string,
@@ -84,7 +87,7 @@ func resolveVariable(
 	}
 
 	// Render the default value as a template (it can reference earlier variables).
-	defaultVal, err := renderDefault(v.Default, current)
+	defaultVal, err := renderDefault(v.DefaultSource, current)
 	if err != nil {
 		return nil, fmt.Errorf("rendering default for %q: %w", v.Name, err)
 	}
@@ -101,8 +104,7 @@ func resolveVariable(
 // resolveFromVarsFile converts a cty.Value supplied via --var-file into
 // the `any` form used throughout the variable resolution chain. The
 // value is already coerced to the declared blueprint type by
-// varsfile.Load, so this is a straightforward Go-type unwrap with
-// validation applied against the string form.
+// varsfile.Load, so this is a straightforward Go-type unwrap.
 func resolveFromVarsFile(val cty.Value, v *config.Variable) (any, error) {
 	if !val.IsKnown() || val.IsNull() {
 		if v.Required {
@@ -112,15 +114,7 @@ func resolveFromVarsFile(val cty.Value, v *config.Variable) (any, error) {
 		return zeroValue(v.Type), nil
 	}
 
-	goVal := ctyToGo(val)
-
-	// Apply the same regex-based validation overrides go through; the
-	// validate regex is defined against the string serialisation.
-	if err := validateValue(fmt.Sprintf("%v", goVal), v); err != nil {
-		return nil, fmt.Errorf("vars-file value for %q failed validation: %w", v.Name, err)
-	}
-
-	return goVal, nil
+	return ctyToGo(val), nil
 }
 
 // ctyToGo converts a cty.Value to the Go `any` shape this package uses
@@ -146,12 +140,9 @@ func ctyToGo(val cty.Value) any {
 	}
 }
 
-// resolveFromOverride validates and coerces an override value.
+// resolveFromOverride coerces an override value against the declared
+// scalar type.
 func resolveFromOverride(raw string, v *config.Variable) (any, error) {
-	if err := validateValue(raw, v); err != nil {
-		return nil, fmt.Errorf("override for %q failed validation: %w", v.Name, err)
-	}
-
 	val, err := coerceValue(raw, v.Type)
 	if err != nil {
 		return nil, fmt.Errorf("invalid override for %q: %w", v.Name, err)
@@ -178,7 +169,7 @@ func resolveFromDefault(defaultVal string, v *config.Variable) (any, error) {
 	return val, nil
 }
 
-// resolveFromPrompt calls the prompt function and validates the result.
+// resolveFromPrompt calls the prompt function and coerces the result.
 func resolveFromPrompt(
 	v *config.Variable,
 	current map[string]any,
@@ -196,10 +187,6 @@ func resolveFromPrompt(
 
 	if raw == "" && v.Required {
 		return nil, fmt.Errorf("variable %q is required", v.Name)
-	}
-
-	if err := validateValue(raw, v); err != nil {
-		return nil, fmt.Errorf("variable %q failed validation: %w", v.Name, err)
 	}
 
 	val, err := coerceValue(raw, v.Type)
@@ -243,46 +230,31 @@ func renderDefault(defaultTmpl string, current map[string]any) (string, error) {
 	return out, nil
 }
 
-// coerceValue converts a string value to the appropriate Go type based on the variable type.
-func coerceValue(raw, varType string) (any, error) {
-	switch varType {
-	case "bool":
+// coerceValue converts a string value to the appropriate Go type based on
+// the declared cty.Type. Scalar-only — list / map / object inputs come
+// through the vars-file path (IMPL-0009 Phase D) and never hit this
+// helper.
+func coerceValue(raw string, varType cty.Type) (any, error) {
+	switch {
+	case varType.Equals(cty.Bool):
 		return strconv.ParseBool(raw)
-	case "int":
+	case varType.Equals(cty.Number):
 		return strconv.Atoi(raw)
-	case "string", "choice", "":
-		return raw, nil
 	default:
 		return raw, nil
 	}
 }
 
-// zeroValue returns the zero value for a variable type.
-func zeroValue(varType string) any {
-	switch varType {
-	case "bool":
+// zeroValue returns the zero value for a scalar cty.Type. Structured
+// types resolve through the vars-file path and never need this helper
+// in Phase B.
+func zeroValue(varType cty.Type) any {
+	switch {
+	case varType.Equals(cty.Bool):
 		return false
-	case "int":
+	case varType.Equals(cty.Number):
 		return 0
 	default:
 		return ""
 	}
-}
-
-// validateValue checks a string value against the variable's validation regex.
-func validateValue(raw string, v *config.Variable) error {
-	if v.Validate == "" {
-		return nil
-	}
-
-	re, err := regexp.Compile(v.Validate)
-	if err != nil {
-		return fmt.Errorf("invalid validation regex %q: %w", v.Validate, err)
-	}
-
-	if !re.MatchString(raw) {
-		return fmt.Errorf("value %q does not match pattern %q", raw, v.Validate)
-	}
-
-	return nil
 }

@@ -5,21 +5,22 @@ import (
 	"strconv"
 
 	"github.com/zclconf/go-cty/cty"
+	"github.com/zclconf/go-cty/cty/convert"
 
 	"github.com/donaldgifford/forge/internal/config"
 )
 
-// ToCtyValues converts a raw lockfile variable map (loaded from YAML) into a
+// ToCtyValues converts a raw lockfile variable map (loaded from disk) into a
 // cty.Value map, normalising values against the declared variable types from
-// the blueprint. The declared type wins over YAML's loose typing — for
-// example, a value of `false` in YAML becomes cty.False whether the on-disk
-// value parsed as bool or string "false".
+// the blueprint. The declared type wins over the on-disk shape — for example,
+// a value of `false` on disk becomes cty.False whether it was stored as a
+// bool or the string "false".
 //
 // Variables not declared in vars fall back to runtime-type inference. Missing
 // raw values produce cty.NullVal of the declared type.
 func ToCtyValues(raw map[string]any, vars []config.Variable) (map[string]cty.Value, error) {
 	out := make(map[string]cty.Value, len(vars))
-	declared := make(map[string]string, len(vars))
+	declared := make(map[string]cty.Type, len(vars))
 
 	for i := range vars {
 		declared[vars[i].Name] = vars[i].Type
@@ -48,8 +49,8 @@ func ToCtyValues(raw map[string]any, vars []config.Variable) (map[string]cty.Val
 	return out, nil
 }
 
-// FromCtyValues converts a cty.Value map back into a Go map suitable for YAML
-// marshaling. Used by create when writing the lockfile.
+// FromCtyValues converts a cty.Value map back into a Go map suitable for
+// on-disk marshaling. Used by create when writing the lockfile.
 func FromCtyValues(vals map[string]cty.Value) map[string]any {
 	out := make(map[string]any, len(vals))
 
@@ -60,32 +61,47 @@ func FromCtyValues(vals map[string]cty.Value) map[string]any {
 	return out
 }
 
-func convertValue(v any, declaredType string) (cty.Value, error) {
+// convertValue coerces a raw Go value to a cty.Value of declaredType.
+// Falls back to runtime-type inference when declaredType is cty.NilType
+// (variable not declared in the blueprint, e.g. legacy lockfile entry).
+func convertValue(v any, declaredType cty.Type) (cty.Value, error) {
 	if v == nil {
 		return nullValueForType(declaredType), nil
 	}
 
-	switch declaredType {
-	case "string", "choice":
+	if declaredType == cty.NilType {
+		return inferValue(v)
+	}
+
+	switch {
+	case declaredType.Equals(cty.String):
 		return cty.StringVal(toString(v)), nil
-	case "bool":
+	case declaredType.Equals(cty.Bool):
 		b, err := toBool(v)
 		if err != nil {
 			return cty.NilVal, err
 		}
 
 		return cty.BoolVal(b), nil
-	case "int":
+	case declaredType.Equals(cty.Number):
 		i, err := toInt(v)
 		if err != nil {
 			return cty.NilVal, err
 		}
 
 		return cty.NumberIntVal(i), nil
-	case "":
-		return inferValue(v)
 	default:
-		return inferValue(v)
+		// Structured types (list/map/object) — defer to inferValue
+		// and let cty.Convert do the structural coercion against the
+		// declared shape. Lockfiles produced by IMPL-0009-aware
+		// writers already round-trip cleanly; the convert pass is for
+		// pre-v0.7 entries that may shape-mismatch.
+		inferred, err := inferValue(v)
+		if err != nil {
+			return cty.NilVal, err
+		}
+
+		return convert.Convert(inferred, declaredType)
 	}
 }
 
@@ -110,15 +126,12 @@ func inferValue(v any) (cty.Value, error) {
 	}
 }
 
-func nullValueForType(declaredType string) cty.Value {
-	switch declaredType {
-	case "bool":
-		return cty.NullVal(cty.Bool)
-	case "int":
-		return cty.NullVal(cty.Number)
-	default:
+func nullValueForType(declaredType cty.Type) cty.Value {
+	if declaredType == cty.NilType {
 		return cty.NullVal(cty.String)
 	}
+
+	return cty.NullVal(declaredType)
 }
 
 func toString(v any) string {

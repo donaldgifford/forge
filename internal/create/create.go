@@ -82,6 +82,12 @@ type Result struct {
 	// --strict-vars flag in v1). Empty when no --var-file paths were
 	// supplied or every key matched a declared variable.
 	UnknownVarsFileKeys []string
+
+	// Deprecations are non-fatal v0.7 transition notices produced by
+	// the blueprint loader (today: the `int`-as-alias-for-`number`
+	// warning). The CLI surfaces these via ui.Warningf before the
+	// success line per IMPL-0009 OQ-3.
+	Deprecations []config.Deprecation
 }
 
 // Run executes the create workflow.
@@ -171,6 +177,7 @@ func Run(opts *Opts) (*Result, error) {
 		FilesCreated:        filesCreated,
 		Blueprint:           bp.Name,
 		UnknownVarsFileKeys: unknownKeys,
+		Deprecations:        bp.Deprecations,
 	}, nil
 }
 

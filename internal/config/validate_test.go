@@ -5,17 +5,26 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/zclconf/go-cty/cty"
 
 	"github.com/donaldgifford/forge/internal/config"
 )
 
+// TestValidateBlueprint_Valid covers the happy path: a blueprint with
+// one well-formed scalar variable passes ValidateBlueprint.
+//
+// Type-shape validation moved to ParseVariableType (vartype.go) at
+// LoadBlueprint time per IMPL-0009 B.5 — ValidateBlueprint is now
+// limited to invariants that aren't expressible in the HCL schema
+// (variable name non-empty, sync strategies in the allowed set,
+// managed file paths non-empty).
 func TestValidateBlueprint_Valid(t *testing.T) {
 	t.Parallel()
 
 	bp := &config.Blueprint{
 		Name: "test",
 		Variables: []config.Variable{
-			{Name: "name", Type: "string"},
+			{Name: "name", Type: cty.String},
 		},
 	}
 	require.NoError(t, config.ValidateBlueprint(bp))
@@ -28,48 +37,6 @@ func TestValidateBlueprint_EmptyName(t *testing.T) {
 	err := config.ValidateBlueprint(bp)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "name is required")
-}
-
-func TestValidateBlueprint_InvalidVariableType(t *testing.T) {
-	t.Parallel()
-
-	bp := &config.Blueprint{
-		Name: "test",
-		Variables: []config.Variable{
-			{Name: "foo", Type: "float"},
-		},
-	}
-	err := config.ValidateBlueprint(bp)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid type")
-}
-
-func TestValidateBlueprint_ChoiceWithoutChoices(t *testing.T) {
-	t.Parallel()
-
-	bp := &config.Blueprint{
-		Name: "test",
-		Variables: []config.Variable{
-			{Name: "pick", Type: "choice"},
-		},
-	}
-	err := config.ValidateBlueprint(bp)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "choices are required")
-}
-
-func TestValidateBlueprint_InvalidRegex(t *testing.T) {
-	t.Parallel()
-
-	bp := &config.Blueprint{
-		Name: "test",
-		Variables: []config.Variable{
-			{Name: "bad", Type: "string", Validate: "[invalid"},
-		},
-	}
-	err := config.ValidateBlueprint(bp)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid validate regex")
 }
 
 func TestValidateBlueprint_InvalidOverrideStrategy(t *testing.T) {
@@ -137,30 +104,19 @@ func TestValidateRegistry_MissingBlueprintPath(t *testing.T) {
 	assert.Contains(t, err.Error(), "path is required")
 }
 
+// TestValidateBlueprint_VariableNameRequired covers the one
+// variable-level validation that survives in ValidateBlueprint —
+// per-name uniqueness check still belongs to a future RFC.
 func TestValidateBlueprint_VariableNameRequired(t *testing.T) {
 	t.Parallel()
 
 	bp := &config.Blueprint{
 		Name: "test",
 		Variables: []config.Variable{
-			{Name: "", Type: "string"},
+			{Name: "", Type: cty.String},
 		},
 	}
 	err := config.ValidateBlueprint(bp)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "name is required")
-}
-
-func TestValidateBlueprint_VariableTypeRequired(t *testing.T) {
-	t.Parallel()
-
-	bp := &config.Blueprint{
-		Name: "test",
-		Variables: []config.Variable{
-			{Name: "foo", Type: ""},
-		},
-	}
-	err := config.ValidateBlueprint(bp)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "type is required")
 }

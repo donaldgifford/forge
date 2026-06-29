@@ -234,7 +234,7 @@ that's Phase C.
 
 #### Tasks
 
-- [ ] **B.1 Refactor `Variable` struct.**
+- [x] **B.1 Refactor `Variable` struct.** *(Bundled with B.2–B.9 in a single commit because the struct change is the atomic refactor anchor — every consumer needed updating in the same commit to keep CI green per the IMPL doc's per-phase `make ci` gate.)*
   - File: `internal/config/blueprint.go` (modify).
   - Before/after:
 
@@ -271,7 +271,7 @@ that's Phase C.
   - Add field comments explaining that `Type` / `DefaultExpr` are
     captured-at-load-time and mirror `Condition.When`'s pattern.
 
-- [ ] **B.2 Update HCL schema (eager spec).**
+- [x] **B.2 Update HCL schema (eager spec).** *(`choices` / `validate` removed from `variableBlockBodySchema`; `validation` nested block added. Legacy attribute detection moved to a pre-decode `rejectLegacyVariableAttrs` pass — see B.4.)*
   - File: `internal/config/hcldec_spec.go` (modify).
   - The `variable "name" { … }` block stays hand-decoded (per the
     file's existing comment) — extend `variableBlockBodySchema` to:
@@ -281,7 +281,7 @@ that's Phase C.
       diagnostic in the hand-decoder, not a generic "unknown
       attribute" error)
 
-- [ ] **B.3 Implement validation-block schema.**
+- [x] **B.3 Implement validation-block schema.** *(`validationBlockBodySchema` added next to the variable schema; required `condition` + `error_message`.)*
   - File: `internal/config/hcldec_spec.go` (modify) — add a new
     `validationBlockBodySchema`:
 
@@ -294,7 +294,7 @@ that's Phase C.
     }
     ```
 
-- [ ] **B.4 Update the loader hand-decoder.**
+- [x] **B.4 Update the loader hand-decoder.** *(`decodeVariableBlock` now routes the `type` attribute through `ParseVariableType`, captures `default` as both an `hcl.Expression` and raw source, decodes each nested `validation { ... }` block via the new `decodeValidationBlock`, and pre-rejects `choices` / `validate` with a MIGRATION.md-anchored error via `rejectLegacyVariableAttrs`. Deprecations from `ParseVariableType` flow through `diagsToDeprecations` and attach to `Blueprint.Deprecations`.)*
   - File: `internal/config/loader_hcl.go` (modify).
   - For each `variable` block:
     - call `ParseVariableType(typeAttr.Expr)` → `Variable.Type`
@@ -307,7 +307,7 @@ that's Phase C.
       `Deprecations []Deprecation` on the load result
       (so callers can warn)
 
-- [ ] **B.5 Update `ValidateBlueprint`.**
+- [x] **B.5 Update `ValidateBlueprint`.** *(`validVariableTypes` map removed; the `Type` allow-list, `choice`-required-choices check, and `Validate` regex compile are all gone. Sync-strategy and managed-files validations unchanged.)*
   - File: `internal/config/validate.go` (modify).
   - Remove the `validVariableTypes` map and the per-variable
     `Type` allow-list check — typing is now enforced by
@@ -317,7 +317,7 @@ that's Phase C.
   - Keep the sync-strategy and managed-files validations
     unchanged.
 
-- [ ] **B.6 Plumb deprecations to the load callers.**
+- [x] **B.6 Plumb deprecations to the load callers.** *(`Blueprint.Deprecations` carries the load-time notices; `create.Result.Deprecations` and `sync.Result.Deprecations` forward them to the CLI, which surfaces each one via `w.Warningf` ahead of the success line — same pattern as IMPL-0008's `UnknownVarsFileKeys`. `LoadBlueprint`'s `(*Blueprint, error)` signature stays stable; the deprecation channel is on the returned struct.)*
   - File: `internal/config/loader.go` (modify),
     `cmd/create.go`, `cmd/sync.go` (modify).
   - Each call site that does `config.LoadBlueprint(...)` reads the
@@ -325,7 +325,7 @@ that's Phase C.
     before proceeding. Pattern mirrors how IMPL-0008 surfaces
     `UnknownVarsFileKeys`.
 
-- [ ] **B.7 Test corpus update.**
+- [x] **B.7 Test corpus update.** *(All in-repo `testdata/*/blueprint.hcl` fixtures that previously used `validate = "regex"` / `type = "choice"` / `choices = [...]` migrated to the v0.7 shape — `validation { condition = can(regex(...)) … }` for the regex case, `type = string` + `validation { condition = contains([...], var.X) … }` for the choice case. Touched: `testdata/registry/go/api`, `testdata/hcl-registry/go/api`, `testdata/hcl-registry/helm/chart`, `testdata/v2-registry/go/api`, `testdata/v2-registry/helm/chart`. Also migrated the scaffold template at `internal/registrycmd/blueprint.go::blueprintScaffoldTemplate` so `forge registry blueprint` emits v0.7-shape blueprints out of the box.)*
   - Update existing `internal/config/testdata/` fixtures: any that
     use `type = "choice"`, `choices = [...]`, or
     `validate = "regex"` get rewritten to use the new validation
@@ -334,7 +334,7 @@ that's Phase C.
   - New fixtures covering the validation block: single, multiple
     stacked, validation referencing an object field.
 
-- [ ] **B.8 Unit + integration tests.**
+- [x] **B.8 Unit + integration tests.** *(New tests in `loader_hcl_test.go`: `TestLoadBlueprintHCL_StructuredTypes` (list/map/object round-trip), `TestLoadBlueprintHCL_RejectsLegacyChoices`, `TestLoadBlueprintHCL_RejectsLegacyValidate`, `TestLoadBlueprintHCL_IntDeprecationFlowsThrough`. `validate_test.go` slimmed down — the now-defunct `InvalidVariableType`, `ChoiceWithoutChoices`, `InvalidRegex`, and `VariableTypeRequired` cases were removed (typing is enforced by `ParseVariableType` at load time, asserted by the `vartype` test suite from Phase A). `prompt_test.go` migrated to `cty.Type` field literals; the `OverrideValidation` and `ChoiceType` cases retired in line with the v0.7 model — validation lives at create-time per Phase C.)*
   - File: `internal/config/loader_hcl_test.go` (modify),
     `internal/config/validate_test.go` (modify).
   - Tests:
@@ -349,7 +349,7 @@ that's Phase C.
       types (the type check is gone, leaving only sync-strategy
       and managed-files validations).
 
-- [ ] **B.9 Run `make ci`.**
+- [x] **B.9 Run `make ci`.** *(`make lint` reports `0 issues`; `make test` is green across all 19 packages.)*
 
 #### Success Criteria
 

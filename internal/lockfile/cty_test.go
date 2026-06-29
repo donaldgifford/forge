@@ -15,10 +15,10 @@ func TestToCtyValues_DeclaredTypesWin(t *testing.T) {
 	t.Parallel()
 
 	vars := []config.Variable{
-		{Name: "use_grpc", Type: "bool"},
-		{Name: "replicas", Type: "int"},
-		{Name: "project_name", Type: "string"},
-		{Name: "license", Type: "choice"},
+		{Name: "use_grpc", Type: cty.Bool},
+		{Name: "replicas", Type: cty.Number},
+		{Name: "project_name", Type: cty.String},
+		{Name: "license", Type: cty.String},
 	}
 
 	raw := map[string]any{
@@ -41,8 +41,8 @@ func TestToCtyValues_PreservesNativeTypes(t *testing.T) {
 	t.Parallel()
 
 	vars := []config.Variable{
-		{Name: "use_grpc", Type: "bool"},
-		{Name: "replicas", Type: "int"},
+		{Name: "use_grpc", Type: cty.Bool},
+		{Name: "replicas", Type: cty.Number},
 	}
 
 	raw := map[string]any{
@@ -61,8 +61,8 @@ func TestToCtyValues_BackfillsMissingDeclared(t *testing.T) {
 	t.Parallel()
 
 	vars := []config.Variable{
-		{Name: "project_name", Type: "string"},
-		{Name: "use_grpc", Type: "bool"},
+		{Name: "project_name", Type: cty.String},
+		{Name: "use_grpc", Type: cty.Bool},
 	}
 
 	raw := map[string]any{
@@ -117,7 +117,7 @@ func TestToCtyValues_RejectsBadCoercion(t *testing.T) {
 	t.Parallel()
 
 	vars := []config.Variable{
-		{Name: "use_grpc", Type: "bool"},
+		{Name: "use_grpc", Type: cty.Bool},
 	}
 
 	raw := map[string]any{

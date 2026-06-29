@@ -113,6 +113,10 @@ func runSync(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
+	for _, d := range result.Deprecations {
+		w.Warningf("%s (variable %q): %s", d.Summary, d.Variable, d.Detail)
+	}
+
 	if len(result.UnknownVarsFileKeys) > 0 {
 		w.Warningf(
 			"--var-file declared values for variable(s) not in this blueprint: %s",

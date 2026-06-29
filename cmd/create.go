@@ -116,6 +116,10 @@ func runCreate(cmd *cobra.Command, args []string) error {
 
 	w := ui.NewWriter(noColor)
 
+	for _, d := range result.Deprecations {
+		w.Warningf("%s (variable %q): %s", d.Summary, d.Variable, d.Detail)
+	}
+
 	if len(result.UnknownVarsFileKeys) > 0 {
 		w.Warningf(
 			"--var-file declared values for variable(s) not in this blueprint: %s",

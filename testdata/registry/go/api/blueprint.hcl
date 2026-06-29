@@ -12,9 +12,12 @@ defaults {
 
 variable "project_name" {
   description = "Name of the project"
-  type        = "string"
+  type        = string
   required    = true
-  validate    = "^[a-z][a-z0-9-]*$"
+  validation {
+    condition     = can(regex("^[a-z][a-z0-9-]*$", var.project_name))
+    error_message = "project_name must be lowercase letters, digits, or hyphens, starting with a letter."
+  }
 }
 
 variable "description" {
@@ -36,9 +39,12 @@ variable "use_grpc" {
 
 variable "license" {
   description = "License type"
-  type        = "choice"
-  choices     = ["MIT", "Apache-2.0", "BSD-3-Clause", "none"]
+  type        = string
   default     = "Apache-2.0"
+  validation {
+    condition     = contains(["MIT", "Apache-2.0", "BSD-3-Clause", "none"], var.license)
+    error_message = "license must be one of: MIT, Apache-2.0, BSD-3-Clause, none."
+  }
 }
 
 condition {

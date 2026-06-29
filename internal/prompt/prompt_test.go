@@ -5,17 +5,20 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/zclconf/go-cty/cty"
 
 	"github.com/donaldgifford/forge/internal/config"
 	"github.com/donaldgifford/forge/internal/prompt"
 )
 
+// TestCollectVariables_Overrides covers the --set path. After IMPL-0009
+// Phase B, types are cty.Type — bool/number coercion follows.
 func TestCollectVariables_Overrides(t *testing.T) {
 	t.Parallel()
 
 	vars := []config.Variable{
-		{Name: "project_name", Type: "string", Required: true},
-		{Name: "use_grpc", Type: "bool", Default: "false"},
+		{Name: "project_name", Type: cty.String, Required: true},
+		{Name: "use_grpc", Type: cty.Bool, DefaultSource: "false"},
 	}
 
 	overrides := map[string]string{
@@ -34,9 +37,9 @@ func TestCollectVariables_Defaults(t *testing.T) {
 	t.Parallel()
 
 	vars := []config.Variable{
-		{Name: "project_name", Type: "string", Default: "default-project"},
-		{Name: "port", Type: "int", Default: "8080"},
-		{Name: "verbose", Type: "bool", Default: "false"},
+		{Name: "project_name", Type: cty.String, DefaultSource: "default-project"},
+		{Name: "port", Type: cty.Number, DefaultSource: "8080"},
+		{Name: "verbose", Type: cty.Bool, DefaultSource: "false"},
 	}
 
 	result, err := prompt.CollectVariables(vars, nil, nil, true, nil)
@@ -51,8 +54,8 @@ func TestCollectVariables_TemplatedDefault(t *testing.T) {
 	t.Parallel()
 
 	vars := []config.Variable{
-		{Name: "project_name", Type: "string", Default: "my-api"},
-		{Name: "go_module", Type: "string", Default: "github.com/example/${project_name}"},
+		{Name: "project_name", Type: cty.String, DefaultSource: "my-api"},
+		{Name: "go_module", Type: cty.String, DefaultSource: "github.com/example/${project_name}"},
 	}
 
 	result, err := prompt.CollectVariables(vars, nil, nil, true, nil)
@@ -65,7 +68,7 @@ func TestCollectVariables_RequiredNoDefault(t *testing.T) {
 	t.Parallel()
 
 	vars := []config.Variable{
-		{Name: "project_name", Type: "string", Required: true},
+		{Name: "project_name", Type: cty.String, Required: true},
 	}
 
 	_, err := prompt.CollectVariables(vars, nil, nil, true, nil)
@@ -73,27 +76,11 @@ func TestCollectVariables_RequiredNoDefault(t *testing.T) {
 	assert.Contains(t, err.Error(), "required but has no default")
 }
 
-func TestCollectVariables_OverrideValidation(t *testing.T) {
-	t.Parallel()
-
-	vars := []config.Variable{
-		{Name: "project_name", Type: "string", Validate: "^[a-z][a-z0-9-]*$"},
-	}
-
-	overrides := map[string]string{
-		"project_name": "INVALID",
-	}
-
-	_, err := prompt.CollectVariables(vars, overrides, nil, false, nil)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed validation")
-}
-
 func TestCollectVariables_InvalidBoolOverride(t *testing.T) {
 	t.Parallel()
 
 	vars := []config.Variable{
-		{Name: "flag", Type: "bool"},
+		{Name: "flag", Type: cty.Bool},
 	}
 
 	overrides := map[string]string{
@@ -109,7 +96,7 @@ func TestCollectVariables_InvalidIntOverride(t *testing.T) {
 	t.Parallel()
 
 	vars := []config.Variable{
-		{Name: "port", Type: "int"},
+		{Name: "port", Type: cty.Number},
 	}
 
 	overrides := map[string]string{
@@ -125,8 +112,8 @@ func TestCollectVariables_PromptFn(t *testing.T) {
 	t.Parallel()
 
 	vars := []config.Variable{
-		{Name: "project_name", Type: "string", Required: true},
-		{Name: "license", Type: "choice", Choices: []string{"MIT", "Apache-2.0"}, Default: "MIT"},
+		{Name: "project_name", Type: cty.String, Required: true},
+		{Name: "license", Type: cty.String, DefaultSource: "MIT"},
 	}
 
 	promptFn := func(v *config.Variable, _ map[string]any) (string, error) {
@@ -151,7 +138,7 @@ func TestCollectVariables_PromptFnUsesDefault(t *testing.T) {
 	t.Parallel()
 
 	vars := []config.Variable{
-		{Name: "name", Type: "string", Default: "default-name"},
+		{Name: "name", Type: cty.String, DefaultSource: "default-name"},
 	}
 
 	// Prompt returns empty string — should fall back to default.
@@ -169,7 +156,7 @@ func TestCollectVariables_OverrideTakesPrecedence(t *testing.T) {
 	t.Parallel()
 
 	vars := []config.Variable{
-		{Name: "name", Type: "string", Default: "default-name"},
+		{Name: "name", Type: cty.String, DefaultSource: "default-name"},
 	}
 
 	overrides := map[string]string{"name": "override-name"}
@@ -185,26 +172,13 @@ func TestCollectVariables_OverrideTakesPrecedence(t *testing.T) {
 	assert.Equal(t, "override-name", result["name"])
 }
 
-func TestCollectVariables_ChoiceType(t *testing.T) {
-	t.Parallel()
-
-	vars := []config.Variable{
-		{Name: "license", Type: "choice", Choices: []string{"MIT", "Apache-2.0", "none"}, Default: "Apache-2.0"},
-	}
-
-	result, err := prompt.CollectVariables(vars, nil, nil, true, nil)
-	require.NoError(t, err)
-
-	assert.Equal(t, "Apache-2.0", result["license"])
-}
-
 func TestCollectVariables_ZeroValues(t *testing.T) {
 	t.Parallel()
 
 	vars := []config.Variable{
-		{Name: "name", Type: "string"},
-		{Name: "flag", Type: "bool"},
-		{Name: "count", Type: "int"},
+		{Name: "name", Type: cty.String},
+		{Name: "flag", Type: cty.Bool},
+		{Name: "count", Type: cty.Number},
 	}
 
 	result, err := prompt.CollectVariables(vars, nil, nil, true, nil)

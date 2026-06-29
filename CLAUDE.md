@@ -52,7 +52,20 @@ packages:
   rescaffold-or-pin-to-v0.4.1 error per ADR-0002). The HCL decode spec lives in
   `hcldec_spec.go` and the emitter for registry round-trip in `hclemit.go`.
   `Condition.When` is `hcl.Expression` parsed at load time, with the original
-  source kept on `WhenSource` for round-tripping
+  source kept on `WhenSource` for round-tripping. Variable typing is delegated
+  to `vartype.go::ParseVariableType` (DESIGN-0006 / IMPL-0009 Phase A) which
+  layers forge-specific concerns (legacy-quoted-scalar shim, `int` deprecation
+  warning, tuple/set/`choice` rejection) over `hcl/v2/ext/typeexpr`. The loader
+  routes the `type` attribute through `ParseVariableType`, captures `default`
+  as both an `hcl.Expression` (`Variable.DefaultExpr`) and raw source text
+  (`Variable.DefaultSource`), and decodes nested `validation { condition,
+  error_message }` blocks into `Variable.Validations`. Legacy `choices = [...]`
+  and `validate = "regex"` attributes are rejected pre-decode via
+  `rejectLegacyVariableAttrs` with errors pointing at
+  `docs/MIGRATION.md#variable-type-system-upgrade-v07` (IMPL-0009 OQ-4).
+  Non-fatal deprecation notices flow through `Blueprint.Deprecations` →
+  `create.Result.Deprecations` / `sync.Result.Deprecations` → `ui.Warningf`
+  (IMPL-0009 OQ-3, same pattern as IMPL-0008's `UnknownVarsFileKeys`).
 - **internal/registry/** — Registry index (`registry.hcl`), blueprint
   resolution, local cache with TTL
 - **internal/defaults/** — `_defaults/` layered inheritance resolution
