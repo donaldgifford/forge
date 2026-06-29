@@ -247,15 +247,31 @@ func resolveFromDefault(defaultVal any, v *config.Variable) (any, error) {
 }
 
 // resolveFromPrompt calls the prompt function and coerces the result.
-// Structured-typed variables short-circuit the interactive prompt
-// here in Phase D and accept the (cty.Value) default — Phase E adds
-// the object-unfold UX.
+//
+// IMPL-0009 Phase E dispatches on the declared type:
+//
+//   - object({...}) variables unfold into per-field prompts using
+//     the declaration-order TypeFieldOrder captured at load time
+//     (E.1 + E.3). The default object value provides per-field
+//     pre-fills; the reconstructed cty.ObjectVal flows downstream
+//     as the variable's resolved value.
+//   - list(T) and map(T) variables are non-interactive — when a
+//     required value isn't supplied by --var-file or a default,
+//     surface a copy-pasteable vars-file snippet (E.2).
+//   - Scalar variables take the existing prompt-string-coerce path.
 func resolveFromPrompt(
 	v *config.Variable,
 	current map[string]any,
 	defaultVal any,
 	promptFn PromptFn,
 ) (any, error) {
+	switch {
+	case v.Type.IsObjectType():
+		return resolveObjectFromPrompt(v, current, defaultVal, promptFn)
+	case v.Type.IsListType() || v.Type.IsMapType():
+		return resolveListOrMapFromPrompt(v, defaultVal)
+	}
+
 	if ctyVal, ok := defaultVal.(cty.Value); ok {
 		return ctyVal, nil
 	}
@@ -284,6 +300,216 @@ func resolveFromPrompt(
 	}
 
 	return val, nil
+}
+
+// resolveObjectFromPrompt unfolds an object-typed variable into
+// per-field prompts, then reconstructs the resolved value as a
+// cty.ObjectVal in the author-declared field order
+// (Variable.TypeFieldOrder).
+//
+// Each prompt callback receives a synthesised Variable with name
+// `parent.field` and the field's declared scalar type; that lets
+// existing prompt callbacks (huh, tests) render a labelled prompt
+// per leaf without needing object-aware UI changes.
+//
+// Defaults flow through by projecting the parent object default
+// (already evaluated by renderDefault) per field. Fields whose
+// declared type is itself an object recurse via a synthesised
+// Variable with its own TypeFieldOrder; list / map fields inside
+// an object follow the non-interactive rule
+// (resolveListOrMapFromPrompt).
+func resolveObjectFromPrompt(
+	parent *config.Variable,
+	current map[string]any,
+	defaultVal any,
+	promptFn PromptFn,
+) (any, error) {
+	defaultObj, ok := defaultVal.(cty.Value)
+	if !ok {
+		defaultObj = cty.NilVal
+	}
+
+	resolved, err := promptObjectFields(parent.Name, parent.Type, parent.TypeFieldOrder, defaultObj, current, promptFn)
+	if err != nil {
+		return nil, fmt.Errorf("collecting %q: %w", parent.Name, err)
+	}
+
+	return resolved, nil
+}
+
+// promptObjectFields is the recursive worker: for each declared
+// attribute on the object type, prompt (or recurse for nested
+// objects) and collect into a cty.ObjectVal. Field iteration follows
+// fieldOrder when provided; otherwise the cty AttributeTypes() map
+// iteration order — non-deterministic but at least covers the case
+// where TypeFieldOrder wasn't captured.
+func promptObjectFields(
+	parentName string,
+	objType cty.Type,
+	fieldOrder []string,
+	defaultObj cty.Value,
+	current map[string]any,
+	promptFn PromptFn,
+) (cty.Value, error) {
+	attrs := objType.AttributeTypes()
+	order := fieldOrder
+
+	if len(order) == 0 {
+		order = make([]string, 0, len(attrs))
+		for name := range attrs {
+			order = append(order, name)
+		}
+	}
+
+	out := make(map[string]cty.Value, len(order))
+
+	for _, name := range order {
+		fieldType, ok := attrs[name]
+		if !ok {
+			continue
+		}
+
+		fieldDefault := projectField(defaultObj, name)
+		dotted := parentName + "." + name
+
+		val, err := promptOneField(dotted, fieldType, fieldDefault, current, promptFn)
+		if err != nil {
+			return cty.NilVal, err
+		}
+
+		out[name] = val
+	}
+
+	return cty.ObjectVal(out), nil
+}
+
+// promptOneField handles a single field of an object: nested object
+// recurses, list/map errors with the vars-file snippet, scalar goes
+// through the existing prompt-then-coerce path.
+func promptOneField(
+	label string,
+	fieldType cty.Type,
+	fieldDefault cty.Value,
+	current map[string]any,
+	promptFn PromptFn,
+) (cty.Value, error) {
+	if fieldType.IsObjectType() {
+		// Nested object — no TypeFieldOrder captured at this level
+		// (only the top declaration carries it), so fall back to the
+		// cty AttributeTypes iteration order.
+		return promptObjectFields(label, fieldType, nil, fieldDefault, current, promptFn)
+	}
+
+	if fieldType.IsListType() || fieldType.IsMapType() {
+		return cty.NilVal, listMapVarsFileError(label, fieldType)
+	}
+
+	syntheticVar := &config.Variable{
+		Name: label,
+		Type: fieldType,
+	}
+
+	defaultStr := ""
+
+	if fieldDefault != cty.NilVal && !fieldDefault.IsNull() && fieldDefault.IsKnown() {
+		if asStr, err := convertx(fieldDefault, cty.String); err == nil {
+			defaultStr = asStr.AsString()
+		}
+	}
+
+	raw, err := promptFn(syntheticVar, current)
+	if err != nil {
+		return cty.NilVal, fmt.Errorf("prompting for %q: %w", label, err)
+	}
+
+	if raw == "" {
+		raw = defaultStr
+	}
+
+	goVal, err := coerceValue(raw, fieldType)
+	if err != nil {
+		return cty.NilVal, fmt.Errorf("invalid value for %q: %w", label, err)
+	}
+
+	return goToCty(goVal), nil
+}
+
+// projectField extracts a named attribute from an object default,
+// returning cty.NilVal when the default isn't a known object or
+// doesn't declare the attribute (the caller treats nil-val as "no
+// default").
+func projectField(defaultObj cty.Value, name string) cty.Value {
+	if defaultObj == cty.NilVal || defaultObj.IsNull() || !defaultObj.IsKnown() {
+		return cty.NilVal
+	}
+
+	if !defaultObj.Type().IsObjectType() {
+		return cty.NilVal
+	}
+
+	if !defaultObj.Type().HasAttribute(name) {
+		return cty.NilVal
+	}
+
+	return defaultObj.GetAttr(name)
+}
+
+// convertx is a thin wrapper over convert.Convert that keeps the
+// import-cycle-free shape this file's helpers use. The cty package
+// has no public reexport so the wrapper exists purely to avoid an
+// extra import line in promptOneField.
+func convertx(v cty.Value, target cty.Type) (cty.Value, error) {
+	return convert.Convert(v, target)
+}
+
+// resolveListOrMapFromPrompt is the non-interactive code path for
+// list(T) and map(T) typed variables (E.2). When a default exists
+// (cty.Value), passthrough; when no value was supplied and the
+// variable is required, surface a copy-pasteable vars-file snippet
+// rather than block on an interactive prompt the TUI can't render
+// for collection types.
+func resolveListOrMapFromPrompt(v *config.Variable, defaultVal any) (any, error) {
+	if ctyVal, ok := defaultVal.(cty.Value); ok {
+		return ctyVal, nil
+	}
+
+	if !v.Required {
+		return cty.NullVal(v.Type), nil
+	}
+
+	return nil, listMapVarsFileError(v.Name, v.Type)
+}
+
+// listMapVarsFileError builds the canonical IMPL-0009 E.2 error
+// message: a single line of `Error: …` plus a 4-space-indented
+// `# project.forge-vars.hcl` snippet showing how to supply the
+// value via --var-file.
+func listMapVarsFileError(name string, ty cty.Type) error {
+	example := vrsFileExample(name, ty)
+
+	return fmt.Errorf(
+		"variable %q (%s) is required but cannot be supplied interactively;\n"+
+			"provide it via --var-file:\n\n"+
+			"    # project.forge-vars.hcl\n"+
+			"    %s\n\n"+
+			"    forge create ... --var-file ./project.forge-vars.hcl",
+		name, ty.FriendlyName(), example,
+	)
+}
+
+// vrsFileExample returns a one-line "name = …" example value for
+// the given list/map type. Keeps the error message snippet
+// copy-pasteable for the two most common shapes
+// (list(number) → `[8080, 9090]`, map(string) → `{linux = "amd64"}`).
+func vrsFileExample(name string, ty cty.Type) string {
+	switch {
+	case ty.IsListType():
+		return fmt.Sprintf("%s = [...]", name)
+	case ty.IsMapType():
+		return fmt.Sprintf(`%s = { key = "value" }`, name)
+	default:
+		return fmt.Sprintf("%s = ...", name)
+	}
 }
 
 // renderDefault resolves a default value for the resolution chain.

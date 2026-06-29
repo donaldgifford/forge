@@ -238,3 +238,65 @@ func unsupportedTypeDiag(varName, typeName string, rng hcl.Range) *hcl.Diagnosti
 func quoteName(s string) string {
 	return `"` + s + `"`
 }
+
+// ObjectFieldOrder walks expr looking for the top-level object
+// constructor and returns its attribute names in author-declared
+// source order. Returns nil when expr isn't an object constructor
+// (scalar, list/map/tuple, or a `object("…")` form that didn't parse
+// cleanly).
+//
+// cty.Object's AttributeTypes() iteration order is hash-based, so
+// the loader captures the source order from the underlying
+// hclsyntax.ObjectConsExpr — necessary for IMPL-0009 Phase E's
+// object-unfold prompt UX (fields prompt in declaration order).
+//
+// Nested object types only contribute their own level; the caller
+// can recurse into the nested cty.Object via Variable.Type and apply
+// the same helper to nested defaults if needed.
+func ObjectFieldOrder(expr hcl.Expression) []string {
+	call, ok := expr.(*hclsyntax.FunctionCallExpr)
+	if !ok || call.Name != "object" || len(call.Args) != 1 {
+		return nil
+	}
+
+	objCons, ok := call.Args[0].(*hclsyntax.ObjectConsExpr)
+	if !ok {
+		return nil
+	}
+
+	out := make([]string, 0, len(objCons.Items))
+
+	for _, item := range objCons.Items {
+		name, ok := objectConsKeyName(item.KeyExpr)
+		if !ok {
+			continue
+		}
+
+		out = append(out, name)
+	}
+
+	return out
+}
+
+// objectConsKeyName extracts the attribute name from an object
+// constructor key expression. HCL wraps bareword keys as
+// ObjectConsKeyExpr → ScopeTraversalExpr; quoted keys arrive as
+// LiteralValueExpr / TemplateExpr. Returns "" + false for shapes
+// the prompt-unfold path can't render.
+func objectConsKeyName(key hcl.Expression) (string, bool) {
+	if wrapper, ok := key.(*hclsyntax.ObjectConsKeyExpr); ok {
+		key = wrapper.Wrapped
+	}
+
+	if trav, ok := key.(*hclsyntax.ScopeTraversalExpr); ok && len(trav.Traversal) == 1 {
+		if root, ok := trav.Traversal[0].(hcl.TraverseRoot); ok {
+			return root.Name, true
+		}
+	}
+
+	if s, ok := literalStringFromExpr(key); ok {
+		return s, true
+	}
+
+	return "", false
+}

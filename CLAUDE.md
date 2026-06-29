@@ -84,7 +84,20 @@ packages:
 - **internal/template/** — HCL2 (`hashicorp/hcl/v2`) rendering with custom
   functions; values flow as `cty.Value` (`zclconf/go-cty`)
 - **internal/prompt/** — Interactive variable collection via charmbracelet/huh;
-  default-value templates also render through HCL2
+  default-value templates also render through HCL2. **IMPL-0009 Phase E
+  structured-type UX:** `resolveFromPrompt` dispatches on `cty.Type`
+  before falling through to the scalar path:
+  - `IsObjectType()` → `resolveObjectFromPrompt` recursively unfolds the
+    object into per-field prompts in `Variable.TypeFieldOrder` order
+    (dotted labels like `git_provider.repo_type`); the resolved value
+    reconstructs as `cty.ObjectVal(...)`. Nested objects recurse via a
+    synthesised child `Variable`; list/map fields inside an object
+    follow the same non-interactive rule as top-level structured types.
+  - `IsListType() || IsMapType()` → `resolveListOrMapFromPrompt`. Required
+    variables abort with `listMapVarsFileError`, which surfaces a
+    copy-pasteable `--var-file` snippet; non-required variants
+    short-circuit with `cty.NullVal(v.Type)` so downstream consumers see
+    a stable typed null.
 - **internal/create/** — Full create workflow orchestration (resolve, prompt,
   render, conditions, lockfile)
 - **internal/sync/** — Three-way merge sync engine for managed files

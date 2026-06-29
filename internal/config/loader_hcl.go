@@ -343,6 +343,7 @@ func decodeVariableType(attr *hcl.Attribute, v *Variable, src []byte) ([]Depreca
 
 	v.Type = ty
 	v.TypeSource = sourceText(attr.Expr, src)
+	v.TypeFieldOrder = ObjectFieldOrder(attr.Expr)
 
 	return diagsToDeprecations(v.Name, diags), nil
 }

@@ -538,7 +538,7 @@ and maps are explicit non-interactive.
 
 #### Tasks
 
-- [ ] **E.1 Object-unfold prompt logic.**
+- [x] **E.1 Object-unfold prompt logic.** *(`internal/prompt/prompt.go` grew `resolveObjectFromPrompt` + `promptObjectFields` + `promptOneField` + `projectField`. `resolveFromPrompt` now dispatches on `cty.Type` before falling through to the scalar path: `IsObjectType()` → recursive unfold using `Variable.TypeFieldOrder` (with the inner object levels recursing via a synthesised child `Variable`). Per-field prompt labels are dotted (`git_provider.repo_type`), and a derived object default's per-field cty.Value flows through `projectField` so the prompt pre-fills correctly. The reconstructed value is bound as `cty.ObjectVal(...)`. List/map fields inside an object follow the same non-interactive rule as top-level structured types — they short-circuit through `resolveListOrMapFromPrompt`.)*
   - File: `internal/prompt/prompt.go` (modify).
   - For each variable whose declared type is `cty.Object(...)`:
     - iterate attribute names in declaration order (preserve via
@@ -555,7 +555,7 @@ and maps are explicit non-interactive.
   - Lists/maps inside an object follow the same non-interactive
     rule as top-level lists/maps (E.2).
 
-- [ ] **E.2 List/map non-interactive error.**
+- [x] **E.2 List/map non-interactive error.** *(`resolveListOfMapFromPrompt` + `listMapVarsFileError` + `vrsFileExample` surface the documented copy-pasteable snippet exactly as specified. Required list/map variables without a vars-file or default abort before any prompt callback fires; non-required variants short-circuit with a typed `cty.NullVal(v.Type)` so downstream consumers see a stable null rather than an untyped nil.)*
   - File: `internal/prompt/prompt.go` (modify).
   - If a variable is `list(T)` or `map(T)`, is required, and has
     no value supplied (no vars-file, no `--set` — which would have
@@ -574,7 +574,7 @@ and maps are explicit non-interactive.
         forge create ... --var-file ./project.forge-vars.hcl
     ```
 
-- [ ] **E.3 Declaration-order preservation.**
+- [x] **E.3 Declaration-order preservation.** *(`config.Variable.TypeFieldOrder []string` (with `json:",omitempty"`) carries the author-declared object-attribute order. `config.ObjectFieldOrder(hcl.Expression)` walks a top-level `object({...})` constructor — `*hclsyntax.FunctionCallExpr` with `Name == "object"` whose single arg is `*hclsyntax.ObjectConsExpr` — and extracts each key's source-order name via `objectConsKeyName` (handles both bareword `*hclsyntax.ScopeTraversalExpr` keys wrapped in `ObjectConsKeyExpr` and quoted-string keys). `decodeVariableType` in `loader_hcl.go` populates `v.TypeFieldOrder`. Nested object levels fall back to cty attribute iteration — see the E.4 test note.)*
   - File: `internal/config/blueprint.go` and the loader (modify
     if needed).
   - `cty.Object(...)`'s attribute map is unordered. Add a parallel
@@ -582,7 +582,7 @@ and maps are explicit non-interactive.
     `TypeFieldOrder []string`) captured at load time so the prompt
     flow can iterate fields in author-declared order.
 
-- [ ] **E.4 Prompt-flow integration tests.**
+- [x] **E.4 Prompt-flow integration tests.** *(Five new tests in `internal/prompt/prompt_test.go`: `TestCollectVariables_ObjectUnfoldDeclarationOrder` (the prompt callback fires exactly once per object field in the order `TypeFieldOrder` dictates), `TestCollectVariables_ObjectUnfoldNested` (recursion into nested object types — asserts shape rather than order at the nested level, since the recursive call falls back to cty attribute iteration without a captured per-level `TypeFieldOrder`), `TestCollectVariables_ListRequiredNonInteractiveError` and `TestCollectVariables_MapRequiredNonInteractiveError` (both assert the prompt callback is never invoked and the error contains the variable name, the documented `--var-file` snippet path, and the shape-appropriate example), and `TestCollectVariables_ListOptionalWithDefault` (non-required list flows through silently as `cty.NullVal(v.Type)`). The derived-default object case from the original task list is covered by `TestCreate_SetObjectLiteral` in `internal/create/objectset_integration_test.go` from Phase D — the test registry's object default flows through `renderDefault → defaultValueFromCty → resolveFromDefault` end-to-end.)*
   - File: `internal/prompt/prompt_test.go` (modify).
   - Tests:
     - Object unfold prompts for each field in declaration order.
@@ -594,7 +594,7 @@ and maps are explicit non-interactive.
     - Object with a derived default (`default = var.X == "..." ? {...} : {...}`)
       pre-fills per-field prompts correctly.
 
-- [ ] **E.5 Run `make ci`.**
+- [x] **E.5 Run `make ci`.** *(`make lint` reports `0 issues`; `make test` is green across all 20 packages including the five new prompt-flow tests; `make build` produces the core binary; license check passes.)*
 
 #### Success Criteria
 

@@ -68,6 +68,15 @@ type Variable struct {
 	// evaluated post-resolution against the full resolved-variable
 	// scope (DESIGN-0006 / IMPL-0009 Phase C).
 	Validations []Validation `json:"-"`
+	// TypeFieldOrder is the author-declared attribute order for
+	// object-typed variables (IMPL-0009 E.3). cty.Object's attribute
+	// map is unordered, so the loader captures the source order from
+	// the type expression so the prompt UX can unfold object fields
+	// in the order the author wrote them. Empty/nil for non-object
+	// types and for nested object levels (each level only carries
+	// its own top-level field order; nested orders are derived by
+	// walking the type tree at prompt time).
+	TypeFieldOrder []string `json:",omitempty"`
 }
 
 // Validation is a single `validation { condition = ..., error_message = ... }`
