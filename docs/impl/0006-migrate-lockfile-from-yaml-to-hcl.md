@@ -76,9 +76,10 @@ mechanical format migration; the rationale lives entirely in the
   pin forge to v0.4.x.
 - Lockfile schema changes — fields stay the same; only the
   serialisation format changes.
-- Object/list/map variable support — covered by RFC-0002. The HCL
-  lockfile naturally extends to nested values when those types land,
-  but the cutover here is single-format-swap only.
+- Object/list/map variable support — covered by RFC-0002 (designed
+  in DESIGN-0006). The HCL lockfile naturally extends to nested
+  values when those types land, but the cutover here is
+  single-format-swap only.
 - Backwards-compatible dual-format reader after the cutover.
   v0.5.x rejects YAML lockfiles outright and points the user at
   `docs/MIGRATION.md`.

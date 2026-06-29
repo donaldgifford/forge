@@ -40,4 +40,5 @@ docz create impl "Your Implementation Title"
 | IMPL-0006 | Migrate lockfile from YAML to HCL | Draft | 2026-05-18 | Donald Gifford | [0006-migrate-lockfile-from-yaml-to-hcl.md](0006-migrate-lockfile-from-yaml-to-hcl.md) |
 | IMPL-0007 | Remove forge migrate command | Implemented | 2026-05-18 | Donald Gifford | [0007-remove-forge-migrate-command.md](0007-remove-forge-migrate-command.md) |
 | IMPL-0008 | Variable input via vars file | Accepted | 2026-05-19 | Donald Gifford | [0008-variable-input-via-vars-file.md](0008-variable-input-via-vars-file.md) |
+| IMPL-0009 | object and collection variable types | Draft | 2026-06-29 | Donald Gifford | [0009-object-and-collection-variable-types.md](0009-object-and-collection-variable-types.md) |
 <!-- END DOCZ AUTO-GENERATED -->

@@ -13,6 +13,13 @@ created: 2026-05-18
 **Author:** Donald Gifford
 **Date:** 2026-05-18
 
+> **Spun out into [DESIGN-0006 — Object and collection variable
+> types](../design/0006-object-and-collection-variable-types.md)
+> (2026-06-29).** DESIGN-0006 carries the implementation contract,
+> resolved open questions, and migration plan. Treat this RFC as
+> the proposal; treat DESIGN-0006 as the source of truth for
+> what's actually being built.
+
 <!--toc:start-->
 - [Summary](#summary)
 - [Problem Statement](#problem-statement)
@@ -678,11 +685,12 @@ Terraform.
   capabilities (object, list, map) but the OQ-3 decision to drop
   `choice` and the `choices = [...]` / scalar `validate` fields is
   breaking — load-time errors on legacy declarations, no in-tool
-  migrator per ADR-0002. **Decision: minor bump with a documented
-  rescaffold/re-author path.** Probably v0.7.0 alongside RFC-0003,
-  per the sequencing DESIGN-0005 → v0.5.0, IMPL-0006/IMPL-0007 →
-  v0.5.0, RFC-0002/RFC-0003 → v0.7.0; concrete number set when the
-  work lands.
+  migrator per ADR-0002. **Decision: minor bump (v0.7.0) with a
+  documented rescaffold/re-author path; RFC-0002 and RFC-0003 ship
+  together** per DESIGN-0006 OQ-1. Release sequencing:
+  DESIGN-0005 → v0.5.0, IMPL-0006/IMPL-0007 → v0.5.0,
+  IMPL-0008 → v0.6.0, RFC-0002 + RFC-0003 (via DESIGN-0006) →
+  v0.7.0.
 
 - **OQ-5: Do we need a `locals` equivalent?** forge today expresses
   "derived value computed from other variables" by declaring a
@@ -708,6 +716,7 @@ Terraform.
 
 ## References
 
+- [DESIGN-0006 — Object and collection variable types](../design/0006-object-and-collection-variable-types.md) — the design spun out from this RFC; carries the implementation contract and resolved open questions.
 - [ADR-0002 — Forge does not ship in-tool migrators](../adr/0002-forge-does-not-ship-in-tool-migrators.md) — establishes the "no migrator" principle that governs the `choice` removal in this RFC.
 - [DESIGN-0001 — Blueprint Authoring](../design/0001-blueprint-authoring.md) — variable declaration schema this RFC extends.
 - [DESIGN-0005 — Variable input via vars file](../design/0005-variable-input-via-vars-file.md) — input mechanism that unblocks non-scalar values on the CLI side.
