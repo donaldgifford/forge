@@ -82,7 +82,16 @@ packages:
 - **internal/getter/** — Source fetching via `hashicorp/go-getter` (registry
   cloning, archive extraction, checksum verification)
 - **internal/template/** — HCL2 (`hashicorp/hcl/v2`) rendering with custom
-  functions; values flow as `cty.Value` (`zclconf/go-cty`)
+  functions; values flow as `cty.Value` (`zclconf/go-cty`). **IMPL-0009
+  Phase F.4** added the `var.X` namespace to the renderer's eval scope
+  alongside bare references — mirrors `config.BuildEvalContext` so
+  default expressions, validation conditions, and template bodies all
+  see the same shape. Object/list/map values flow through HCL2's native
+  attribute (`${var.git_provider.repo_type}`), index
+  (`${var.exposed_ports[0]}`, `${var.build_targets["linux"]}`), and
+  iteration (`%{ for p in exposed_ports ~}…%{ endfor ~}`) operators —
+  no custom strict-vars layer is needed; unknown attributes surface as
+  HCL's `Unsupported attribute` diagnostic.
 - **internal/prompt/** — Interactive variable collection via charmbracelet/huh;
   default-value templates also render through HCL2. **IMPL-0009 Phase E
   structured-type UX:** `resolveFromPrompt` dispatches on `cty.Type`

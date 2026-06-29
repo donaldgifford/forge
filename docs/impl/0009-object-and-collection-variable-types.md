@@ -616,7 +616,7 @@ under structured-type round-trip.
 
 #### Tasks
 
-- [ ] **F.1 Lockfile `cty` helpers.**
+- [x] **F.1 Lockfile `cty` helpers.** *(`internal/lockfile/cty.go::convertValue` collapsed the per-primitive switch (`toString` / `toBool` / `toInt`) into a single `inferValue → cty.Convert(val, declaredType)` pipeline — same shape as `internal/varsfile/varsfile.go::coerceToDeclared`. `cty.Value` inputs short-circuit the infer step; pre-IMPL-0009 string/bool/int payloads infer to their natural cty types and cty.Convert handles string→number, string→bool, and structural coercion uniformly. Dead helpers and the `strconv` import removed. One existing test (`TestToCtyValues_DeclaredTypesWin`) had its `NumberIntVal(3)` comparison switched from `assert.Equal` to `cty.Equals` because cty.Convert produces a higher-precision `big.Float` than `NumberIntVal`'s default, and the values are semantically equal but not reflect-equal — the test comment now explains the rationale.)*
   - File: `internal/lockfile/cty.go` (modify).
   - `ToCtyValues` / `FromCtyValues` already operate on
     `cty.Value`. The type-aware coercion in `ToCtyValues` switches
@@ -624,7 +624,7 @@ under structured-type round-trip.
     tag-switch with a single `cty.Convert(val, declaredType)` —
     same approach as `internal/varsfile`.
 
-- [ ] **F.2 Lockfile HCL round-trip verification.**
+- [x] **F.2 Lockfile HCL round-trip verification.** *(`hclwrite` emits nested cty values cleanly for the `variables { ... }` block — `writeVariablesBlock` already passes the cty.Value through `ctyForVariableValue` (Phase D passthrough) to `SetAttributeValue`, and the loader's `decodeVariablesBlocks → attr.Expr.Value(nil) → fromCty` chain returns the same cty.Value for non-primitive types. End-to-end verification lives in F.3's new round-trip test — no emitter changes were needed.)*
   - File: `internal/lockfile/emit_hcl.go` and
     `internal/lockfile/loader_hcl.go` (modify if needed).
   - `hclwrite` natively emits nested values; the loader already
@@ -633,7 +633,7 @@ under structured-type round-trip.
     only if `hclwrite` produces something the loader can't parse
     back.
 
-- [ ] **F.3 Lockfile round-trip tests.**
+- [x] **F.3 Lockfile round-trip tests.** *(`TestHCLRoundTrip_StructuredVariables` in `internal/lockfile/roundtrip_test.go` builds a Lockfile carrying object (with a nested-object field), list(number), and map(string) variables, writes via `WriteLockfileHCL`, flushes to disk under `t.TempDir()`, reads back via `LoadLockfileHCL`, and re-coerces against the declared variable types via `ToCtyValues`. Assertions use `cty.Equals` rather than `reflect.DeepEqual` because cty number values may differ in big.Float precision between direct construction and convert-pass coercion. Covers project_name (scalar), git_provider (object, including nested attribute access), exposed_ports (list shape preserved), and build_targets (map shape preserved).)*
   - File: `internal/lockfile/roundtrip_test.go` (modify) or new
     `internal/lockfile/object_roundtrip_test.go`.
   - Fixture: a project lockfile with `variables { ... }` carrying
@@ -641,7 +641,7 @@ under structured-type round-trip.
     write-then-load yields byte-identity (or at minimum a
     semantically equal `*Lockfile`).
 
-- [ ] **F.4 Template strict-vars update.**
+- [x] **F.4 Template strict-vars update.** *(`internal/template/renderer.go::evalContext` grew the `var.X` namespace alongside bare references — mirrors `config.BuildEvalContext` so default expressions, validation conditions, and template bodies share scope shape. Object attribute access (`${var.git_provider.repo_type}`), list index access (`${var.exposed_ports[0]}`), and map key access (`${var.build_targets["linux"]}`) all flow through HCL2's native traversal/index operators — no custom strict-vars layer was needed. Undeclared object attributes surface as an `Unsupported attribute` diagnostic with the unknown field name quoted. Per DESIGN-0006 OQ-1 (deferral of RFC-0003's locals IMPL), this closes the namespace gap without waiting for RFC-0003 to ship first.)*
   - File: `internal/template/renderer.go` (modify) — wherever the
     strict-vars check lives.
   - Allow nested attribute access against declared object types:
@@ -654,7 +654,7 @@ under structured-type round-trip.
     DESIGN-0006 assumes that namespace lands first or co-lands
     (see OQ-1 below).
 
-- [ ] **F.5 Template integration tests.**
+- [x] **F.5 Template integration tests.** *(Two new test functions in `internal/template/renderer_test.go`: `TestRenderer_StructuredTypeAccess` is a 7-case table covering object attribute access via bare name + var.X, list index access via bare name + var.X, map key access via bare name + var.X, and a `for p in exposed_ports` directive. `TestRenderer_UndeclaredObjectAttributeErrors` asserts the strict-vars failure path — a `${git_provider.repo_tipe}` typo surfaces an HCL `Unsupported attribute` diagnostic with the unknown attribute name quoted. The shared `structuredVars()` helper keeps the data tight and the tests readable.)*
   - File: `internal/template/renderer_test.go` (modify).
   - Tests:
     - `${var.obj.field}` renders correctly against an
@@ -668,7 +668,7 @@ under structured-type round-trip.
     - `%{ for x in var.list ~}...%{ endfor ~}` iterates as
       expected.
 
-- [ ] **F.6 Run `make ci`.**
+- [x] **F.6 Run `make ci`.** *(`make lint` reports `0 issues`; `make test` is green across all 20 packages including the new round-trip and structured-type template tests; `make build` produces the core binary; license check passes.)*
 
 #### Success Criteria
 

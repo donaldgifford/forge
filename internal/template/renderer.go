@@ -6,6 +6,7 @@ package template
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -131,9 +132,34 @@ func (r *hclRenderer) renderTemplate(name string, src []byte, vars map[string]ct
 	return asString.AsString(), nil
 }
 
+// evalContext builds the renderer's HCL evaluation scope. Variables
+// resolve via two equivalent shapes: bare references
+// (`${project_name}`, `${git_provider.repo_type}`) and the `var.X`
+// namespace (`${var.project_name}`, `${var.git_provider.repo_type}`).
+//
+// Object-typed variables support attribute traversal via HCL's native
+// `.` operator (`${var.git_provider.repo_type}`); list and map
+// variables support index access (`${var.exposed_ports[0]}`,
+// `${var.build_targets["linux"]}`) — both are free from HCL2 once
+// the variable arrives as a typed cty.Value. Undeclared attribute
+// access against a declared object surfaces an HCL `Unsupported
+// attribute` diagnostic, which is what tests and end users see.
+//
+// IMPL-0009 Phase F.4: the `var.X` namespace mirrors
+// `config.BuildEvalContext` so default expressions, validation
+// conditions, and template bodies all see the same scope shape. This
+// closes the namespace gap ahead of RFC-0003's locals IMPL
+// (DESIGN-0006 OQ-1) without requiring it to ship first.
 func (r *hclRenderer) evalContext(vars map[string]cty.Value) *hcl.EvalContext {
+	scope := make(map[string]cty.Value, len(vars)+1)
+	maps.Copy(scope, vars)
+
+	if len(vars) > 0 {
+		scope["var"] = cty.ObjectVal(vars)
+	}
+
 	return &hcl.EvalContext{
-		Variables: vars,
+		Variables: scope,
 		Functions: r.funcs,
 	}
 }

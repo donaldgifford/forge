@@ -2,7 +2,6 @@ package lockfile
 
 import (
 	"fmt"
-	"strconv"
 
 	"github.com/zclconf/go-cty/cty"
 	"github.com/zclconf/go-cty/cty/convert"
@@ -65,57 +64,40 @@ func FromCtyValues(vals map[string]cty.Value) map[string]any {
 // Falls back to runtime-type inference when declaredType is cty.NilType
 // (variable not declared in the blueprint, e.g. legacy lockfile entry).
 //
-// IMPL-0009 Phase D: a cty.Value input (carried in-memory through the
-// resolution chain for structured-typed overrides and vars-file
-// values) flows through with a final cty.Convert pass to enforce the
-// declared shape.
+// IMPL-0009 Phase F.1 collapsed the per-primitive switch into a single
+// `inferValue → cty.Convert(val, declaredType)` pipeline — same shape
+// as `internal/varsfile/varsfile.go::coerceToDeclared`. A `cty.Value`
+// input (carried in-memory through the resolution chain for
+// structured-typed overrides and vars-file values) short-circuits the
+// infer step. Pre-IMPL-0009 string/bool/int payloads infer to their
+// natural cty types and are then converted to declaredType by
+// cty.Convert (handles string→number, string→bool, and structural
+// shape coercion uniformly).
 func convertValue(v any, declaredType cty.Type) (cty.Value, error) {
 	if v == nil {
 		return nullValueForType(declaredType), nil
 	}
 
-	if ctyVal, ok := v.(cty.Value); ok {
-		if declaredType == cty.NilType {
-			return ctyVal, nil
-		}
-
-		return convert.Convert(ctyVal, declaredType)
-	}
-
-	if declaredType == cty.NilType {
-		return inferValue(v)
-	}
-
-	switch {
-	case declaredType.Equals(cty.String):
-		return cty.StringVal(toString(v)), nil
-	case declaredType.Equals(cty.Bool):
-		b, err := toBool(v)
-		if err != nil {
-			return cty.NilVal, err
-		}
-
-		return cty.BoolVal(b), nil
-	case declaredType.Equals(cty.Number):
-		i, err := toInt(v)
-		if err != nil {
-			return cty.NilVal, err
-		}
-
-		return cty.NumberIntVal(i), nil
-	default:
-		// Structured types (list/map/object) — defer to inferValue
-		// and let cty.Convert do the structural coercion against the
-		// declared shape. Lockfiles produced by IMPL-0009-aware
-		// writers already round-trip cleanly; the convert pass is for
-		// pre-v0.7 entries that may shape-mismatch.
+	val, ok := v.(cty.Value)
+	if !ok {
 		inferred, err := inferValue(v)
 		if err != nil {
 			return cty.NilVal, err
 		}
 
-		return convert.Convert(inferred, declaredType)
+		val = inferred
 	}
+
+	if declaredType == cty.NilType {
+		return val, nil
+	}
+
+	converted, err := convert.Convert(val, declaredType)
+	if err != nil {
+		return cty.NilVal, err
+	}
+
+	return converted, nil
 }
 
 func inferValue(v any) (cty.Value, error) {
@@ -145,42 +127,6 @@ func nullValueForType(declaredType cty.Type) cty.Value {
 	}
 
 	return cty.NullVal(declaredType)
-}
-
-func toString(v any) string {
-	if s, ok := v.(string); ok {
-		return s
-	}
-
-	return fmt.Sprintf("%v", v)
-}
-
-func toBool(v any) (bool, error) {
-	switch x := v.(type) {
-	case bool:
-		return x, nil
-	case string:
-		return strconv.ParseBool(x)
-	default:
-		return false, fmt.Errorf("cannot coerce %T to bool", v)
-	}
-}
-
-func toInt(v any) (int64, error) {
-	switch x := v.(type) {
-	case int:
-		return int64(x), nil
-	case int32:
-		return int64(x), nil
-	case int64:
-		return x, nil
-	case float64:
-		return int64(x), nil
-	case string:
-		return strconv.ParseInt(x, 10, 64)
-	default:
-		return 0, fmt.Errorf("cannot coerce %T to int", v)
-	}
 }
 
 func fromCty(v cty.Value) any {
