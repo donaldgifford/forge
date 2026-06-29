@@ -536,6 +536,234 @@ See [DESIGN-0005](design/0005-variable-input-via-vars-file.md) for
 the contract and [IMPL-0008](impl/0008-variable-input-via-vars-file.md)
 for the implementation details.
 
+## Variable type system upgrade (v0.7+)
+
+v0.7 reshapes how blueprint authors declare variable types. The change
+is breaking for blueprints that use `type = "choice"` or `validate =
+"regex"`; it is additive for everything else, with one soft deprecation
+warning. There is no in-tool migrator — the patterns are mechanical and
+fit on one screen.
+
+### Why the change
+
+The pre-v0.7 type surface was a shallow string allow-list (`string`,
+`bool`, `int`, `choice`) with two ad-hoc validation hooks bolted on
+(`validate = "regex"` and `choices = [...]`). Two pain points
+accumulated:
+
+- **Structured config could not be expressed.** A blueprint that
+  scaffolds a Renovate config has to capture four related strings
+  (`repo_type`, `repo_url`, `project_org`, `team`) as four flat
+  variables — the structural relationship between them is invisible
+  to the prompt UX, to validation, and to downstream templates.
+- **Validation was an enum.** `validate = "regex"` could only run a
+  regex; `choices = [...]` could only enumerate strings. There was
+  no way to express *"must be a valid semver"* via a function call,
+  no way to stack two constraints on the same variable, no way to
+  cross-reference another variable.
+
+v0.7 swaps the string-tag allow-list for the cty type-expression
+grammar (`hashicorp/hcl/v2/ext/typeexpr`), introduces `validation { ... }`
+blocks evaluated against a full `cty.Value` scope, and exposes the
+`var.X` namespace in templates so authors can traverse structured
+values naturally. The full design lives in
+[DESIGN-0006](design/0006-object-and-collection-variable-types.md).
+
+### Migration: `type = "choice"` → `validation { contains(...) }`
+
+The `choice` shape was a string enum dressed up as a type. v0.7
+removes it. Re-declare as `type = string` plus a `validation` block:
+
+**Before (v0.6):**
+```hcl
+variable "license" {
+  type        = "choice"
+  description = "License to scaffold"
+  choices     = ["MIT", "Apache-2.0", "BSD-3-Clause", "GPL-3.0"]
+}
+```
+
+**After (v0.7):**
+```hcl
+variable "license" {
+  type        = string
+  description = "License to scaffold"
+
+  validation {
+    condition     = contains(["MIT", "Apache-2.0", "BSD-3-Clause", "GPL-3.0"], var.license)
+    error_message = "license must be one of MIT, Apache-2.0, BSD-3-Clause, GPL-3.0."
+  }
+}
+```
+
+The string list is now under your control — combine, parameterise via
+another variable, or stack multiple `validation` blocks.
+
+### Migration: `validate = "regex"` → `validation { can(regex(...)) }`
+
+The single-regex `validate` attribute is removed. Re-declare as a
+`validation` block whose condition wraps `regex` in `can` (so a
+non-match becomes a `false` rather than a panic-style diagnostic):
+
+**Before (v0.6):**
+```hcl
+variable "project_name" {
+  type        = string
+  description = "Project slug"
+  validate    = "^[a-z][a-z0-9-]*$"
+}
+```
+
+**After (v0.7):**
+```hcl
+variable "project_name" {
+  type        = string
+  description = "Project slug"
+
+  validation {
+    condition     = can(regex("^[a-z][a-z0-9-]*$", var.project_name))
+    error_message = "project_name must be lowercase letters, digits, and hyphens, starting with a letter."
+  }
+}
+```
+
+Stack additional `validation` blocks on the same variable to layer
+constraints — each failing block surfaces independently rather than
+short-circuiting on the first one.
+
+### Migration: `type = int` → `type = number` (warning only)
+
+`int` is now a deprecated alias for `number`. The forge loader emits
+a one-line warning and continues. No file changes are required to
+keep working today; update at your own pace to clear the warning:
+
+```hcl
+# Before — still works, emits a deprecation warning
+variable "port" {
+  type = int
+}
+
+# After — no warning
+variable "port" {
+  type = number
+}
+```
+
+The warning text points back to this section. The `int` form may be
+removed in a future release; there is no scheduled removal date.
+
+### Variable type expressiveness gain
+
+The new type surface adds `object({...})`, `list(T)`, and `map(T)`
+constructors (and continues to accept `string`, `bool`, `number`).
+The motivating use case — a Renovate-config blueprint — collapses
+from four flat scalars to one structured object:
+
+**Before (v0.6) — four flat scalars:**
+```hcl
+variable "git_provider_repo_type" {
+  type    = "choice"
+  choices = ["github", "gitlab", "bitbucket"]
+}
+
+variable "git_provider_repo_url" {
+  type = string
+}
+
+variable "git_provider_project_org" {
+  type = string
+}
+
+variable "git_provider_team" {
+  type = string
+}
+```
+
+**After (v0.7) — one object:**
+```hcl
+variable "git_provider" {
+  type = object({
+    repo_type   = string
+    repo_url    = string
+    project_org = string
+    team        = string
+  })
+
+  validation {
+    condition     = contains(["github", "gitlab", "bitbucket"], var.git_provider.repo_type)
+    error_message = "git_provider.repo_type must be one of github, gitlab, bitbucket."
+  }
+}
+```
+
+Templates traverse the structured value natively — both
+`${git_provider.repo_url}` and `${var.git_provider.repo_url}` resolve
+identically.
+
+`list(T)` and `map(T)` follow the same shape. For example:
+
+```hcl
+variable "exposed_ports" {
+  type    = list(number)
+  default = [8080, 9090]
+}
+
+variable "build_targets" {
+  type = map(string)
+  default = {
+    linux  = "amd64"
+    darwin = "arm64"
+  }
+}
+```
+
+### Prompt UX and `--set` for structured types
+
+Object variables unfold interactively into per-field prompts in
+declaration order. List and map variables *cannot* be supplied
+interactively in v0.7 — supply them via `--var-file` or as a
+`default`. A required list/map without a value fails fast with a
+copy-pasteable `.forge-vars.hcl` snippet pointing at the escape
+hatch.
+
+`--set` behaviour on structured types:
+
+- **Object-typed variables** accept an HCL object literal:
+  `--set 'git_provider={repo_type="github",repo_url="github.com/acme/app",project_org="acme"}'`.
+  Mind the shell quoting.
+- **List- and map-typed variables** reject `--set` with the same
+  `--var-file` pointer error documented above. The shell-quoting
+  burden made inline support not worth it; use `--var-file` instead.
+
+### Lockfile compatibility
+
+Structured-typed variables round-trip cleanly through the v0.7
+lockfile (`.forge-lock.hcl`). Existing scalar-only lockfiles are
+unaffected and continue to load without changes. If you migrate an
+in-flight project from `type = "choice"` to `type = string` +
+validation, the next `forge sync` rewrites the lockfile to the new
+shape with no manual intervention.
+
+### Why no in-tool migrator
+
+Per [ADR-0002](adr/0002-forge-does-not-ship-in-tool-migrators.md),
+forge does not ship in-tool migrators. The patterns above are
+mechanical (search-and-replace within a `variable { ... }` block)
+and the error path on outdated blueprints is explicit:
+
+- `choices` / `validate` attributes are rejected at load time with
+  an error pointing back at this section.
+- `int` emits a one-line warning and continues.
+
+If you need to keep running an unmigrated blueprint while you stage
+the upgrade, pin forge to v0.6 — the v0.7 loader will refuse the
+legacy attributes outright, not silently coerce. The same path
+covers in-flight projects whose lockfile was produced against a
+`type = "choice"` variable: pin forge to v0.6 until you migrate
+the blueprint, then upgrade to v0.7 and run `forge sync` — the
+sync rewrites the lockfile to the new resolved-value shape with no
+manual cleanup.
+
 ## Troubleshooting
 
 ### `apiVersion v1 is no longer supported`
@@ -623,3 +851,6 @@ needed.
 - [IMPL-0005](impl/0005-unify-config-file-format-to-hcl2.md) — Config-format cutover implementation.
 - [ADR-0002](adr/0002-forge-does-not-ship-in-tool-migrators.md) — Why forge no longer ships in-tool migrators.
 - [IMPL-0006](impl/0006-migrate-lockfile-from-yaml-to-hcl.md) — Lockfile cutover implementation (v0.5.0).
+- [DESIGN-0006](design/0006-object-and-collection-variable-types.md) — Object and collection variable types (v0.7.0 design).
+- [IMPL-0009](impl/0009-object-and-collection-variable-types.md) — Object and collection variable types (v0.7.0 implementation).
+- [docs/REFERENCE.md § Variable types](REFERENCE.md#variable-types) — canonical type table including object/list/map.

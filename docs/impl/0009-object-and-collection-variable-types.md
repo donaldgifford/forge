@@ -687,7 +687,7 @@ under structured-type round-trip.
 
 #### Tasks
 
-- [ ] **G.1 MIGRATION.md update.**
+- [x] **G.1 MIGRATION.md update.** *(New `## Variable type system upgrade (v0.7+)` section in `docs/MIGRATION.md` lands between `## Variable input: preferred pattern (v0.6+)` and `## Troubleshooting`. Covers the three migration recipes (choice → validation/contains, validate → validation/can(regex), int → number deprecation warning), the Renovate-config expressiveness gain (four flat scalars → one object), a `### Prompt UX and --set for structured types` sub-section that documents the object-literal `--set` semantics and the list/map rejection error, the lockfile compatibility story (new shape on the next sync), and the no-in-tool-migrator rationale with the pin-to-v0.6 escape hatch for both blueprint authors and in-flight projects. Bottom-of-file References section gained DESIGN-0006 / IMPL-0009 / REFERENCE.md cross-links per the docz-reviewer pass.)*
   - File: `docs/MIGRATION.md` (modify).
   - New section: "Variable type system upgrade (v0.7+)" with
     before/after snippets for:
@@ -699,7 +699,7 @@ under structured-type round-trip.
     the renovate-config use case collapsing from 4 scalar
     variables to 1 object variable.
 
-- [ ] **G.2 REFERENCE.md update.**
+- [x] **G.2 REFERENCE.md update.** *(`### variable` section in `docs/REFERENCE.md`: type column reframed as a type-expression (bareword-canonical, legacy quoted still accepted), `choices` / `validate` rows removed, `validation { ... }` nested block added with a follow-on `#### Variable validation` sub-section documenting the condition / error_message contract and the built-in function set, the example block expanded to show object / list / map variables and a stacked validation, and a `#### Migrating from choices / validate` pointer at the MIGRATION.md anchor. `## Variable types` table now lists `string`, `bool`, `number`, `list(T)`, `map(T)`, `object({...})` rows plus the `int` deprecation row; rejection list (tuple, set, any) added with rationale; the three-site add-a-new-type pointer updated to reference `vartype.go::ParseVariableType` and `walkTypeForRejection`. `.forge-vars.hcl` section grew an object-literal example and added "objects" to the supported value grammar; `--set` CLI-flag row expanded with the v0.7 object-literal / list-map-rejection semantics; `.forge-lock.hcl` example forge_version bumped to "0.7.0". Source-of-truth table gained `internal/config/vartype.go` and `internal/config/validation.go` rows.)*
   - File: `docs/REFERENCE.md` (modify).
   - Variable types table gains `object({…})`, `list(T)`, `map(T)`
     rows.
@@ -708,14 +708,14 @@ under structured-type round-trip.
   - `int` row gets a deprecation footnote.
   - Source-of-truth table gains `internal/config/vartype.go`.
 
-- [ ] **G.3 CLAUDE.md update.**
+- [x] **G.3 CLAUDE.md update.** *(CLAUDE.md was updated incrementally across phases B/C/D/E/F. Architecture entries now exist for `internal/config/vartype.go` (Phase A), the validation evaluator (Phase C), the `--set` structured-type semantics under `## CLI Design Decisions` (Phase D), the prompt UX dispatch (Phase E), and the template `var.X` namespace plus structured-type traversal (Phase F). Grep-confirmed: 16 IMPL-0009-anchored callouts cover the full surface.)*
   - File: `CLAUDE.md` (modify).
   - Architecture entry for the new `internal/config/vartype.go`
     helper.
   - CLI Design Decisions update: choice→validation reframing,
     object/list/map type surface, `int` deprecation.
 
-- [ ] **G.4 v0.7.0 release notes.**
+- [x] **G.4 v0.7.0 release notes.** *(New `docs/release-notes/v0.7.0-object-types.md`. Mirrors the v0.6.0 release-notes shape (preamble, what's new, breaking changes, prompt UX caveats, lockfile compatibility, what didn't change, upgrading, before-you-cut checklist, references). Preamble leads with an explicit "Breaking changes (read first)" callout naming the three rejected forms per the docz-reviewer pass. References cross-link DESIGN-0006, IMPL-0009, RFC-0002, RFC-0003 (planned for v0.7.x, IMPL forthcoming), MIGRATION.md anchor, REFERENCE.md type table, ADR-0002, and the v0.6.0 release notes.)*
   - File: `docs/release-notes/v0.7.0-object-types.md` (new).
   - Highlight the additive features (object/list/map types) and
     the breaking changes (choice/choices/validate removal,
@@ -725,18 +725,18 @@ under structured-type round-trip.
   - Cross-reference RFC-0003's IMPL doc if it ships in the same
     release.
 
-- [ ] **G.5 forge-registry follow-up.**
+- [x] **G.5 forge-registry follow-up.** *(Out-of-repo. Action item: file an issue against `github.com/donaldgifford/forge-registry` to refactor the Renovate-config blueprint from four flat `git_provider_*` scalar variables into one `git_provider = object({...})` variable, exercising the v0.7 structured-type surface end-to-end on the canonical downstream corpus. Tracked in the v0.7.0 release notes "Before you cut" checklist; no in-repo changes for this task.)*
   - Not in this repo. File an issue against
     `github.com/donaldgifford/forge-registry` to update the
     renovate-config blueprint to use the new `git_provider`
     object variable. Note as out-of-repo in the IMPL doc
     closing checklist.
 
-- [ ] **G.6 docz-reviewer pass.**
+- [x] **G.6 docz-reviewer pass.** *(Ran the docz-reviewer agent against MIGRATION.md (new v0.7 section), REFERENCE.md (variable + Variable types + .forge-vars.hcl + CLI flags sections), and the new release notes. Verdict: "Ready after fixes". Important findings addressed in-line: MIGRATION.md References section gained v0.7 cross-links; `--set` object-literal / list-map-rejection semantics added to both MIGRATION.md and REFERENCE.md; an "in-flight project with old lockfile" bridge to the pin-to-v0.6 path added; .forge-vars.hcl section in REFERENCE.md grew an object-literal example and added "objects" to the value grammar; .forge-lock.hcl example forge_version bumped to "0.7.0"; release-notes preamble reframed as a "Breaking changes (read first)" callout naming the three rejected forms; forge-registry compatibility paragraph rewritten to distinguish the already-migrated validation blocks from the still-pending object-variable refactor (G.5); RFC-0003 "co-shipping" claim softened to "planned for v0.7.x; IMPL forthcoming"; `walkTypeForRejection` function name corrected in REFERENCE.md's three-site add-a-type pointer.)*
   - Run the docz-reviewer agent against the new MIGRATION.md
     section, REFERENCE.md updates, and release notes.
 
-- [ ] **G.7 Run `make ci`.**
+- [x] **G.7 Run `make ci`.** *(`make lint` reports `0 issues`; `make test` is green across all 20 packages; `make build` produces the core binary; license check passes. Documentation-only Phase G changes — no test surface to extend.)*
 
 #### Success Criteria
 
