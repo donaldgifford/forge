@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/zclconf/go-cty/cty"
+	"github.com/zclconf/go-cty/cty/convert"
 
 	"github.com/donaldgifford/forge/internal/config"
 	tmpl "github.com/donaldgifford/forge/internal/template"
@@ -86,8 +87,13 @@ func resolveVariable(
 		return resolveFromOverride(raw, v)
 	}
 
-	// Render the default value as a template (it can reference earlier variables).
-	defaultVal, err := renderDefault(v.DefaultSource, current)
+	// Resolve the default. IMPL-0009 C.1: try the parsed
+	// hcl.Expression first (handles `var.X`, function calls, literal
+	// expressions); fall back to the legacy string-template path when
+	// the expression references symbols not in the resolved scope —
+	// the backwards-compat shim for v0.7 transition defaults using
+	// bare-reference templates like `"github.com/example/${name}"`.
+	defaultVal, err := renderDefault(v, current)
 	if err != nil {
 		return nil, fmt.Errorf("rendering default for %q: %w", v.Name, err)
 	}
@@ -197,34 +203,97 @@ func resolveFromPrompt(
 	return val, nil
 }
 
-// renderDefault renders a default value through the HCL2 renderer with the
-// current variable values. Defaults without `${` or `%{` markers short-circuit
-// and pass through unchanged.
-func renderDefault(defaultTmpl string, current map[string]any) (string, error) {
-	if defaultTmpl == "" || (!strings.Contains(defaultTmpl, "${") && !strings.Contains(defaultTmpl, "%{")) {
-		return defaultTmpl, nil
-	}
+// renderDefault resolves a default value to a string for prompt
+// display / consumption by the scalar-only coerceValue path.
+//
+// IMPL-0009 C.1: when DefaultExpr is set, evaluate it against an
+// hcl.EvalContext seeded with the already-bound variables under both
+// bare names and the `var.*` namespace (config.BuildEvalContext).
+// On evaluation failure — typically a `${tmpl}` style default that
+// references a not-yet-bound variable or a runtime function — fall
+// back to the legacy template-render path so the v0.7 transition
+// fixtures keep working.
+//
+// A nil DefaultExpr (no default declared, or a Variable constructed
+// directly in test code rather than via the loader) falls through to
+// the same template-render path, treating DefaultSource as the inline
+// template.
+func renderDefault(v *config.Variable, current map[string]any) (string, error) {
+	ctyCurrent := bareValuesToCty(current)
 
-	ctyVars := make(map[string]cty.Value, len(current))
-
-	for k, v := range current {
-		switch x := v.(type) {
-		case string:
-			ctyVars[k] = cty.StringVal(x)
-		case bool:
-			ctyVars[k] = cty.BoolVal(x)
-		case int:
-			ctyVars[k] = cty.NumberIntVal(int64(x))
-		case int64:
-			ctyVars[k] = cty.NumberIntVal(x)
-		default:
-			ctyVars[k] = cty.StringVal(fmt.Sprintf("%v", v))
+	if v.DefaultExpr != nil {
+		ctx := config.BuildEvalContext(ctyCurrent)
+		if val, diags := v.DefaultExpr.Value(ctx); !diags.HasErrors() {
+			return ctyValueToDefaultString(val)
 		}
 	}
 
-	out, err := defaultRenderer.RenderString(defaultTmpl, ctyVars)
+	return renderLegacyDefaultTemplate(v.DefaultSource, ctyCurrent)
+}
+
+// bareValuesToCty projects the in-flight `any` resolution map into
+// cty values so it can be fed into hcl.EvalContext. Mirrors the
+// scalar-conversion shape already used by lockfile.ToCtyValues.
+func bareValuesToCty(current map[string]any) map[string]cty.Value {
+	out := make(map[string]cty.Value, len(current))
+
+	for k, v := range current {
+		out[k] = goToCty(v)
+	}
+
+	return out
+}
+
+func goToCty(v any) cty.Value {
+	switch x := v.(type) {
+	case string:
+		return cty.StringVal(x)
+	case bool:
+		return cty.BoolVal(x)
+	case int:
+		return cty.NumberIntVal(int64(x))
+	case int64:
+		return cty.NumberIntVal(x)
+	case float64:
+		return cty.NumberFloatVal(x)
+	default:
+		return cty.StringVal(fmt.Sprintf("%v", v))
+	}
+}
+
+// ctyValueToDefaultString renders a cty.Value to the string form the
+// scalar-only resolveFromDefault / resolveFromPrompt paths consume.
+// Falls back to GoString for non-scalar values (those will surface
+// through the Phase E object-unfold path; this is just the
+// string-projection for prompt display).
+func ctyValueToDefaultString(val cty.Value) (string, error) {
+	if val.IsNull() || !val.IsKnown() {
+		return "", nil
+	}
+
+	asStr, err := convert.Convert(val, cty.String)
+	if err == nil {
+		return asStr.AsString(), nil
+	}
+
+	return val.GoString(), nil
+}
+
+// renderLegacyDefaultTemplate is the v0.7 backwards-compat shim:
+// re-parses DefaultSource as an inline template and renders it
+// through the established template renderer. Reached only when
+// hcl.Expression.Value() failed on the parsed default (typically a
+// `${name}` template referencing an earlier variable bound only at
+// the bare-name level, which cty.Convert + bareValuesToCty handle but
+// the v0.7 transition window keeps available).
+func renderLegacyDefaultTemplate(src string, ctyCurrent map[string]cty.Value) (string, error) {
+	if src == "" || (!strings.Contains(src, "${") && !strings.Contains(src, "%{")) {
+		return src, nil
+	}
+
+	out, err := defaultRenderer.RenderString(src, ctyCurrent)
 	if err != nil {
-		return "", fmt.Errorf("rendering default %q: %w", defaultTmpl, err)
+		return "", fmt.Errorf("rendering default %q: %w", src, err)
 	}
 
 	return out, nil

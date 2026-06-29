@@ -66,6 +66,15 @@ packages:
   Non-fatal deprecation notices flow through `Blueprint.Deprecations` →
   `create.Result.Deprecations` / `sync.Result.Deprecations` → `ui.Warningf`
   (IMPL-0009 OQ-3, same pattern as IMPL-0008's `UnknownVarsFileKeys`).
+  Validation-block evaluation lives in `validation.go::EvaluateValidations`
+  (IMPL-0009 Phase C, OQ-2): runs each variable's `validation.condition`
+  expressions against an `hcl.EvalContext` built by `BuildEvalContext` that
+  exposes bound variables under both bare names AND the `var.X` namespace,
+  with a Terraform-aligned function set (`can`, `try`, `regex`, `contains`,
+  `length`, `lower`, `upper`, `coalesce`). Failures accumulate (not
+  short-circuit) and surface as
+  `<error_message> (variable "X", blueprint.hcl:L:C)`. Hooked into
+  `create.Run` and `sync.Run` before any file ops.
 - **internal/registry/** — Registry index (`registry.hcl`), blueprint
   resolution, local cache with TTL
 - **internal/defaults/** — `_defaults/` layered inheritance resolution

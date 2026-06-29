@@ -128,6 +128,14 @@ func Run(opts *Opts) (*Result, error) {
 		return nil, fmt.Errorf("converting variables to cty: %w", err)
 	}
 
+	// 6b. Evaluate validation blocks against the fully resolved
+	//     variable scope (IMPL-0009 Phase C). Failures accumulate so
+	//     authors see every constraint violation at once; the flow
+	//     aborts before any files are touched.
+	if errs := config.EvaluateValidations(bp.Variables, ctyVars); len(errs) > 0 {
+		return nil, fmt.Errorf("validating variables: %w", config.JoinErrors(errs))
+	}
+
 	// 7. Resolve defaults inheritance.
 	fileSet, err := defaults.Resolve(opts.RegistryDir, resolved.BlueprintPath, bp.Defaults.Exclude)
 	if err != nil {

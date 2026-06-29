@@ -91,6 +91,14 @@ func Run(opts *Opts) (*Result, error) {
 		return nil, err
 	}
 
+	// IMPL-0009 Phase C: re-validate against the (possibly
+	// vars-file-overlaid) scope before touching any files. Sync paths
+	// that flow through here treat the lockfile as authoritative
+	// state, so a bad overlay should abort early.
+	if errs := config.EvaluateValidations(bpVars, ctyVars); len(errs) > 0 {
+		return nil, fmt.Errorf("validating variables: %w", config.JoinErrors(errs))
+	}
+
 	// Sync defaults.
 	for i := range lock.Defaults {
 		d := &lock.Defaults[i]
