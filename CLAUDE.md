@@ -107,15 +107,18 @@ packages:
   Rejection check walks the type tree so nested cases like
   `object({tags = set(string)})` are also caught. Per-function coverage
   averages ~94% (IMPL-0009 Phase A quality gate: ≥90%).
-- **internal/varsfile/** — `--var-file` input loading (IMPL-0008). Single
-  exported `Load(paths, declared)` that parses one or more `.forge-vars.hcl`
-  files (strict `.hcl` extension, attributes-only, no functions or
-  traversals), composes them left-to-right with last-wins semantics, and
-  coerces values against the blueprint's declared variable types via
-  `cty/convert`. Returns the resolved `map[string]cty.Value` plus an
-  `unknown` slice for keys not declared in `blueprint.hcl` (warning, not
-  error). Used by `create.Run` and `sync.Run`; `forge check` rejects the
-  flag outright with an actionable error.
+- **internal/varsfile/** — `--var-file` input loading (IMPL-0008,
+  IMPL-0009 D.1). Single exported `Load(paths, declared)` that parses
+  one or more `.forge-vars.hcl` files (strict `.hcl` extension,
+  attributes-only, no functions or traversals), composes them
+  left-to-right with last-wins semantics, and coerces values against
+  the blueprint's declared `cty.Type` via `cty/convert`. Object, list,
+  and map values flow through the same path — `coerceToDeclared` takes
+  the declared `cty.Type` directly (the v0.7 shape) so structural
+  coercion is free. Returns the resolved `map[string]cty.Value` plus
+  an `unknown` slice for keys not declared in `blueprint.hcl` (warning,
+  not error). Used by `create.Run` and `sync.Run`; `forge check`
+  rejects the flag outright with an actionable error.
 - **internal/check/** — Drift detection comparing lockfile vs local files
 - **internal/hooks/** — Post-create hook execution with context cancellation
 - **internal/list/** — Blueprint listing with tag filtering
@@ -176,6 +179,20 @@ See `docs/impl/0002-mvp-cli-gap-closure.md` for the full history and rationale.
   on the path (IMPL-0008 OQ-8); the documented escape hatch is the
   tempfile pattern. Unknown keys surface as a warning, not an
   error; type-coercion failures abort before any side effects.
+- **`--set` structured-type semantics (IMPL-0009 Phase D).** The
+  `--set k=v` flag dispatches on the declared `cty.Type`:
+  object-typed variables accept an HCL object literal that is parsed
+  through `hclsyntax.ParseExpression`, evaluated against an empty
+  EvalContext, and coerced to the declared shape
+  (`internal/prompt/prompt.go::parseObjectOverride`); list- and
+  map-typed variables are rejected with the documented `--set on
+  variable X (...) is not supported; use --var-file ...` error.
+  Scalars take the existing string→type coercion path. Structured
+  values flow through the resolution chain as `cty.Value` (carried
+  inside `map[string]any`) end-to-end; `lockfile.ToCtyValues` and
+  `lockfile.ctyForVariableValue` both passthrough `cty.Value`
+  inputs so the lockfile records nested values without
+  Go-shape round-tripping.
 
 ## Code Style
 

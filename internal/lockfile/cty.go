@@ -64,9 +64,22 @@ func FromCtyValues(vals map[string]cty.Value) map[string]any {
 // convertValue coerces a raw Go value to a cty.Value of declaredType.
 // Falls back to runtime-type inference when declaredType is cty.NilType
 // (variable not declared in the blueprint, e.g. legacy lockfile entry).
+//
+// IMPL-0009 Phase D: a cty.Value input (carried in-memory through the
+// resolution chain for structured-typed overrides and vars-file
+// values) flows through with a final cty.Convert pass to enforce the
+// declared shape.
 func convertValue(v any, declaredType cty.Type) (cty.Value, error) {
 	if v == nil {
 		return nullValueForType(declaredType), nil
+	}
+
+	if ctyVal, ok := v.(cty.Value); ok {
+		if declaredType == cty.NilType {
+			return ctyVal, nil
+		}
+
+		return convert.Convert(ctyVal, declaredType)
 	}
 
 	if declaredType == cty.NilType {
@@ -189,6 +202,11 @@ func fromCty(v cty.Value) any {
 
 		return f
 	default:
-		return nil
+		// Structured types (object/list/map) stay as a cty.Value so
+		// the emit path (ctyForVariableValue) can hand them straight
+		// to hclwrite without round-tripping through Go shapes. The
+		// load side hand-decodes the lockfile's variables block back
+		// to cty.Value already, so symmetry holds.
+		return v
 	}
 }

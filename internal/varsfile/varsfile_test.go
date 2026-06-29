@@ -25,6 +25,40 @@ func declaredVars() []config.Variable {
 	}
 }
 
+// structuredVars are the IMPL-0009 Phase D fixtures: object (flat +
+// nested), list(number), map(string). Used by the object-types
+// fixture suite.
+func structuredVars() []config.Variable {
+	return []config.Variable{
+		{
+			Name: "git_provider",
+			Type: cty.Object(map[string]cty.Type{
+				"repo_type":   cty.String,
+				"repo_url":    cty.String,
+				"project_org": cty.String,
+			}),
+		},
+		{
+			Name: "service",
+			Type: cty.Object(map[string]cty.Type{
+				"name": cty.String,
+				"addr": cty.Object(map[string]cty.Type{
+					"host": cty.String,
+					"port": cty.Number,
+				}),
+			}),
+		},
+		{
+			Name: "exposed_ports",
+			Type: cty.List(cty.Number),
+		},
+		{
+			Name: "build_targets",
+			Type: cty.Map(cty.String),
+		},
+	}
+}
+
 func TestLoad_HappyPath_ScalarTypes(t *testing.T) {
 	t.Parallel()
 
@@ -251,4 +285,123 @@ func TestLoad_OverrideSourceLocation_PointsAtWinningFile(t *testing.T) {
 // budget.
 func writeFile(path, content string) error {
 	return os.WriteFile(path, []byte(content), 0o600)
+}
+
+// --- IMPL-0009 Phase D: structured-type fixtures ---
+
+// TestLoad_StructuredType_ObjectFlat covers the canonical
+// object-replacement pattern from DESIGN-0006 — the renovate-config
+// use case that motivates the whole feature.
+func TestLoad_StructuredType_ObjectFlat(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join("testdata", "object-types", "object-flat.forge-vars.hcl")
+
+	resolved, unknown, err := varsfile.Load([]string{path}, structuredVars())
+	require.NoError(t, err)
+	assert.Empty(t, unknown)
+
+	got, ok := resolved["git_provider"]
+	require.True(t, ok, "git_provider must be in the resolved map")
+	require.True(t, got.Type().IsObjectType())
+	assert.Equal(t, cty.StringVal("github"), got.GetAttr("repo_type"))
+	assert.Equal(t, cty.StringVal("github.com"), got.GetAttr("repo_url"))
+	assert.Equal(t, cty.StringVal("donaldgifford"), got.GetAttr("project_org"))
+}
+
+// TestLoad_StructuredType_ObjectNested covers a two-level object
+// (service.addr.host/port). Important because the loader must
+// recursively type-coerce.
+func TestLoad_StructuredType_ObjectNested(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join("testdata", "object-types", "object-nested.forge-vars.hcl")
+
+	resolved, _, err := varsfile.Load([]string{path}, structuredVars())
+	require.NoError(t, err)
+
+	svc, ok := resolved["service"]
+	require.True(t, ok)
+	assert.Equal(t, cty.StringVal("api"), svc.GetAttr("name"))
+
+	addr := svc.GetAttr("addr")
+	assert.Equal(t, cty.StringVal("0.0.0.0"), addr.GetAttr("host"))
+
+	port, _ := addr.GetAttr("port").AsBigFloat().Int64()
+	assert.Equal(t, int64(8080), port)
+}
+
+// TestLoad_StructuredType_ListOfNumbers covers the list(number) shape
+// — the exposed_ports use case from the DESIGN-0006 examples.
+func TestLoad_StructuredType_ListOfNumbers(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join("testdata", "object-types", "list-of-numbers.forge-vars.hcl")
+
+	resolved, _, err := varsfile.Load([]string{path}, structuredVars())
+	require.NoError(t, err)
+
+	got, ok := resolved["exposed_ports"]
+	require.True(t, ok)
+	require.True(t, got.Type().IsListType())
+
+	var ports []int64
+	for it := got.ElementIterator(); it.Next(); {
+		_, v := it.Element()
+		i, _ := v.AsBigFloat().Int64()
+		ports = append(ports, i)
+	}
+
+	assert.Equal(t, []int64{8080, 9090, 9091}, ports)
+}
+
+// TestLoad_StructuredType_MapOfStrings covers the map(string) shape.
+func TestLoad_StructuredType_MapOfStrings(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join("testdata", "object-types", "map-of-strings.forge-vars.hcl")
+
+	resolved, _, err := varsfile.Load([]string{path}, structuredVars())
+	require.NoError(t, err)
+
+	got, ok := resolved["build_targets"]
+	require.True(t, ok)
+	require.True(t, got.Type().IsMapType())
+	assert.Equal(t, cty.StringVal("amd64"), got.Index(cty.StringVal("linux")))
+	assert.Equal(t, cty.StringVal("arm64"), got.Index(cty.StringVal("darwin")))
+}
+
+// TestLoad_StructuredType_ObjectShapeMismatchErrors verifies a
+// structured-value mismatch (declared string field supplied as
+// number) aborts with a vars-file-anchored error rather than silently
+// coercing or panicking.
+func TestLoad_StructuredType_ObjectShapeMismatchErrors(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join("testdata", "object-types", "object-mismatch.forge-vars.hcl")
+
+	_, _, err := varsfile.Load([]string{path}, structuredVars())
+	require.Error(t, err)
+
+	msg := err.Error()
+	assert.Contains(t, msg, "object-mismatch.forge-vars.hcl",
+		"error must point at the source file")
+	assert.Contains(t, msg, "git_provider",
+		"error must name the offending variable")
+}
+
+// TestLoad_StructuredType_ListElementMismatchErrors covers the
+// list(T) element-type mismatch case: list(number) declared, mixed
+// types supplied. cty.Convert refuses the coercion.
+func TestLoad_StructuredType_ListElementMismatchErrors(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join("testdata", "object-types", "list-mismatch.forge-vars.hcl")
+
+	_, _, err := varsfile.Load([]string{path}, structuredVars())
+	require.Error(t, err)
+
+	msg := err.Error()
+	assert.Contains(t, msg, "list-mismatch.forge-vars.hcl")
+	assert.Contains(t, msg, "exposed_ports")
 }

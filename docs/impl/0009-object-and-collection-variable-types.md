@@ -450,7 +450,7 @@ natively); `--set` gets a narrow extension for object literals.
 
 #### Tasks
 
-- [ ] **D.1 Vars-file structured-type support.**
+- [x] **D.1 Vars-file structured-type support.** *(Already landed in Phase B's coerceToDeclared refactor — the helper takes a cty.Type directly and cty.Convert handles object/list/map targets without further changes. Phase D adds the fixture-driven verification through the loader.)*
   - File: `internal/varsfile/varsfile.go` (modify).
   - `coerceToDeclared` (existing helper) already delegates to
     `cty.Convert`. Verify it handles object/list/map targets
@@ -468,7 +468,7 @@ natively); `--set` gets a narrow extension for object literals.
     //  v.Type field access)
     ```
 
-- [ ] **D.2 Vars-file test corpus extension.**
+- [x] **D.2 Vars-file test corpus extension.** *(`internal/varsfile/testdata/object-types/` now holds: `object-flat`, `object-nested`, `list-of-numbers`, `map-of-strings`, plus `object-mismatch` (string-field supplied as a list) and `list-mismatch` (mixed-type elements). The mismatched fixtures exercise the cty.Convert failure path.)*
   - Directory: `internal/varsfile/testdata/object-types/` (new).
   - Fixtures: `object-flat.forge-vars.hcl`,
     `object-nested.forge-vars.hcl`,
@@ -476,13 +476,13 @@ natively); `--set` gets a narrow extension for object literals.
     `map-of-strings.forge-vars.hcl`, plus mismatched-type
     fixtures for each shape.
 
-- [ ] **D.3 Vars-file integration tests.**
+- [x] **D.3 Vars-file integration tests.** *(Six new tests in `varsfile_test.go` (`TestLoad_StructuredType_*`) walk each fixture through `varsfile.Load` against a `structuredVars()` declaration set and assert the expected `map[string]cty.Value` shape — including the failure-path tests that pin the error message at the vars-file location.)*
   - File: `internal/varsfile/varsfile_test.go` (modify).
   - Each fixture: assert `Load` returns the expected
     `map[string]cty.Value`; mismatched-type cases assert clean
     error with `vars file PATH:L:C` location.
 
-- [ ] **D.4 `--set` object literal parsing.**
+- [x] **D.4 `--set` object literal parsing.** *(Lives on `internal/prompt/prompt.go::parseObjectOverride` rather than as a `internal/create/setvars.go` helper, because the type-driven dispatch happens inside `resolveFromOverride` which is owned by the prompt package — a `create` import in prompt would close the dependency cycle. The helper parses the raw value via `hclsyntax.ParseExpression`, evaluates against an empty EvalContext (literal-only), and coerces to the declared `cty.Object` shape. Resolved cty.Value flows through the rest of the chain as `any`; `lockfile.ToCtyValues` and `ctyForVariableValue` both grew a passthrough case for `cty.Value` inputs so the structured value survives the cty→Go→cty round-trip.)*
   - File: `cmd/create.go` (modify),
     `internal/create/setvars.go` (likely new helper).
   - When the value side of a `--set k=v` is detected as an HCL
@@ -496,7 +496,7 @@ natively); `--set` gets a narrow extension for object literals.
   - Scalars continue to flow through the existing string-coercion
     path (no change).
 
-- [ ] **D.5 `--set` list/map rejection.**
+- [x] **D.5 `--set` list/map rejection.** *(Same `resolveFromOverride` dispatch — when `v.Type.IsListType()` or `v.Type.IsMapType()`, the call returns the documented `--set on variable X (...) is not supported; use --var-file to supply list and map values` error.)*
   - File: `cmd/create.go` (modify).
   - At resolve time, after the user supplies `--set X=Y` for a
     variable `X` declared as `list(T)` or `map(T)`, surface:
@@ -506,7 +506,7 @@ natively); `--set` gets a narrow extension for object literals.
     use --var-file to supply list and map values.
     ```
 
-- [ ] **D.6 Integration tests for create.**
+- [x] **D.6 Integration tests for create.** *(`internal/create/objectset_integration_test.go` (new) builds a synthetic registry inline (`buildStructuredRegistry`) with an object variable plus list(number) + map(string) variables. Tests: `TestCreate_SetObjectLiteral` walks create.Run with `--set git_provider={...}` and asserts the lockfile records the structured `cty.Value`; `TestCreate_SetRejectsList` and `TestCreate_SetRejectsMap` assert the documented rejection error for list and map declared types. Structured-typed defaults are exercised here too — the test registry's `exposed_ports = [8080]` default flows through renderDefault → defaultValueFromCty → resolveFromDefault as a cty.Value, no string-coercion roundtrip.)*
   - File: `internal/create/varsfile_integration_test.go` (modify) /
     a new `objectset_integration_test.go`.
   - Tests:
@@ -517,7 +517,7 @@ natively); `--set` gets a narrow extension for object literals.
     - `--set` against a `list(T)` variable errors with the
       documented message.
 
-- [ ] **D.7 Run `make ci`.**
+- [x] **D.7 Run `make ci`.** *(`make lint` reports `0 issues`; `make test` is green across all 20 packages including the new structured-type tests in `varsfile` and `create`.)*
 
 #### Success Criteria
 

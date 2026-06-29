@@ -160,9 +160,17 @@ func writeManagedFileBlock(body *hclwrite.Body, entry *ManagedFileEntry) {
 // infers the cty type from the Go type at emit time. Mirrors the
 // inferValue helper in cty.go but exposes a single entry point for the
 // emitter.
+//
+// IMPL-0009 Phase D: structured-typed values (object/list/map) flow
+// through the resolution chain as cty.Value and pass straight through
+// here for hclwrite — no scalar coercion needed.
 func ctyForVariableValue(v any) (cty.Value, error) {
 	if v == nil {
 		return cty.NullVal(cty.String), nil
+	}
+
+	if ctyVal, ok := v.(cty.Value); ok {
+		return ctyVal, nil
 	}
 
 	return inferValue(v)
