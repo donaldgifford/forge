@@ -134,14 +134,14 @@ depends on this.
 
 #### Tasks
 
-- [ ] **A.1 Create the new file.**
+- [x] **A.1 Create the new file.**
   - File: `internal/config/vartype.go` (new).
   - Package comment summarises responsibility: "parses a
     `variable.type` HCL expression to a `cty.Type` using the cty
     type-expression grammar, plus forge-specific error wrapping and
     the `int` deprecation warning."
 
-- [ ] **A.2 Define the public API.**
+- [x] **A.2 Define the public API.** *(Architect feedback during implementation: dropped the `*Deprecation` out-of-band return in favour of folding the warning into `hcl.Diagnostics` as a `DiagWarning` — more idiomatic, single accumulator, no parallel state. Signature is `(cty.Type, hcl.Diagnostics)`.)*
   - File: `internal/config/vartype.go` (modify).
   - Signature:
 
@@ -171,7 +171,7 @@ depends on this.
     }
     ```
 
-- [ ] **A.3 Implement using `hashicorp/hcl/v2/ext/typeexpr`.**
+- [x] **A.3 Implement using `hashicorp/hcl/v2/ext/typeexpr`.**
   - Delegate the parse to `typeexpr.Type(expr)`.
   - On success, inspect for `cty.Tuple`, `cty.Set`, or types with
     optional attributes; if present, return a forge-specific
@@ -181,7 +181,7 @@ depends on this.
     (caller passes it via a separate parameter or via expression
     range lookup).
 
-- [ ] **A.4 Implement the `int` deprecation detection.**
+- [x] **A.4 Implement the `int` deprecation detection.**
   - Inspect the expression source: if it parses as either the bare
     `int` keyword or the quoted-string `"int"`, set
     `deprecation = &Deprecation{...}` with the message
@@ -189,14 +189,14 @@ depends on this.
   - The Range carries the source location of the `type` attribute
     so the warning surfaces with file:line:col.
 
-- [ ] **A.5 Hermetic test fixtures.**
-  - Directory: `internal/config/testdata/vartype/` (new).
-  - Per-fixture pattern: each fixture is a `.hcl` snippet with one
-    variable declaration. Fixture covers the form being tested
-    (e.g. `accepts-list-string.hcl`, `rejects-tuple.hcl`,
-    `int-deprecation.hcl`).
+- [x] **A.5 Hermetic test fixtures.** *(Deviated from per-`.hcl`-file fixtures
+  in favour of inline `hclsyntax.ParseExpression` in the test file. Reason:
+  `ParseVariableType` takes a single `hcl.Expression`, so each fixture
+  would have been a one-line file. Inline table-driven tests are
+  clearer at this size. Phase B's loader integration tests will use
+  proper `.hcl` fixtures since they exercise full blueprint parsing.)*
 
-- [ ] **A.6 Unit tests.**
+- [x] **A.6 Unit tests.** *(Coverage on `internal/config/vartype.go` averages ~94% across functions — above the 90% gate. All accepted forms, legacy quoted forms, `int` deprecation, `choice` rejection, tuple/set rejection, nested set-in-object rejection, `any` rejection, and garbage input covered.)*
   - File: `internal/config/vartype_test.go` (new).
   - Table-driven coverage for:
     - All accepted bareword forms: `string`, `bool`, `number`,
@@ -212,7 +212,7 @@ depends on this.
       `int` and `"int"`, nil for `number` and `string`.
   - Coverage gate: ≥90%.
 
-- [ ] **A.7 Run `make lint` and `make fmt`.**
+- [x] **A.7 Run `make lint` and `make fmt`.** *(`make lint` returned `0 issues`.)*
 
 #### Success Criteria
 

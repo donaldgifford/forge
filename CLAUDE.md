@@ -74,6 +74,17 @@ packages:
   PartialContent on the eager fields and hand-decode the dynamic `variables`
   block; `cty.Value` in memory with typed coercion via `lockfile.ToCtyValues`
   using declared variable types
+- **internal/config/vartype.go** — Type expression parser (IMPL-0009 Phase A).
+  Single exported `ParseVariableType(varName, expr) (cty.Type, hcl.Diagnostics)`
+  that delegates the bareword parse to `hashicorp/hcl/v2/ext/typeexpr` and
+  adds forge-specific layers: handles legacy quoted-string scalars
+  (`"string"`, `"bool"`, `"number"`) during the v0.7 transition; emits a
+  `DiagWarning` for `int` (alias for `number` per DESIGN-0006 OQ-6);
+  rejects `"choice"`, `tuple([...])`, `set(T)`, optional fields, and `any`
+  with forge-specific errors pointing at MIGRATION.md / REFERENCE.md.
+  Rejection check walks the type tree so nested cases like
+  `object({tags = set(string)})` are also caught. Per-function coverage
+  averages ~94% (IMPL-0009 Phase A quality gate: ≥90%).
 - **internal/varsfile/** — `--var-file` input loading (IMPL-0008). Single
   exported `Load(paths, declared)` that parses one or more `.forge-vars.hcl`
   files (strict `.hcl` extension, attributes-only, no functions or
