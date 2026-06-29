@@ -43,9 +43,9 @@ commands and contemplated two more:
 
 The migrate commands have served their purpose well for the
 *mechanical* format swaps (template syntax v1→v2, YAML→HCL configs).
-But the upcoming work package (RFC-0002 object/list/map types,
-choice→validation block, RFC-0003 locals + namespacing, IMPL-0006
-lockfile format) is **architecturally entangled**:
+But the upcoming work package (RFC-0002 / DESIGN-0006 object/list/map
+types and choice→validation block, RFC-0003 locals + namespacing,
+IMPL-0006 lockfile format) is **architecturally entangled**:
 
 - Namespacing every variable reference (`${X}` → `${var.X}`) is a
   mechanical transform, but the optional promotion of
@@ -116,7 +116,7 @@ rescaffold from the new blueprint version.
   outside `internal/migratecmd/`; removing both unblocks the
   dependency removal.
 - **Frees development bandwidth** for the architectural work
-  (RFC-0002, RFC-0003, IMPL-0006). Designing, building, and testing
+  (RFC-0002 / DESIGN-0006, RFC-0003, IMPL-0006). Designing, building, and testing
   migrators for an entangled multi-RFC change set would consume
   more cycles than the underlying work.
 - **Sharper release boundaries.** Each minor release has a clear
@@ -191,6 +191,7 @@ rescaffold from the new blueprint version.
 - [IMPL-0007 — Remove forge migrate command](../impl/0007-remove-forge-migrate-command.md) — removes existing migrate commands from the codebase per this decision.
 - [RFC-0003 — Locals for derived values](../rfc/0003-locals-for-derived-values.md) — drops Phase 4 (`forge migrate refs`) per this decision.
 - [RFC-0002 — Object and collection variable types](../rfc/0002-object-and-collection-variable-types.md) — semantic complexity (choice→validation reframing, object types) that informed the "too entangled for a migrator" argument.
+- [DESIGN-0006 — Object and collection variable types](../design/0006-object-and-collection-variable-types.md) — formalises RFC-0002's design and pins the migration story to the rescaffold/re-author pattern established by this ADR.
 - [IMPL-0004 — HCL2 cutover](../impl/0004-hcl2-cutover.md) — `forge migrate templates`, scheduled for removal under IMPL-0007.
 - [IMPL-0005 — Unify config file format to HCL2](../impl/0005-unify-config-file-format-to-hcl2.md) — `forge migrate config`, scheduled for removal under IMPL-0007.
 - [docs/MIGRATION.md](../MIGRATION.md) — the document that absorbs the migrator's former role.

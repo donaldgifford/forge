@@ -567,6 +567,7 @@ explicitly weighed against in-tool tooling and rejected.
 
 - [ADR-0002 — Forge does not ship in-tool migrators](../adr/0002-forge-does-not-ship-in-tool-migrators.md) — drops the originally-planned `forge migrate refs` command; informs the [Migration](#migration) section.
 - [RFC-0002 — Object and collection variable types](0002-object-and-collection-variable-types.md) — the type-system work this RFC composes with; RFC-0002 OQ-5 deferred the locals question here.
+- [DESIGN-0006 — Object and collection variable types](../design/0006-object-and-collection-variable-types.md) — RFC-0002's design; co-ships with this RFC in v0.7.0 per DESIGN-0006 OQ-1.
 - [DESIGN-0001 — Blueprint Authoring](../design/0001-blueprint-authoring.md) — variable declaration schema that gains the `locals` block.
 - [DESIGN-0005 — Variable input via vars file](../design/0005-variable-input-via-vars-file.md) — input-side surface that locals deliberately stay out of.
 - [IMPL-0006 — Migrate lockfile from YAML to HCL](../impl/0006-migrate-lockfile-from-yaml-to-hcl.md) — lockfile format that the locals round-trip depends on.

@@ -110,8 +110,9 @@ existing resolution flow that already terminates in
 - **HCL function calls inside vars files** (OQ-1) — strict
   literals only.
 - **Object / list / map values.** This IMPL ships with scalar-only
-  parsing; the parser is structured so RFC-0002's types drop in via
-  the existing `cty.Value` plumbing without re-architecting.
+  parsing; the parser is structured so RFC-0002's types
+  (designed in DESIGN-0006) drop in via the existing `cty.Value`
+  plumbing without re-architecting.
 - **`--strict-vars` flag** to promote unknown-key warnings to
   errors (OQ-7) — not in v1.
 - **Recording the vars file path in the lockfile** (DESIGN-0005
@@ -681,9 +682,10 @@ actionable (DESIGN-0005-aligned), rather than Cobra's generic
 - **External libraries** (`hashicorp/hcl/v2`, `zclconf/go-cty`) are
   already in `go.mod` — no new dependencies.
 - **Composes with future work:**
-  - **RFC-0002** (object/list/map types) — when those types land,
-    the vars-file parser's existing `cty.Value` plumbing extends to
-    nested HCL natively. No change to the package public API.
+  - **RFC-0002** (object/list/map types, designed in DESIGN-0006)
+    — when those types land, the vars-file parser's existing
+    `cty.Value` plumbing extends to nested HCL natively. No change
+    to the package public API.
   - **IMPL-0006** (HCL lockfile) — both files become HCL2; the
     parser/emitter machinery is shared.
   - **RFC-0003** (locals + namespacing) — vars-file keys remain
@@ -765,6 +767,7 @@ actionable (DESIGN-0005-aligned), rather than Cobra's generic
 
 - [DESIGN-0005 — Variable input via vars file](../design/0005-variable-input-via-vars-file.md) — the design this IMPL realises.
 - [RFC-0002 — Object and collection variable types](../rfc/0002-object-and-collection-variable-types.md) — composing feature (object/list/map values in vars files).
+- [DESIGN-0006 — Object and collection variable types](../design/0006-object-and-collection-variable-types.md) — RFC-0002's design; its `--var-file` section relies on this IMPL's parser shape extending via `cty.Convert` for structured types.
 - [RFC-0003 — Locals for derived values](../rfc/0003-locals-for-derived-values.md) — namespacing convention (vars files keep bare keys, RFC-0003 affects templates/conditions only).
 - [IMPL-0006 — Migrate lockfile from YAML to HCL](0006-migrate-lockfile-from-yaml-to-hcl.md) — sibling HCL2 work; shares parsing patterns.
 - `internal/config/loader_hcl.go` — HCL2 parsing reference pattern (lines 69–74).

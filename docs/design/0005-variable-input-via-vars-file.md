@@ -41,7 +41,7 @@ Add a `--var-file` flag to `forge create` (and `forge sync` / `forge check`
 where it applies) that loads variable values from an HCL document. This
 replaces the long `--set k=v --set k=v ...` chains that currently
 dominate non-trivial scaffold commands, and lays the input-side
-groundwork for object/list/map variable types (see RFC-0002).
+groundwork for object/list/map variable types (see RFC-0002, designed in DESIGN-0006).
 
 ## Goals and Non-Goals
 
@@ -75,8 +75,9 @@ groundwork for object/list/map variable types (see RFC-0002).
   parser handles it for free via hcldec's JSON support — wiring is
   trivial but adds CLI surface and tests. Defer to a follow-up.
 - **Object / list / map variable types.** Out of scope here — covered
-  by RFC-0002. This DESIGN ships with scalar-only support and the
-  file format naturally extends when object types land.
+  by RFC-0002 (designed in DESIGN-0006). This DESIGN ships with
+  scalar-only support and the file format naturally extends when
+  object types land.
 - **Lockfile format change.** Out of scope — covered by IMPL-0006.
 
 ## Background
@@ -114,8 +115,8 @@ Issues:
   given scaffolded project, separate from the lockfile (which lives
   inside the project).
 - **No path for non-scalar values.** `--set k=v` is fundamentally
-  scalar. When object/list/map types land (RFC-0002), there's no CLI
-  surface that can express them ergonomically.
+  scalar. When object/list/map types land (RFC-0002 / DESIGN-0006),
+  there's no CLI surface that can express them ergonomically.
 - **Documentation surface.** A `.forge-vars.hcl` checked in next to
   a scaffolded project is a self-documenting input artifact.
 
@@ -138,7 +139,7 @@ project_owner       = "donaldgifford"
 project_description = "A lightweight, embeddable Okta mock for Terraform tests"
 git_provider        = "github"
 
-# When object types land (RFC-0002), this just works:
+# When object types land (RFC-0002 / DESIGN-0006), this just works:
 # git_provider = {
 #   repo_type   = "github"
 #   repo_url    = "github.com"
@@ -387,6 +388,7 @@ No release-notes pressure since the feature is additive.
 - [DESIGN-0004 — Unify config file format after HCL2 cutover](0004-unify-config-file-format-after-hcl2-cutover.md) — precedent for "HCL everywhere" consistency.
 - [IMPL-0006 — Migrate lockfile from YAML to HCL](../impl/0006-migrate-lockfile-from-yaml-to-hcl.md) — parallel format consistency work.
 - [RFC-0002 — Object and collection variable types](../rfc/0002-object-and-collection-variable-types.md) — the long-tail feature this DESIGN unblocks on the input side.
+- [DESIGN-0006 — Object and collection variable types](0006-object-and-collection-variable-types.md) — RFC-0002's design; vars-file parser delegates to `cty.Convert` for structured types per DESIGN-0006's `--var-file` section.
 - [RFC-0003 — Locals for derived values](../rfc/0003-locals-for-derived-values.md) — defines the `var.NAME` / `local.NAME` namespacing used in templates and conditions; vars files keep bare keys.
 - [Terraform `-var-file` documentation](https://developer.hashicorp.com/terraform/language/values/variables#variable-definitions-tfvars-files) — direct inspiration; the precedence-rules wart in Terraform's design is what motivates the mutual-exclusion rule here.
 - `internal/lockfile/cty.go` — existing `cty.Value` coercion machinery this design reuses.
