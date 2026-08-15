@@ -73,48 +73,109 @@ label becomes the variable name. Repeat the block once per variable.
 
 | Attribute | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `type` | string | **yes** | One of [`string`, `bool`, `choice`, `int`](#variable-types). |
+| `type` | type expression | **yes** | A [variable type](#variable-types) — `string`, `bool`, `number`, `list(T)`, `map(T)`, or `object({...})`. Bareword form (e.g. `string`); legacy quoted form (`"string"`) still accepted during the v0.7 transition. |
 | `description` | string | no | Shown to the user during interactive prompts. |
 | `default` | expression | no | Default value. May be a template (`"${other_var}-api"`) — evaluated after the variables it references are bound. |
 | `required` | bool | no | When `true`, the user cannot accept an empty value. |
-| `choices` | list(string) | conditional | **Required when `type = "choice"`**; the menu options. Ignored for other types. |
-| `validate` | string | no | Regular expression (Go `regexp` syntax) the resolved value must match. Compiled at load time. |
+
+| Nested block | Required | Description |
+|--------------|----------|-------------|
+| `validation { condition = …, error_message = … }` | no | One or more validation rules. The `condition` is an HCL expression that must evaluate to `true`; `error_message` is the static message surfaced on failure. Repeat the block per rule. See [the validation block](#variable-validation). |
 
 ```hcl
 variable "project_name" {
-  type        = "string"
+  type        = string
   description = "Service name; used in module paths and helm release name"
   required    = true
-  validate    = "^[a-z][a-z0-9-]*$"
+
+  validation {
+    condition     = can(regex("^[a-z][a-z0-9-]*$", var.project_name))
+    error_message = "project_name must be lowercase letters, digits, and hyphens, starting with a letter."
+  }
 }
 
 variable "go_module" {
-  type    = "string"
+  type    = string
   default = "github.com/example/${project_name}"
 }
 
 variable "use_grpc" {
-  type    = "bool"
-  default = "false"
+  type    = bool
+  default = false
 }
 
 variable "license" {
-  type    = "choice"
-  choices = ["Apache-2.0", "MIT", "BSD-3-Clause"]
+  type    = string
   default = "Apache-2.0"
+
+  validation {
+    condition     = contains(["Apache-2.0", "MIT", "BSD-3-Clause"], var.license)
+    error_message = "license must be one of Apache-2.0, MIT, BSD-3-Clause."
+  }
 }
 
 variable "port" {
-  type    = "int"
-  default = "8080"
+  type    = number
+  default = 8080
+}
+
+variable "git_provider" {
+  type = object({
+    repo_type   = string
+    repo_url    = string
+    project_org = string
+  })
+
+  validation {
+    condition     = contains(["github", "gitlab", "bitbucket"], var.git_provider.repo_type)
+    error_message = "git_provider.repo_type must be one of github, gitlab, bitbucket."
+  }
+}
+
+variable "exposed_ports" {
+  type    = list(number)
+  default = [8080, 9090]
+}
+
+variable "build_targets" {
+  type = map(string)
+  default = {
+    linux  = "amd64"
+    darwin = "arm64"
+  }
 }
 ```
 
-> **Why `default` is stringly-typed.** It is held as raw source text
-> so the prompt renderer can re-evaluate it after other variables are
-> bound (the template `"${project_name}-api"` only resolves once
-> `project_name` is known). Coercion to the declared type happens
-> when the resolved value is read.
+> **Why `default` accepts an expression.** The default expression is
+> parsed at load time but evaluated against the resolved-variable
+> scope at prompt time, so a template like
+> `"github.com/example/${project_name}"` only resolves once
+> `project_name` is bound. Coercion to the declared `cty.Type` happens
+> at evaluation time via `cty.Convert` against the type the author
+> declared.
+
+#### Variable validation
+
+`validation { … }` runs author-defined constraints against the
+fully-resolved variable scope. Repeat the block once per constraint;
+failures accumulate (one pass, no short-circuit) so the user sees
+every violation in a single error report.
+
+| Attribute | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `condition` | expression | **yes** | HCL expression that must evaluate to a `bool`. Has access to the full resolved-variable scope under both the bare name (`project_name`) and the `var.X` namespace (`var.project_name`). |
+| `error_message` | string | **yes** | Static message surfaced when `condition` evaluates to false. Template interpolation in error messages is not supported in v0.7. |
+
+Built-in functions usable inside `condition`: `can`, `try`, `regex`,
+`contains`, `length`, `lower`, `upper`, `coalesce` (Terraform-aligned
+naming).
+
+#### Migrating from `choices` / `validate`
+
+The pre-v0.7 `choices = [...]` and `validate = "regex"` attributes
+are **rejected at load time**. Both shapes re-express cleanly as a
+`validation { ... }` block. See the migration patterns in
+[docs/MIGRATION.md — Variable type system upgrade (v0.7+)](MIGRATION.md#variable-type-system-upgrade-v07).
 
 ### condition
 
@@ -352,7 +413,7 @@ blueprint {
 
 created_at    = "2026-05-19T10:15:30Z"
 last_synced   = "2026-05-19T10:15:30Z"
-forge_version = "0.6.0"
+forge_version = "0.7.0"
 
 variables {
   project_name = "my-api"
@@ -395,13 +456,25 @@ go_module    = "github.com/example/mockta"
 use_grpc     = true
 port         = 8080
 tags         = ["beta", "staging"]
+
+# Structured-type values match the declared type in blueprint.hcl
+# (v0.7+). See `## Variable types` for the supported shapes.
+git_provider = {
+  repo_type   = "github"
+  repo_url    = "github.com/acme/app"
+  project_org = "acme"
+}
+build_targets = {
+  linux  = "amd64"
+  darwin = "arm64"
+}
 ```
 
 | Rule | Detail |
 |------|--------|
 | File extension | Must be `.hcl`. Process substitution (`<(…)`) fails this check; use the tempfile pattern instead. |
 | Document grammar | Top-level attributes only. Blocks (`foo { … }`) are rejected with a `vars file may not contain blocks` error. |
-| Expression grammar | Values must be literal: strings, numbers, bools, lists, maps. Function calls (`upper("x")`), references (`other_var`), and computed expressions are rejected with a `variable only accepts literal values` error. |
+| Expression grammar | Values must be literal: strings, numbers, bools, lists, maps, and objects (v0.7+). Function calls (`upper("x")`), references (`other_var`), and computed expressions are rejected with a `variable only accepts literal values` error. |
 | Composition | `--var-file` is repeatable; later files override earlier files on key collision. |
 | Type coercion | Values are coerced against the declared blueprint variable type via `cty/convert`. Coercion failures abort before any files are written. |
 | Unknown keys | Keys that are not declared in `blueprint.hcl` surface as a CLI **warning**, not an error, and are silently dropped from the resolved map. |
@@ -413,22 +486,48 @@ tags         = ["beta", "staging"]
 
 ## Variable types
 
-The four types accepted by the `type` attribute of a `variable`
-block. Defined in
-[`internal/config/validate.go`](../internal/config/validate.go):
+The types accepted by the `type` attribute of a `variable` block.
+Parsed at load time by
+[`internal/config/vartype.go`](../internal/config/vartype.go), which
+delegates to `hashicorp/hcl/v2/ext/typeexpr` and adds forge-specific
+deprecation / rejection layers.
 
 | Type | Description | Native cty type |
 |------|-------------|-----------------|
-| `string` | Free-text string. Optionally constrained via `validate` regex. | `cty.String` |
+| `string` | Free-text string. | `cty.String` |
 | `bool` | Boolean. Accepts `true`/`false` literals or stringly-typed coercions (e.g. `"true"`). | `cty.Bool` |
-| `choice` | String constrained to one of `choices`. **`choices` is required.** | `cty.String` |
-| `int` | Integer. Stored as `cty.Number` natively; coerced from string vars-file inputs (`port = "8080"` works). | `cty.Number` |
+| `number` | Number. Integer and float subtypes both accepted; vars-file string coercion supported (`port = "8080"` works). | `cty.Number` |
+| `list(T)` | Homogeneous list. `T` is any other supported type, e.g. `list(string)`, `list(number)`, `list(object({...}))`. | `cty.List(T)` |
+| `map(T)` | String-keyed map with homogeneous values. `T` is any other supported type, e.g. `map(string)`, `map(object({...}))`. | `cty.Map(T)` |
+| `object({…})` | Heterogeneous record. Each attribute carries its own type, including nested objects. | `cty.Object(...)` |
+| `int` | **Deprecated alias for `number`.** Continues to work; emits a one-line warning at load time. May be removed in a future release. | `cty.Number` |
+
+Legacy quoted forms (`"string"`, `"bool"`, `"number"`, `"int"`) are
+still accepted during the v0.7 transition window; the bareword form
+(`string`, `bool`, `number`, `int`) is the canonical shape going
+forward.
+
+**Removed in v0.7:**
+
+- `type = "choice"` and the `choices = [...]` attribute. Re-express as
+  `type = string` + a `validation { condition = contains(...) }` block.
+- `validate = "regex"`. Re-express as
+  `validation { condition = can(regex(...)) }`.
+- `tuple([...])` and `set(T)` — rejected with a forge-specific error
+  pointing back at this table. `tuple` is rejected because positional
+  collections do not map cleanly to the `--var-file` HCL surface; `set`
+  is rejected because forge has no need for unordered-collection
+  semantics yet.
+- `any` / `cty.DynamicPseudoType` — rejected by `typeexpr.Type` itself.
+
+See [docs/MIGRATION.md — Variable type system upgrade (v0.7+)](MIGRATION.md#variable-type-system-upgrade-v07)
+for the migration recipes.
 
 Adding a new type means touching three sites:
 
-1. [`internal/config/validate.go`](../internal/config/validate.go) — `validVariableTypes` map.
-2. [`internal/lockfile/cty.go`](../internal/lockfile/cty.go) — `ToCtyValues` / `FromCtyValues`.
-3. [`internal/varsfile/varsfile.go`](../internal/varsfile/varsfile.go) — `ctyTypeForDeclared`.
+1. [`internal/config/vartype.go`](../internal/config/vartype.go) — extend `ParseVariableType` (and `walkTypeForRejection` if loosening a current rejection).
+2. [`internal/lockfile/cty.go`](../internal/lockfile/cty.go) — `convertValue` / `fromCty`.
+3. [`internal/varsfile/varsfile.go`](../internal/varsfile/varsfile.go) — `coerceToDeclared`.
 
 ---
 
@@ -452,7 +551,7 @@ the files above:
 
 | Flag | Commands | Effect |
 |------|----------|--------|
-| `--set key=value` | `create` | Inline variable value. Repeatable. Mutually exclusive with `--var-file`. |
+| `--set key=value` | `create` | Inline variable value. Repeatable. Mutually exclusive with `--var-file`. Object-typed variables (v0.7+) accept an HCL object literal (`--set 'git_provider={repo_type="github",...}'`); list- and map-typed variables reject `--set` with a `--var-file` pointer error. |
 | `--var-file PATH` | `create`, `sync` | Load variable values from a `.forge-vars.hcl` file. Repeatable. On `sync`, requires `--force`. Rejected on `check`. |
 | `--force` | `create`, `sync` | On `create`: write into a non-empty directory. On `sync`: required when `--var-file` is supplied (acknowledges the lockfile rewrite). |
 | `--registry-dir` | `create`, `sync`, `check` | Override the registry source. Accepts local paths and go-getter URLs (auto-detected). |
@@ -472,7 +571,9 @@ Every claim in this document maps to one or more of:
 | Registry Go schema | [`internal/config/registry.go`](../internal/config/registry.go) |
 | Lockfile Go schema | [`internal/lockfile/lock.go`](../internal/lockfile/lock.go) |
 | HCL decode specs (blueprint + registry) | [`internal/config/hcldec_spec.go`](../internal/config/hcldec_spec.go) |
-| Allowed `type` and `strategy` values | [`internal/config/validate.go`](../internal/config/validate.go) |
+| Allowed `strategy` values | [`internal/config/validate.go`](../internal/config/validate.go) |
+| Variable type-expression parser | [`internal/config/vartype.go`](../internal/config/vartype.go) |
+| Variable validation evaluator | [`internal/config/validation.go`](../internal/config/validation.go) |
 | Variable-to-cty type mapping | [`internal/lockfile/cty.go`](../internal/lockfile/cty.go) |
 | Vars-file parser + coercion | [`internal/varsfile/varsfile.go`](../internal/varsfile/varsfile.go) |
 | Lockfile emitter (HCL output shape) | [`internal/lockfile/emit_hcl.go`](../internal/lockfile/emit_hcl.go) |

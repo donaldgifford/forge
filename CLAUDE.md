@@ -52,7 +52,29 @@ packages:
   rescaffold-or-pin-to-v0.4.1 error per ADR-0002). The HCL decode spec lives in
   `hcldec_spec.go` and the emitter for registry round-trip in `hclemit.go`.
   `Condition.When` is `hcl.Expression` parsed at load time, with the original
-  source kept on `WhenSource` for round-tripping
+  source kept on `WhenSource` for round-tripping. Variable typing is delegated
+  to `vartype.go::ParseVariableType` (DESIGN-0006 / IMPL-0009 Phase A) which
+  layers forge-specific concerns (legacy-quoted-scalar shim, `int` deprecation
+  warning, tuple/set/`choice` rejection) over `hcl/v2/ext/typeexpr`. The loader
+  routes the `type` attribute through `ParseVariableType`, captures `default`
+  as both an `hcl.Expression` (`Variable.DefaultExpr`) and raw source text
+  (`Variable.DefaultSource`), and decodes nested `validation { condition,
+  error_message }` blocks into `Variable.Validations`. Legacy `choices = [...]`
+  and `validate = "regex"` attributes are rejected pre-decode via
+  `rejectLegacyVariableAttrs` with errors pointing at
+  `docs/MIGRATION.md#variable-type-system-upgrade-v07` (IMPL-0009 OQ-4).
+  Non-fatal deprecation notices flow through `Blueprint.Deprecations` →
+  `create.Result.Deprecations` / `sync.Result.Deprecations` → `ui.Warningf`
+  (IMPL-0009 OQ-3, same pattern as IMPL-0008's `UnknownVarsFileKeys`).
+  Validation-block evaluation lives in `validation.go::EvaluateValidations`
+  (IMPL-0009 Phase C, OQ-2): runs each variable's `validation.condition`
+  expressions against an `hcl.EvalContext` built by `BuildEvalContext` that
+  exposes bound variables under both bare names AND the `var.X` namespace,
+  with a Terraform-aligned function set (`can`, `try`, `regex`, `contains`,
+  `length`, `lower`, `upper`, `coalesce`). Failures accumulate (not
+  short-circuit) and surface as
+  `<error_message> (variable "X", blueprint.hcl:L:C)`. Hooked into
+  `create.Run` and `sync.Run` before any file ops.
 - **internal/registry/** — Registry index (`registry.hcl`), blueprint
   resolution, local cache with TTL
 - **internal/defaults/** — `_defaults/` layered inheritance resolution
@@ -60,9 +82,31 @@ packages:
 - **internal/getter/** — Source fetching via `hashicorp/go-getter` (registry
   cloning, archive extraction, checksum verification)
 - **internal/template/** — HCL2 (`hashicorp/hcl/v2`) rendering with custom
-  functions; values flow as `cty.Value` (`zclconf/go-cty`)
+  functions; values flow as `cty.Value` (`zclconf/go-cty`). **IMPL-0009
+  Phase F.4** added the `var.X` namespace to the renderer's eval scope
+  alongside bare references — mirrors `config.BuildEvalContext` so
+  default expressions, validation conditions, and template bodies all
+  see the same shape. Object/list/map values flow through HCL2's native
+  attribute (`${var.git_provider.repo_type}`), index
+  (`${var.exposed_ports[0]}`, `${var.build_targets["linux"]}`), and
+  iteration (`%{ for p in exposed_ports ~}…%{ endfor ~}`) operators —
+  no custom strict-vars layer is needed; unknown attributes surface as
+  HCL's `Unsupported attribute` diagnostic.
 - **internal/prompt/** — Interactive variable collection via charmbracelet/huh;
-  default-value templates also render through HCL2
+  default-value templates also render through HCL2. **IMPL-0009 Phase E
+  structured-type UX:** `resolveFromPrompt` dispatches on `cty.Type`
+  before falling through to the scalar path:
+  - `IsObjectType()` → `resolveObjectFromPrompt` recursively unfolds the
+    object into per-field prompts in `Variable.TypeFieldOrder` order
+    (dotted labels like `git_provider.repo_type`); the resolved value
+    reconstructs as `cty.ObjectVal(...)`. Nested objects recurse via a
+    synthesised child `Variable`; list/map fields inside an object
+    follow the same non-interactive rule as top-level structured types.
+  - `IsListType() || IsMapType()` → `resolveListOrMapFromPrompt`. Required
+    variables abort with `listMapVarsFileError`, which surfaces a
+    copy-pasteable `--var-file` snippet; non-required variants
+    short-circuit with `cty.NullVal(v.Type)` so downstream consumers see
+    a stable typed null.
 - **internal/create/** — Full create workflow orchestration (resolve, prompt,
   render, conditions, lockfile)
 - **internal/sync/** — Three-way merge sync engine for managed files
@@ -74,15 +118,29 @@ packages:
   PartialContent on the eager fields and hand-decode the dynamic `variables`
   block; `cty.Value` in memory with typed coercion via `lockfile.ToCtyValues`
   using declared variable types
-- **internal/varsfile/** — `--var-file` input loading (IMPL-0008). Single
-  exported `Load(paths, declared)` that parses one or more `.forge-vars.hcl`
-  files (strict `.hcl` extension, attributes-only, no functions or
-  traversals), composes them left-to-right with last-wins semantics, and
-  coerces values against the blueprint's declared variable types via
-  `cty/convert`. Returns the resolved `map[string]cty.Value` plus an
-  `unknown` slice for keys not declared in `blueprint.hcl` (warning, not
-  error). Used by `create.Run` and `sync.Run`; `forge check` rejects the
-  flag outright with an actionable error.
+- **internal/config/vartype.go** — Type expression parser (IMPL-0009 Phase A).
+  Single exported `ParseVariableType(varName, expr) (cty.Type, hcl.Diagnostics)`
+  that delegates the bareword parse to `hashicorp/hcl/v2/ext/typeexpr` and
+  adds forge-specific layers: handles legacy quoted-string scalars
+  (`"string"`, `"bool"`, `"number"`) during the v0.7 transition; emits a
+  `DiagWarning` for `int` (alias for `number` per DESIGN-0006 OQ-6);
+  rejects `"choice"`, `tuple([...])`, `set(T)`, optional fields, and `any`
+  with forge-specific errors pointing at MIGRATION.md / REFERENCE.md.
+  Rejection check walks the type tree so nested cases like
+  `object({tags = set(string)})` are also caught. Per-function coverage
+  averages ~94% (IMPL-0009 Phase A quality gate: ≥90%).
+- **internal/varsfile/** — `--var-file` input loading (IMPL-0008,
+  IMPL-0009 D.1). Single exported `Load(paths, declared)` that parses
+  one or more `.forge-vars.hcl` files (strict `.hcl` extension,
+  attributes-only, no functions or traversals), composes them
+  left-to-right with last-wins semantics, and coerces values against
+  the blueprint's declared `cty.Type` via `cty/convert`. Object, list,
+  and map values flow through the same path — `coerceToDeclared` takes
+  the declared `cty.Type` directly (the v0.7 shape) so structural
+  coercion is free. Returns the resolved `map[string]cty.Value` plus
+  an `unknown` slice for keys not declared in `blueprint.hcl` (warning,
+  not error). Used by `create.Run` and `sync.Run`; `forge check`
+  rejects the flag outright with an actionable error.
 - **internal/check/** — Drift detection comparing lockfile vs local files
 - **internal/hooks/** — Post-create hook execution with context cancellation
 - **internal/list/** — Blueprint listing with tag filtering
@@ -143,6 +201,20 @@ See `docs/impl/0002-mvp-cli-gap-closure.md` for the full history and rationale.
   on the path (IMPL-0008 OQ-8); the documented escape hatch is the
   tempfile pattern. Unknown keys surface as a warning, not an
   error; type-coercion failures abort before any side effects.
+- **`--set` structured-type semantics (IMPL-0009 Phase D).** The
+  `--set k=v` flag dispatches on the declared `cty.Type`:
+  object-typed variables accept an HCL object literal that is parsed
+  through `hclsyntax.ParseExpression`, evaluated against an empty
+  EvalContext, and coerced to the declared shape
+  (`internal/prompt/prompt.go::parseObjectOverride`); list- and
+  map-typed variables are rejected with the documented `--set on
+  variable X (...) is not supported; use --var-file ...` error.
+  Scalars take the existing string→type coercion path. Structured
+  values flow through the resolution chain as `cty.Value` (carried
+  inside `map[string]any`) end-to-end; `lockfile.ToCtyValues` and
+  `lockfile.ctyForVariableValue` both passthrough `cty.Value`
+  inputs so the lockfile records nested values without
+  Go-shape round-tripping.
 
 ## Code Style
 

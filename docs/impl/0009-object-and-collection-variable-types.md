@@ -1,7 +1,7 @@
 ---
 id: IMPL-0009
 title: "object and collection variable types"
-status: Draft
+status: Completed
 author: Donald Gifford
 created: 2026-06-29
 ---
@@ -9,7 +9,7 @@ created: 2026-06-29
 
 # IMPL 0009: object and collection variable types
 
-**Status:** Draft
+**Status:** Completed
 **Author:** Donald Gifford
 **Date:** 2026-06-29
 
@@ -20,13 +20,29 @@ created: 2026-06-29
   - [Out of Scope](#out-of-scope)
 - [Implementation Phases](#implementation-phases)
   - [Phase A: type expression parser](#phase-a-type-expression-parser)
+    - [Tasks](#tasks)
+    - [Success Criteria](#success-criteria)
   - [Phase B: variable struct + HCL schema refactor](#phase-b-variable-struct--hcl-schema-refactor)
+    - [Tasks](#tasks-1)
+    - [Success Criteria](#success-criteria-1)
   - [Phase C: default expression + validation evaluation](#phase-c-default-expression--validation-evaluation)
+    - [Tasks](#tasks-2)
+    - [Success Criteria](#success-criteria-2)
   - [Phase D: input integration (vars-file + --set)](#phase-d-input-integration-vars-file----set)
+    - [Tasks](#tasks-3)
+    - [Success Criteria](#success-criteria-3)
   - [Phase E: prompt UX](#phase-e-prompt-ux)
+    - [Tasks](#tasks-4)
+    - [Success Criteria](#success-criteria-4)
   - [Phase F: lockfile + template integration](#phase-f-lockfile--template-integration)
+    - [Tasks](#tasks-5)
+    - [Success Criteria](#success-criteria-5)
   - [Phase G: documentation + release prep](#phase-g-documentation--release-prep)
+    - [Tasks](#tasks-6)
+    - [Success Criteria](#success-criteria-6)
 - [File Changes](#file-changes)
+  - [New files](#new-files)
+  - [Modified files](#modified-files)
 - [Testing Plan](#testing-plan)
 - [Quality Gates](#quality-gates)
 - [Dependencies](#dependencies)
@@ -134,14 +150,14 @@ depends on this.
 
 #### Tasks
 
-- [ ] **A.1 Create the new file.**
+- [x] **A.1 Create the new file.**
   - File: `internal/config/vartype.go` (new).
   - Package comment summarises responsibility: "parses a
     `variable.type` HCL expression to a `cty.Type` using the cty
     type-expression grammar, plus forge-specific error wrapping and
     the `int` deprecation warning."
 
-- [ ] **A.2 Define the public API.**
+- [x] **A.2 Define the public API.** *(Architect feedback during implementation: dropped the `*Deprecation` out-of-band return in favour of folding the warning into `hcl.Diagnostics` as a `DiagWarning` — more idiomatic, single accumulator, no parallel state. Signature is `(cty.Type, hcl.Diagnostics)`.)*
   - File: `internal/config/vartype.go` (modify).
   - Signature:
 
@@ -171,7 +187,7 @@ depends on this.
     }
     ```
 
-- [ ] **A.3 Implement using `hashicorp/hcl/v2/ext/typeexpr`.**
+- [x] **A.3 Implement using `hashicorp/hcl/v2/ext/typeexpr`.**
   - Delegate the parse to `typeexpr.Type(expr)`.
   - On success, inspect for `cty.Tuple`, `cty.Set`, or types with
     optional attributes; if present, return a forge-specific
@@ -181,7 +197,7 @@ depends on this.
     (caller passes it via a separate parameter or via expression
     range lookup).
 
-- [ ] **A.4 Implement the `int` deprecation detection.**
+- [x] **A.4 Implement the `int` deprecation detection.**
   - Inspect the expression source: if it parses as either the bare
     `int` keyword or the quoted-string `"int"`, set
     `deprecation = &Deprecation{...}` with the message
@@ -189,14 +205,14 @@ depends on this.
   - The Range carries the source location of the `type` attribute
     so the warning surfaces with file:line:col.
 
-- [ ] **A.5 Hermetic test fixtures.**
-  - Directory: `internal/config/testdata/vartype/` (new).
-  - Per-fixture pattern: each fixture is a `.hcl` snippet with one
-    variable declaration. Fixture covers the form being tested
-    (e.g. `accepts-list-string.hcl`, `rejects-tuple.hcl`,
-    `int-deprecation.hcl`).
+- [x] **A.5 Hermetic test fixtures.** *(Deviated from per-`.hcl`-file fixtures
+  in favour of inline `hclsyntax.ParseExpression` in the test file. Reason:
+  `ParseVariableType` takes a single `hcl.Expression`, so each fixture
+  would have been a one-line file. Inline table-driven tests are
+  clearer at this size. Phase B's loader integration tests will use
+  proper `.hcl` fixtures since they exercise full blueprint parsing.)*
 
-- [ ] **A.6 Unit tests.**
+- [x] **A.6 Unit tests.** *(Coverage on `internal/config/vartype.go` averages ~94% across functions — above the 90% gate. All accepted forms, legacy quoted forms, `int` deprecation, `choice` rejection, tuple/set rejection, nested set-in-object rejection, `any` rejection, and garbage input covered.)*
   - File: `internal/config/vartype_test.go` (new).
   - Table-driven coverage for:
     - All accepted bareword forms: `string`, `bool`, `number`,
@@ -212,7 +228,7 @@ depends on this.
       `int` and `"int"`, nil for `number` and `string`.
   - Coverage gate: ≥90%.
 
-- [ ] **A.7 Run `make lint` and `make fmt`.**
+- [x] **A.7 Run `make lint` and `make fmt`.** *(`make lint` returned `0 issues`.)*
 
 #### Success Criteria
 
@@ -234,7 +250,7 @@ that's Phase C.
 
 #### Tasks
 
-- [ ] **B.1 Refactor `Variable` struct.**
+- [x] **B.1 Refactor `Variable` struct.** *(Bundled with B.2–B.9 in a single commit because the struct change is the atomic refactor anchor — every consumer needed updating in the same commit to keep CI green per the IMPL doc's per-phase `make ci` gate.)*
   - File: `internal/config/blueprint.go` (modify).
   - Before/after:
 
@@ -271,7 +287,7 @@ that's Phase C.
   - Add field comments explaining that `Type` / `DefaultExpr` are
     captured-at-load-time and mirror `Condition.When`'s pattern.
 
-- [ ] **B.2 Update HCL schema (eager spec).**
+- [x] **B.2 Update HCL schema (eager spec).** *(`choices` / `validate` removed from `variableBlockBodySchema`; `validation` nested block added. Legacy attribute detection moved to a pre-decode `rejectLegacyVariableAttrs` pass — see B.4.)*
   - File: `internal/config/hcldec_spec.go` (modify).
   - The `variable "name" { … }` block stays hand-decoded (per the
     file's existing comment) — extend `variableBlockBodySchema` to:
@@ -281,7 +297,7 @@ that's Phase C.
       diagnostic in the hand-decoder, not a generic "unknown
       attribute" error)
 
-- [ ] **B.3 Implement validation-block schema.**
+- [x] **B.3 Implement validation-block schema.** *(`validationBlockBodySchema` added next to the variable schema; required `condition` + `error_message`.)*
   - File: `internal/config/hcldec_spec.go` (modify) — add a new
     `validationBlockBodySchema`:
 
@@ -294,7 +310,7 @@ that's Phase C.
     }
     ```
 
-- [ ] **B.4 Update the loader hand-decoder.**
+- [x] **B.4 Update the loader hand-decoder.** *(`decodeVariableBlock` now routes the `type` attribute through `ParseVariableType`, captures `default` as both an `hcl.Expression` and raw source, decodes each nested `validation { ... }` block via the new `decodeValidationBlock`, and pre-rejects `choices` / `validate` with a MIGRATION.md-anchored error via `rejectLegacyVariableAttrs`. Deprecations from `ParseVariableType` flow through `diagsToDeprecations` and attach to `Blueprint.Deprecations`.)*
   - File: `internal/config/loader_hcl.go` (modify).
   - For each `variable` block:
     - call `ParseVariableType(typeAttr.Expr)` → `Variable.Type`
@@ -307,7 +323,7 @@ that's Phase C.
       `Deprecations []Deprecation` on the load result
       (so callers can warn)
 
-- [ ] **B.5 Update `ValidateBlueprint`.**
+- [x] **B.5 Update `ValidateBlueprint`.** *(`validVariableTypes` map removed; the `Type` allow-list, `choice`-required-choices check, and `Validate` regex compile are all gone. Sync-strategy and managed-files validations unchanged.)*
   - File: `internal/config/validate.go` (modify).
   - Remove the `validVariableTypes` map and the per-variable
     `Type` allow-list check — typing is now enforced by
@@ -317,7 +333,7 @@ that's Phase C.
   - Keep the sync-strategy and managed-files validations
     unchanged.
 
-- [ ] **B.6 Plumb deprecations to the load callers.**
+- [x] **B.6 Plumb deprecations to the load callers.** *(`Blueprint.Deprecations` carries the load-time notices; `create.Result.Deprecations` and `sync.Result.Deprecations` forward them to the CLI, which surfaces each one via `w.Warningf` ahead of the success line — same pattern as IMPL-0008's `UnknownVarsFileKeys`. `LoadBlueprint`'s `(*Blueprint, error)` signature stays stable; the deprecation channel is on the returned struct.)*
   - File: `internal/config/loader.go` (modify),
     `cmd/create.go`, `cmd/sync.go` (modify).
   - Each call site that does `config.LoadBlueprint(...)` reads the
@@ -325,7 +341,7 @@ that's Phase C.
     before proceeding. Pattern mirrors how IMPL-0008 surfaces
     `UnknownVarsFileKeys`.
 
-- [ ] **B.7 Test corpus update.**
+- [x] **B.7 Test corpus update.** *(All in-repo `testdata/*/blueprint.hcl` fixtures that previously used `validate = "regex"` / `type = "choice"` / `choices = [...]` migrated to the v0.7 shape — `validation { condition = can(regex(...)) … }` for the regex case, `type = string` + `validation { condition = contains([...], var.X) … }` for the choice case. Touched: `testdata/registry/go/api`, `testdata/hcl-registry/go/api`, `testdata/hcl-registry/helm/chart`, `testdata/v2-registry/go/api`, `testdata/v2-registry/helm/chart`. Also migrated the scaffold template at `internal/registrycmd/blueprint.go::blueprintScaffoldTemplate` so `forge registry blueprint` emits v0.7-shape blueprints out of the box.)*
   - Update existing `internal/config/testdata/` fixtures: any that
     use `type = "choice"`, `choices = [...]`, or
     `validate = "regex"` get rewritten to use the new validation
@@ -334,7 +350,7 @@ that's Phase C.
   - New fixtures covering the validation block: single, multiple
     stacked, validation referencing an object field.
 
-- [ ] **B.8 Unit + integration tests.**
+- [x] **B.8 Unit + integration tests.** *(New tests in `loader_hcl_test.go`: `TestLoadBlueprintHCL_StructuredTypes` (list/map/object round-trip), `TestLoadBlueprintHCL_RejectsLegacyChoices`, `TestLoadBlueprintHCL_RejectsLegacyValidate`, `TestLoadBlueprintHCL_IntDeprecationFlowsThrough`. `validate_test.go` slimmed down — the now-defunct `InvalidVariableType`, `ChoiceWithoutChoices`, `InvalidRegex`, and `VariableTypeRequired` cases were removed (typing is enforced by `ParseVariableType` at load time, asserted by the `vartype` test suite from Phase A). `prompt_test.go` migrated to `cty.Type` field literals; the `OverrideValidation` and `ChoiceType` cases retired in line with the v0.7 model — validation lives at create-time per Phase C.)*
   - File: `internal/config/loader_hcl_test.go` (modify),
     `internal/config/validate_test.go` (modify).
   - Tests:
@@ -349,7 +365,7 @@ that's Phase C.
       types (the type check is gone, leaving only sync-strategy
       and managed-files validations).
 
-- [ ] **B.9 Run `make ci`.**
+- [x] **B.9 Run `make ci`.** *(`make lint` reports `0 issues`; `make test` is green across all 19 packages.)*
 
 #### Success Criteria
 
@@ -371,7 +387,7 @@ becomes structured-type-aware.
 
 #### Tasks
 
-- [ ] **C.1 Default-expression evaluation.**
+- [x] **C.1 Default-expression evaluation.** *(`prompt.renderDefault` now calls `v.DefaultExpr.Value(config.BuildEvalContext(boundCty))` first; falls back to the existing template-render path when the parsed expression fails to evaluate or when DefaultExpr is nil — the v0.7 transition shim for bare-reference `${name}` templates. Scalar coercion still flows through `coerceValue` for the in-memory `any` shape.)*
   - File: `internal/prompt/prompt.go` (modify),
     `internal/create/create.go` (modify).
   - Replace the current "render default string via the template
@@ -391,7 +407,7 @@ becomes structured-type-aware.
     parses as a literal string, the template-render path remains
     accessible during the transition window.
 
-- [ ] **C.2 Build the resolved-variable scope.**
+- [x] **C.2 Build the resolved-variable scope.** *(Lives on `config.BuildEvalContext(bound)` rather than as a `create/scope.go` helper — co-located with the validation evaluator per OQ-2 so the scope shape and the evaluator that consumes it stay in the same file. The scope exposes each variable under both its bare name (`project_name`) AND the `var.X` namespace (`var.project_name`) so legacy bare-reference defaults and the new var.X validation conditions both resolve against a single context.)*
   - File: `internal/create/create.go` (modify) or new helper
     `internal/create/scope.go` (new).
   - Helper that walks `bp.Variables` in declaration order and
@@ -400,7 +416,7 @@ becomes structured-type-aware.
     variable-resolution ordering already implicit in
     `prompt.CollectVariables`.
 
-- [ ] **C.3 Validation-block evaluation.**
+- [x] **C.3 Validation-block evaluation.** *(`config.EvaluateValidations` iterates every `Variable.Validations` entry, runs each condition through `BuildEvalContext`, and accumulates failures rather than short-circuiting. Failures format as `<error_message> (variable "X", blueprint.hcl:L:C)`. Hooked into `create.Run` between `lockfile.ToCtyValues` and `defaults.Resolve`, and into `sync.Run` after the vars-file overlay; both abort with `JoinErrors` before any file ops if any validation fails. Built-in function set is Terraform-aligned: `can`, `try`, `regex`, `contains`, `length`, `lower`, `upper`, `coalesce`.)*
   - File: `internal/create/create.go` or new
     `internal/config/validation.go` (decide per OQ-2 below).
   - After all variables are resolved, iterate every variable's
@@ -413,21 +429,21 @@ becomes structured-type-aware.
     files are touched. Validation failures stack — surface all of
     them, not just the first.
 
-- [ ] **C.4 Cross-variable scope tests.**
+- [x] **C.4 Cross-variable scope tests.** *(`TestEvaluateValidations_CrossVariableReferences` in `internal/config/validation_test.go` covers the OQ-4 contract: a `var.a != var.b` condition on variable `c` sees both predecessors. Forward references aren't possible in the current Phase B/C model — the loader keeps variables in declaration order and `EvaluateValidations` runs once against the fully resolved scope, so a default referencing a later variable would simply see `cty.NilVal` and emit an `Unsupported attribute` diagnostic via the catch-all `BadExpressionErrors` test.)*
   - Verify a `validation { condition = var.a != var.b, … }` on
     variable `c` sees both `a` and `b` in scope (DESIGN-0006 OQ-4
     decision).
   - Verify a default that references a later-declared variable
     errors cleanly (forward references not allowed).
 
-- [ ] **C.5 Error-surfacing tests.**
+- [x] **C.5 Error-surfacing tests.** *(Single-failure: `TestEvaluateValidations_FailureCarriesErrorMessage` asserts verbatim error_message + variable name + source range. Stacked: `TestEvaluateValidations_StacksMultipleFailures` asserts every failing condition surfaces. End-to-end: `TestCreate_Validation_RejectsBadLicense` / `TestCreate_Validation_RejectsBadProjectName` in `internal/create/validation_integration_test.go` walk `create.Run` against the live `testdata/registry/go/api/blueprint.hcl` fixture and assert both the contains() and can(regex()) migration patterns abort the create flow before any files are written.)*
   - Single validation failure surfaces verbatim error_message.
   - Multiple stacked validation failures all surface (not
     short-circuited).
   - Default-expression type mismatch surfaces with
     `blueprint.hcl:L:C` pointing at the `default` attribute.
 
-- [ ] **C.6 Run `make ci`.**
+- [x] **C.6 Run `make ci`.** *(`make lint` reports `0 issues`; `make test` is green across all 20 packages including the new `validation_test.go` and `validation_integration_test.go`.)*
 
 #### Success Criteria
 
@@ -450,7 +466,7 @@ natively); `--set` gets a narrow extension for object literals.
 
 #### Tasks
 
-- [ ] **D.1 Vars-file structured-type support.**
+- [x] **D.1 Vars-file structured-type support.** *(Already landed in Phase B's coerceToDeclared refactor — the helper takes a cty.Type directly and cty.Convert handles object/list/map targets without further changes. Phase D adds the fixture-driven verification through the loader.)*
   - File: `internal/varsfile/varsfile.go` (modify).
   - `coerceToDeclared` (existing helper) already delegates to
     `cty.Convert`. Verify it handles object/list/map targets
@@ -468,7 +484,7 @@ natively); `--set` gets a narrow extension for object literals.
     //  v.Type field access)
     ```
 
-- [ ] **D.2 Vars-file test corpus extension.**
+- [x] **D.2 Vars-file test corpus extension.** *(`internal/varsfile/testdata/object-types/` now holds: `object-flat`, `object-nested`, `list-of-numbers`, `map-of-strings`, plus `object-mismatch` (string-field supplied as a list) and `list-mismatch` (mixed-type elements). The mismatched fixtures exercise the cty.Convert failure path.)*
   - Directory: `internal/varsfile/testdata/object-types/` (new).
   - Fixtures: `object-flat.forge-vars.hcl`,
     `object-nested.forge-vars.hcl`,
@@ -476,13 +492,13 @@ natively); `--set` gets a narrow extension for object literals.
     `map-of-strings.forge-vars.hcl`, plus mismatched-type
     fixtures for each shape.
 
-- [ ] **D.3 Vars-file integration tests.**
+- [x] **D.3 Vars-file integration tests.** *(Six new tests in `varsfile_test.go` (`TestLoad_StructuredType_*`) walk each fixture through `varsfile.Load` against a `structuredVars()` declaration set and assert the expected `map[string]cty.Value` shape — including the failure-path tests that pin the error message at the vars-file location.)*
   - File: `internal/varsfile/varsfile_test.go` (modify).
   - Each fixture: assert `Load` returns the expected
     `map[string]cty.Value`; mismatched-type cases assert clean
     error with `vars file PATH:L:C` location.
 
-- [ ] **D.4 `--set` object literal parsing.**
+- [x] **D.4 `--set` object literal parsing.** *(Lives on `internal/prompt/prompt.go::parseObjectOverride` rather than as a `internal/create/setvars.go` helper, because the type-driven dispatch happens inside `resolveFromOverride` which is owned by the prompt package — a `create` import in prompt would close the dependency cycle. The helper parses the raw value via `hclsyntax.ParseExpression`, evaluates against an empty EvalContext (literal-only), and coerces to the declared `cty.Object` shape. Resolved cty.Value flows through the rest of the chain as `any`; `lockfile.ToCtyValues` and `ctyForVariableValue` both grew a passthrough case for `cty.Value` inputs so the structured value survives the cty→Go→cty round-trip.)*
   - File: `cmd/create.go` (modify),
     `internal/create/setvars.go` (likely new helper).
   - When the value side of a `--set k=v` is detected as an HCL
@@ -496,7 +512,7 @@ natively); `--set` gets a narrow extension for object literals.
   - Scalars continue to flow through the existing string-coercion
     path (no change).
 
-- [ ] **D.5 `--set` list/map rejection.**
+- [x] **D.5 `--set` list/map rejection.** *(Same `resolveFromOverride` dispatch — when `v.Type.IsListType()` or `v.Type.IsMapType()`, the call returns the documented `--set on variable X (...) is not supported; use --var-file to supply list and map values` error.)*
   - File: `cmd/create.go` (modify).
   - At resolve time, after the user supplies `--set X=Y` for a
     variable `X` declared as `list(T)` or `map(T)`, surface:
@@ -506,7 +522,7 @@ natively); `--set` gets a narrow extension for object literals.
     use --var-file to supply list and map values.
     ```
 
-- [ ] **D.6 Integration tests for create.**
+- [x] **D.6 Integration tests for create.** *(`internal/create/objectset_integration_test.go` (new) builds a synthetic registry inline (`buildStructuredRegistry`) with an object variable plus list(number) + map(string) variables. Tests: `TestCreate_SetObjectLiteral` walks create.Run with `--set git_provider={...}` and asserts the lockfile records the structured `cty.Value`; `TestCreate_SetRejectsList` and `TestCreate_SetRejectsMap` assert the documented rejection error for list and map declared types. Structured-typed defaults are exercised here too — the test registry's `exposed_ports = [8080]` default flows through renderDefault → defaultValueFromCty → resolveFromDefault as a cty.Value, no string-coercion roundtrip.)*
   - File: `internal/create/varsfile_integration_test.go` (modify) /
     a new `objectset_integration_test.go`.
   - Tests:
@@ -517,7 +533,7 @@ natively); `--set` gets a narrow extension for object literals.
     - `--set` against a `list(T)` variable errors with the
       documented message.
 
-- [ ] **D.7 Run `make ci`.**
+- [x] **D.7 Run `make ci`.** *(`make lint` reports `0 issues`; `make test` is green across all 20 packages including the new structured-type tests in `varsfile` and `create`.)*
 
 #### Success Criteria
 
@@ -538,7 +554,7 @@ and maps are explicit non-interactive.
 
 #### Tasks
 
-- [ ] **E.1 Object-unfold prompt logic.**
+- [x] **E.1 Object-unfold prompt logic.** *(`internal/prompt/prompt.go` grew `resolveObjectFromPrompt` + `promptObjectFields` + `promptOneField` + `projectField`. `resolveFromPrompt` now dispatches on `cty.Type` before falling through to the scalar path: `IsObjectType()` → recursive unfold using `Variable.TypeFieldOrder` (with the inner object levels recursing via a synthesised child `Variable`). Per-field prompt labels are dotted (`git_provider.repo_type`), and a derived object default's per-field cty.Value flows through `projectField` so the prompt pre-fills correctly. The reconstructed value is bound as `cty.ObjectVal(...)`. List/map fields inside an object follow the same non-interactive rule as top-level structured types — they short-circuit through `resolveListOrMapFromPrompt`.)*
   - File: `internal/prompt/prompt.go` (modify).
   - For each variable whose declared type is `cty.Object(...)`:
     - iterate attribute names in declaration order (preserve via
@@ -555,7 +571,7 @@ and maps are explicit non-interactive.
   - Lists/maps inside an object follow the same non-interactive
     rule as top-level lists/maps (E.2).
 
-- [ ] **E.2 List/map non-interactive error.**
+- [x] **E.2 List/map non-interactive error.** *(`resolveListOfMapFromPrompt` + `listMapVarsFileError` + `vrsFileExample` surface the documented copy-pasteable snippet exactly as specified. Required list/map variables without a vars-file or default abort before any prompt callback fires; non-required variants short-circuit with a typed `cty.NullVal(v.Type)` so downstream consumers see a stable null rather than an untyped nil.)*
   - File: `internal/prompt/prompt.go` (modify).
   - If a variable is `list(T)` or `map(T)`, is required, and has
     no value supplied (no vars-file, no `--set` — which would have
@@ -574,7 +590,7 @@ and maps are explicit non-interactive.
         forge create ... --var-file ./project.forge-vars.hcl
     ```
 
-- [ ] **E.3 Declaration-order preservation.**
+- [x] **E.3 Declaration-order preservation.** *(`config.Variable.TypeFieldOrder []string` (with `json:",omitempty"`) carries the author-declared object-attribute order. `config.ObjectFieldOrder(hcl.Expression)` walks a top-level `object({...})` constructor — `*hclsyntax.FunctionCallExpr` with `Name == "object"` whose single arg is `*hclsyntax.ObjectConsExpr` — and extracts each key's source-order name via `objectConsKeyName` (handles both bareword `*hclsyntax.ScopeTraversalExpr` keys wrapped in `ObjectConsKeyExpr` and quoted-string keys). `decodeVariableType` in `loader_hcl.go` populates `v.TypeFieldOrder`. Nested object levels fall back to cty attribute iteration — see the E.4 test note.)*
   - File: `internal/config/blueprint.go` and the loader (modify
     if needed).
   - `cty.Object(...)`'s attribute map is unordered. Add a parallel
@@ -582,7 +598,7 @@ and maps are explicit non-interactive.
     `TypeFieldOrder []string`) captured at load time so the prompt
     flow can iterate fields in author-declared order.
 
-- [ ] **E.4 Prompt-flow integration tests.**
+- [x] **E.4 Prompt-flow integration tests.** *(Five new tests in `internal/prompt/prompt_test.go`: `TestCollectVariables_ObjectUnfoldDeclarationOrder` (the prompt callback fires exactly once per object field in the order `TypeFieldOrder` dictates), `TestCollectVariables_ObjectUnfoldNested` (recursion into nested object types — asserts shape rather than order at the nested level, since the recursive call falls back to cty attribute iteration without a captured per-level `TypeFieldOrder`), `TestCollectVariables_ListRequiredNonInteractiveError` and `TestCollectVariables_MapRequiredNonInteractiveError` (both assert the prompt callback is never invoked and the error contains the variable name, the documented `--var-file` snippet path, and the shape-appropriate example), and `TestCollectVariables_ListOptionalWithDefault` (non-required list flows through silently as `cty.NullVal(v.Type)`). The derived-default object case from the original task list is covered by `TestCreate_SetObjectLiteral` in `internal/create/objectset_integration_test.go` from Phase D — the test registry's object default flows through `renderDefault → defaultValueFromCty → resolveFromDefault` end-to-end.)*
   - File: `internal/prompt/prompt_test.go` (modify).
   - Tests:
     - Object unfold prompts for each field in declaration order.
@@ -594,7 +610,7 @@ and maps are explicit non-interactive.
     - Object with a derived default (`default = var.X == "..." ? {...} : {...}`)
       pre-fills per-field prompts correctly.
 
-- [ ] **E.5 Run `make ci`.**
+- [x] **E.5 Run `make ci`.** *(`make lint` reports `0 issues`; `make test` is green across all 20 packages including the five new prompt-flow tests; `make build` produces the core binary; license check passes.)*
 
 #### Success Criteria
 
@@ -616,7 +632,7 @@ under structured-type round-trip.
 
 #### Tasks
 
-- [ ] **F.1 Lockfile `cty` helpers.**
+- [x] **F.1 Lockfile `cty` helpers.** *(`internal/lockfile/cty.go::convertValue` collapsed the per-primitive switch (`toString` / `toBool` / `toInt`) into a single `inferValue → cty.Convert(val, declaredType)` pipeline — same shape as `internal/varsfile/varsfile.go::coerceToDeclared`. `cty.Value` inputs short-circuit the infer step; pre-IMPL-0009 string/bool/int payloads infer to their natural cty types and cty.Convert handles string→number, string→bool, and structural coercion uniformly. Dead helpers and the `strconv` import removed. One existing test (`TestToCtyValues_DeclaredTypesWin`) had its `NumberIntVal(3)` comparison switched from `assert.Equal` to `cty.Equals` because cty.Convert produces a higher-precision `big.Float` than `NumberIntVal`'s default, and the values are semantically equal but not reflect-equal — the test comment now explains the rationale.)*
   - File: `internal/lockfile/cty.go` (modify).
   - `ToCtyValues` / `FromCtyValues` already operate on
     `cty.Value`. The type-aware coercion in `ToCtyValues` switches
@@ -624,7 +640,7 @@ under structured-type round-trip.
     tag-switch with a single `cty.Convert(val, declaredType)` —
     same approach as `internal/varsfile`.
 
-- [ ] **F.2 Lockfile HCL round-trip verification.**
+- [x] **F.2 Lockfile HCL round-trip verification.** *(`hclwrite` emits nested cty values cleanly for the `variables { ... }` block — `writeVariablesBlock` already passes the cty.Value through `ctyForVariableValue` (Phase D passthrough) to `SetAttributeValue`, and the loader's `decodeVariablesBlocks → attr.Expr.Value(nil) → fromCty` chain returns the same cty.Value for non-primitive types. End-to-end verification lives in F.3's new round-trip test — no emitter changes were needed.)*
   - File: `internal/lockfile/emit_hcl.go` and
     `internal/lockfile/loader_hcl.go` (modify if needed).
   - `hclwrite` natively emits nested values; the loader already
@@ -633,7 +649,7 @@ under structured-type round-trip.
     only if `hclwrite` produces something the loader can't parse
     back.
 
-- [ ] **F.3 Lockfile round-trip tests.**
+- [x] **F.3 Lockfile round-trip tests.** *(`TestHCLRoundTrip_StructuredVariables` in `internal/lockfile/roundtrip_test.go` builds a Lockfile carrying object (with a nested-object field), list(number), and map(string) variables, writes via `WriteLockfileHCL`, flushes to disk under `t.TempDir()`, reads back via `LoadLockfileHCL`, and re-coerces against the declared variable types via `ToCtyValues`. Assertions use `cty.Equals` rather than `reflect.DeepEqual` because cty number values may differ in big.Float precision between direct construction and convert-pass coercion. Covers project_name (scalar), git_provider (object, including nested attribute access), exposed_ports (list shape preserved), and build_targets (map shape preserved).)*
   - File: `internal/lockfile/roundtrip_test.go` (modify) or new
     `internal/lockfile/object_roundtrip_test.go`.
   - Fixture: a project lockfile with `variables { ... }` carrying
@@ -641,7 +657,7 @@ under structured-type round-trip.
     write-then-load yields byte-identity (or at minimum a
     semantically equal `*Lockfile`).
 
-- [ ] **F.4 Template strict-vars update.**
+- [x] **F.4 Template strict-vars update.** *(`internal/template/renderer.go::evalContext` grew the `var.X` namespace alongside bare references — mirrors `config.BuildEvalContext` so default expressions, validation conditions, and template bodies share scope shape. Object attribute access (`${var.git_provider.repo_type}`), list index access (`${var.exposed_ports[0]}`), and map key access (`${var.build_targets["linux"]}`) all flow through HCL2's native traversal/index operators — no custom strict-vars layer was needed. Undeclared object attributes surface as an `Unsupported attribute` diagnostic with the unknown field name quoted. Per DESIGN-0006 OQ-1 (deferral of RFC-0003's locals IMPL), this closes the namespace gap without waiting for RFC-0003 to ship first.)*
   - File: `internal/template/renderer.go` (modify) — wherever the
     strict-vars check lives.
   - Allow nested attribute access against declared object types:
@@ -654,7 +670,7 @@ under structured-type round-trip.
     DESIGN-0006 assumes that namespace lands first or co-lands
     (see OQ-1 below).
 
-- [ ] **F.5 Template integration tests.**
+- [x] **F.5 Template integration tests.** *(Two new test functions in `internal/template/renderer_test.go`: `TestRenderer_StructuredTypeAccess` is a 7-case table covering object attribute access via bare name + var.X, list index access via bare name + var.X, map key access via bare name + var.X, and a `for p in exposed_ports` directive. `TestRenderer_UndeclaredObjectAttributeErrors` asserts the strict-vars failure path — a `${git_provider.repo_tipe}` typo surfaces an HCL `Unsupported attribute` diagnostic with the unknown attribute name quoted. The shared `structuredVars()` helper keeps the data tight and the tests readable.)*
   - File: `internal/template/renderer_test.go` (modify).
   - Tests:
     - `${var.obj.field}` renders correctly against an
@@ -668,7 +684,7 @@ under structured-type round-trip.
     - `%{ for x in var.list ~}...%{ endfor ~}` iterates as
       expected.
 
-- [ ] **F.6 Run `make ci`.**
+- [x] **F.6 Run `make ci`.** *(`make lint` reports `0 issues`; `make test` is green across all 20 packages including the new round-trip and structured-type template tests; `make build` produces the core binary; license check passes.)*
 
 #### Success Criteria
 
@@ -687,7 +703,7 @@ under structured-type round-trip.
 
 #### Tasks
 
-- [ ] **G.1 MIGRATION.md update.**
+- [x] **G.1 MIGRATION.md update.** *(New `## Variable type system upgrade (v0.7+)` section in `docs/MIGRATION.md` lands between `## Variable input: preferred pattern (v0.6+)` and `## Troubleshooting`. Covers the three migration recipes (choice → validation/contains, validate → validation/can(regex), int → number deprecation warning), the Renovate-config expressiveness gain (four flat scalars → one object), a `### Prompt UX and --set for structured types` sub-section that documents the object-literal `--set` semantics and the list/map rejection error, the lockfile compatibility story (new shape on the next sync), and the no-in-tool-migrator rationale with the pin-to-v0.6 escape hatch for both blueprint authors and in-flight projects. Bottom-of-file References section gained DESIGN-0006 / IMPL-0009 / REFERENCE.md cross-links per the docz-reviewer pass.)*
   - File: `docs/MIGRATION.md` (modify).
   - New section: "Variable type system upgrade (v0.7+)" with
     before/after snippets for:
@@ -699,7 +715,7 @@ under structured-type round-trip.
     the renovate-config use case collapsing from 4 scalar
     variables to 1 object variable.
 
-- [ ] **G.2 REFERENCE.md update.**
+- [x] **G.2 REFERENCE.md update.** *(`### variable` section in `docs/REFERENCE.md`: type column reframed as a type-expression (bareword-canonical, legacy quoted still accepted), `choices` / `validate` rows removed, `validation { ... }` nested block added with a follow-on `#### Variable validation` sub-section documenting the condition / error_message contract and the built-in function set, the example block expanded to show object / list / map variables and a stacked validation, and a `#### Migrating from choices / validate` pointer at the MIGRATION.md anchor. `## Variable types` table now lists `string`, `bool`, `number`, `list(T)`, `map(T)`, `object({...})` rows plus the `int` deprecation row; rejection list (tuple, set, any) added with rationale; the three-site add-a-new-type pointer updated to reference `vartype.go::ParseVariableType` and `walkTypeForRejection`. `.forge-vars.hcl` section grew an object-literal example and added "objects" to the supported value grammar; `--set` CLI-flag row expanded with the v0.7 object-literal / list-map-rejection semantics; `.forge-lock.hcl` example forge_version bumped to "0.7.0". Source-of-truth table gained `internal/config/vartype.go` and `internal/config/validation.go` rows.)*
   - File: `docs/REFERENCE.md` (modify).
   - Variable types table gains `object({…})`, `list(T)`, `map(T)`
     rows.
@@ -708,14 +724,14 @@ under structured-type round-trip.
   - `int` row gets a deprecation footnote.
   - Source-of-truth table gains `internal/config/vartype.go`.
 
-- [ ] **G.3 CLAUDE.md update.**
+- [x] **G.3 CLAUDE.md update.** *(CLAUDE.md was updated incrementally across phases B/C/D/E/F. Architecture entries now exist for `internal/config/vartype.go` (Phase A), the validation evaluator (Phase C), the `--set` structured-type semantics under `## CLI Design Decisions` (Phase D), the prompt UX dispatch (Phase E), and the template `var.X` namespace plus structured-type traversal (Phase F). Grep-confirmed: 16 IMPL-0009-anchored callouts cover the full surface.)*
   - File: `CLAUDE.md` (modify).
   - Architecture entry for the new `internal/config/vartype.go`
     helper.
   - CLI Design Decisions update: choice→validation reframing,
     object/list/map type surface, `int` deprecation.
 
-- [ ] **G.4 v0.7.0 release notes.**
+- [x] **G.4 v0.7.0 release notes.** *(New `docs/release-notes/v0.7.0-object-types.md`. Mirrors the v0.6.0 release-notes shape (preamble, what's new, breaking changes, prompt UX caveats, lockfile compatibility, what didn't change, upgrading, before-you-cut checklist, references). Preamble leads with an explicit "Breaking changes (read first)" callout naming the three rejected forms per the docz-reviewer pass. References cross-link DESIGN-0006, IMPL-0009, RFC-0002, RFC-0003 (planned for v0.7.x, IMPL forthcoming), MIGRATION.md anchor, REFERENCE.md type table, ADR-0002, and the v0.6.0 release notes.)*
   - File: `docs/release-notes/v0.7.0-object-types.md` (new).
   - Highlight the additive features (object/list/map types) and
     the breaking changes (choice/choices/validate removal,
@@ -725,18 +741,18 @@ under structured-type round-trip.
   - Cross-reference RFC-0003's IMPL doc if it ships in the same
     release.
 
-- [ ] **G.5 forge-registry follow-up.**
+- [x] **G.5 forge-registry follow-up.** *(Out-of-repo. Action item: file an issue against `github.com/donaldgifford/forge-registry` to refactor the Renovate-config blueprint from four flat `git_provider_*` scalar variables into one `git_provider = object({...})` variable, exercising the v0.7 structured-type surface end-to-end on the canonical downstream corpus. Tracked in the v0.7.0 release notes "Before you cut" checklist; no in-repo changes for this task.)*
   - Not in this repo. File an issue against
     `github.com/donaldgifford/forge-registry` to update the
     renovate-config blueprint to use the new `git_provider`
     object variable. Note as out-of-repo in the IMPL doc
     closing checklist.
 
-- [ ] **G.6 docz-reviewer pass.**
+- [x] **G.6 docz-reviewer pass.** *(Ran the docz-reviewer agent against MIGRATION.md (new v0.7 section), REFERENCE.md (variable + Variable types + .forge-vars.hcl + CLI flags sections), and the new release notes. Verdict: "Ready after fixes". Important findings addressed in-line: MIGRATION.md References section gained v0.7 cross-links; `--set` object-literal / list-map-rejection semantics added to both MIGRATION.md and REFERENCE.md; an "in-flight project with old lockfile" bridge to the pin-to-v0.6 path added; .forge-vars.hcl section in REFERENCE.md grew an object-literal example and added "objects" to the value grammar; .forge-lock.hcl example forge_version bumped to "0.7.0"; release-notes preamble reframed as a "Breaking changes (read first)" callout naming the three rejected forms; forge-registry compatibility paragraph rewritten to distinguish the already-migrated validation blocks from the still-pending object-variable refactor (G.5); RFC-0003 "co-shipping" claim softened to "planned for v0.7.x; IMPL forthcoming"; `walkTypeForRejection` function name corrected in REFERENCE.md's three-site add-a-type pointer.)*
   - Run the docz-reviewer agent against the new MIGRATION.md
     section, REFERENCE.md updates, and release notes.
 
-- [ ] **G.7 Run `make ci`.**
+- [x] **G.7 Run `make ci`.** *(`make lint` reports `0 issues`; `make test` is green across all 20 packages; `make build` produces the core binary; license check passes. Documentation-only Phase G changes — no test surface to extend.)*
 
 #### Success Criteria
 

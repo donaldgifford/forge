@@ -216,16 +216,13 @@ func evalLiteral(attr *hcl.Attribute) (cty.Value, error) {
 	return val, nil
 }
 
-// coerceToDeclared converts the literal val to the cty.Value that
-// matches the declared blueprint variable type. cty.Convert already
-// handles the common string→number and string→bool coercions a
-// vars-file author would write (e.g. `port = "42"` against a
-// declared int), so the fallback layer that lockfile.ToCtyValues
-// keeps for YAML scalars isn't needed here. Errors carry the
-// vars-file source location of the attribute that supplied val.
-func coerceToDeclared(val cty.Value, declaredType string, attr *hcl.Attribute) (cty.Value, error) {
-	target := ctyTypeForDeclared(declaredType)
-
+// coerceToDeclared converts the literal val to the declared cty.Type
+// from the blueprint. cty.Convert handles string→number and string→bool
+// coercions a vars-file author would write (e.g. `port = "42"` against
+// a declared `number`) as well as the structured-type targets
+// (object/list/map) shipped in IMPL-0009. Errors carry the vars-file
+// source location of the attribute that supplied val.
+func coerceToDeclared(val cty.Value, target cty.Type, attr *hcl.Attribute) (cty.Value, error) {
 	converted, err := convert.Convert(val, target)
 	if err == nil {
 		return converted, nil
@@ -236,20 +233,6 @@ func coerceToDeclared(val cty.Value, declaredType string, attr *hcl.Attribute) (
 	return cty.NilVal, fmt.Errorf(
 		"vars file %s:%d,%d: variable %q expects %s, got %s: %w",
 		rng.Filename, rng.Start.Line, rng.Start.Column,
-		attr.Name, declaredType, val.Type().FriendlyName(), err,
+		attr.Name, target.FriendlyName(), val.Type().FriendlyName(), err,
 	)
-}
-
-// ctyTypeForDeclared maps a blueprint variable type tag to its
-// cty.Type. Unknown tags fall through to cty.String — matches the
-// loose-by-default posture of lockfile.ToCtyValues.
-func ctyTypeForDeclared(declaredType string) cty.Type {
-	switch declaredType {
-	case "bool":
-		return cty.Bool
-	case "int":
-		return cty.Number
-	default:
-		return cty.String
-	}
 }

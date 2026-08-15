@@ -82,6 +82,12 @@ type Result struct {
 	// --strict-vars flag in v1). Empty when no --var-file paths were
 	// supplied or every key matched a declared variable.
 	UnknownVarsFileKeys []string
+
+	// Deprecations are non-fatal v0.7 transition notices produced by
+	// the blueprint loader (today: the `int`-as-alias-for-`number`
+	// warning). The CLI surfaces these via ui.Warningf before the
+	// success line per IMPL-0009 OQ-3.
+	Deprecations []config.Deprecation
 }
 
 // Run executes the create workflow.
@@ -120,6 +126,14 @@ func Run(opts *Opts) (*Result, error) {
 	ctyVars, err := lockfile.ToCtyValues(vars, bp.Variables)
 	if err != nil {
 		return nil, fmt.Errorf("converting variables to cty: %w", err)
+	}
+
+	// 6b. Evaluate validation blocks against the fully resolved
+	//     variable scope (IMPL-0009 Phase C). Failures accumulate so
+	//     authors see every constraint violation at once; the flow
+	//     aborts before any files are touched.
+	if errs := config.EvaluateValidations(bp.Variables, ctyVars); len(errs) > 0 {
+		return nil, fmt.Errorf("validating variables: %w", config.JoinErrors(errs))
 	}
 
 	// 7. Resolve defaults inheritance.
@@ -171,6 +185,7 @@ func Run(opts *Opts) (*Result, error) {
 		FilesCreated:        filesCreated,
 		Blueprint:           bp.Name,
 		UnknownVarsFileKeys: unknownKeys,
+		Deprecations:        bp.Deprecations,
 	}, nil
 }
 

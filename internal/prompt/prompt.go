@@ -3,11 +3,13 @@ package prompt
 
 import (
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 
+	"github.com/hashicorp/hcl/v2"
+	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/zclconf/go-cty/cty"
+	"github.com/zclconf/go-cty/cty/convert"
 
 	"github.com/donaldgifford/forge/internal/config"
 	tmpl "github.com/donaldgifford/forge/internal/template"
@@ -40,6 +42,10 @@ type PromptFn func(v *config.Variable, current map[string]any) (string, error)
 // varsFileValues and overrides are mutually exclusive at the CLI layer;
 // CollectVariables accepts both for flexibility (tests may stub either
 // path) but does not enforce that exclusion itself.
+//
+// IMPL-0009 Phase B: this function still operates on the legacy
+// scalar-only resolution shape. Structured-type (object / list / map)
+// support and validation-block evaluation land in Phases C and E.
 func CollectVariables(
 	vars []config.Variable,
 	overrides map[string]string,
@@ -83,8 +89,14 @@ func resolveVariable(
 		return resolveFromOverride(raw, v)
 	}
 
-	// Render the default value as a template (it can reference earlier variables).
-	defaultVal, err := renderDefault(v.Default, current)
+	// Resolve the default. IMPL-0009 C.1 / D.1: try the parsed
+	// hcl.Expression first (handles `var.X`, function calls, literal
+	// expressions, structured defaults); fall back to the legacy
+	// string-template path when the expression fails to evaluate.
+	//
+	// Returns `any` so structured-typed defaults can flow through as
+	// cty.Value while scalar defaults take the existing string path.
+	defaultVal, err := renderDefault(v, current)
 	if err != nil {
 		return nil, fmt.Errorf("rendering default for %q: %w", v.Name, err)
 	}
@@ -101,8 +113,7 @@ func resolveVariable(
 // resolveFromVarsFile converts a cty.Value supplied via --var-file into
 // the `any` form used throughout the variable resolution chain. The
 // value is already coerced to the declared blueprint type by
-// varsfile.Load, so this is a straightforward Go-type unwrap with
-// validation applied against the string form.
+// varsfile.Load, so this is a straightforward Go-type unwrap.
 func resolveFromVarsFile(val cty.Value, v *config.Variable) (any, error) {
 	if !val.IsKnown() || val.IsNull() {
 		if v.Required {
@@ -112,15 +123,7 @@ func resolveFromVarsFile(val cty.Value, v *config.Variable) (any, error) {
 		return zeroValue(v.Type), nil
 	}
 
-	goVal := ctyToGo(val)
-
-	// Apply the same regex-based validation overrides go through; the
-	// validate regex is defined against the string serialisation.
-	if err := validateValue(fmt.Sprintf("%v", goVal), v); err != nil {
-		return nil, fmt.Errorf("vars-file value for %q failed validation: %w", v.Name, err)
-	}
-
-	return goVal, nil
+	return ctyToGo(val), nil
 }
 
 // ctyToGo converts a cty.Value to the Go `any` shape this package uses
@@ -146,31 +149,96 @@ func ctyToGo(val cty.Value) any {
 	}
 }
 
-// resolveFromOverride validates and coerces an override value.
+// resolveFromOverride coerces a `--set k=v` value against the declared
+// variable type.
+//
+// IMPL-0009 Phase D dispatches on the declared cty.Type:
+//
+//   - object({…}) variables parse `raw` as an HCL object literal
+//     against an empty EvalContext, then coerce to the declared shape.
+//     The resolved value flows through the chain as a cty.Value (not
+//     a string), and lockfile.ToCtyValues passes it through unchanged.
+//   - list(T) and map(T) variables are rejected with an actionable
+//     error pointing at --var-file (D.5).
+//   - Scalar variables (string, bool, number) take the existing
+//     string→type coercion path.
 func resolveFromOverride(raw string, v *config.Variable) (any, error) {
-	if err := validateValue(raw, v); err != nil {
-		return nil, fmt.Errorf("override for %q failed validation: %w", v.Name, err)
-	}
+	switch {
+	case v.Type.IsObjectType():
+		val, err := parseObjectOverride(raw, v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid override for %q: %w", v.Name, err)
+		}
 
-	val, err := coerceValue(raw, v.Type)
-	if err != nil {
-		return nil, fmt.Errorf("invalid override for %q: %w", v.Name, err)
-	}
+		return val, nil
 
-	return val, nil
+	case v.Type.IsListType() || v.Type.IsMapType():
+		return nil, fmt.Errorf(
+			"--set on variable %s (%s) is not supported; "+
+				"use --var-file to supply list and map values",
+			v.Name, v.Type.FriendlyName(),
+		)
+
+	default:
+		val, err := coerceValue(raw, v.Type)
+		if err != nil {
+			return nil, fmt.Errorf("invalid override for %q: %w", v.Name, err)
+		}
+
+		return val, nil
+	}
 }
 
-// resolveFromDefault uses the rendered default value, checking required constraints.
-func resolveFromDefault(defaultVal string, v *config.Variable) (any, error) {
-	if defaultVal == "" && v.Required {
+// parseObjectOverride parses an HCL object-literal override against
+// an empty EvalContext and coerces the result to the declared
+// cty.Object shape. Returns the cty.Value untouched — the
+// resolution chain treats cty.Value as a valid `any`, and
+// lockfile.ToCtyValues / lockfile.FromCtyValues both passthrough.
+func parseObjectOverride(raw string, v *config.Variable) (cty.Value, error) {
+	expr, diags := hclsyntax.ParseExpression([]byte(raw), "<--set>", hcl.InitialPos)
+	if diags.HasErrors() {
+		return cty.NilVal, fmt.Errorf("parsing HCL literal: %s", diags.Error())
+	}
+
+	val, diags := expr.Value(nil)
+	if diags.HasErrors() {
+		return cty.NilVal, fmt.Errorf("only literal values are allowed in --set: %s", diags.Error())
+	}
+
+	coerced, err := convert.Convert(val, v.Type)
+	if err != nil {
+		return cty.NilVal, fmt.Errorf(
+			"expects %s, got %s: %w",
+			v.Type.FriendlyName(), val.Type().FriendlyName(), err,
+		)
+	}
+
+	return coerced, nil
+}
+
+// resolveFromDefault consumes the rendered default value. Structured
+// defaults (object/list/map) arrive as cty.Value and pass through
+// untouched; scalar defaults arrive as a string and take the existing
+// coerce path.
+func resolveFromDefault(defaultVal any, v *config.Variable) (any, error) {
+	if ctyVal, ok := defaultVal.(cty.Value); ok {
+		return ctyVal, nil
+	}
+
+	str, ok := defaultVal.(string)
+	if !ok {
+		str = ""
+	}
+
+	if str == "" && v.Required {
 		return nil, fmt.Errorf("variable %q is required but has no default value", v.Name)
 	}
 
-	if defaultVal == "" {
+	if str == "" {
 		return zeroValue(v.Type), nil
 	}
 
-	val, err := coerceValue(defaultVal, v.Type)
+	val, err := coerceValue(str, v.Type)
 	if err != nil {
 		return nil, fmt.Errorf("invalid default for %q: %w", v.Name, err)
 	}
@@ -178,28 +246,52 @@ func resolveFromDefault(defaultVal string, v *config.Variable) (any, error) {
 	return val, nil
 }
 
-// resolveFromPrompt calls the prompt function and validates the result.
+// resolveFromPrompt calls the prompt function and coerces the result.
+//
+// IMPL-0009 Phase E dispatches on the declared type:
+//
+//   - object({...}) variables unfold into per-field prompts using
+//     the declaration-order TypeFieldOrder captured at load time
+//     (E.1 + E.3). The default object value provides per-field
+//     pre-fills; the reconstructed cty.ObjectVal flows downstream
+//     as the variable's resolved value.
+//   - list(T) and map(T) variables are non-interactive — when a
+//     required value isn't supplied by --var-file or a default,
+//     surface a copy-pasteable vars-file snippet (E.2).
+//   - Scalar variables take the existing prompt-string-coerce path.
 func resolveFromPrompt(
 	v *config.Variable,
 	current map[string]any,
-	defaultVal string,
+	defaultVal any,
 	promptFn PromptFn,
 ) (any, error) {
+	switch {
+	case v.Type.IsObjectType():
+		return resolveObjectFromPrompt(v, current, defaultVal, promptFn)
+	case v.Type.IsListType() || v.Type.IsMapType():
+		return resolveListOrMapFromPrompt(v, defaultVal)
+	}
+
+	if ctyVal, ok := defaultVal.(cty.Value); ok {
+		return ctyVal, nil
+	}
+
+	defaultStr, ok := defaultVal.(string)
+	if !ok {
+		defaultStr = ""
+	}
+
 	raw, err := promptFn(v, current)
 	if err != nil {
 		return nil, fmt.Errorf("prompting for %q: %w", v.Name, err)
 	}
 
 	if raw == "" {
-		raw = defaultVal
+		raw = defaultStr
 	}
 
 	if raw == "" && v.Required {
 		return nil, fmt.Errorf("variable %q is required", v.Name)
-	}
-
-	if err := validateValue(raw, v); err != nil {
-		return nil, fmt.Errorf("variable %q failed validation: %w", v.Name, err)
 	}
 
 	val, err := coerceValue(raw, v.Type)
@@ -210,79 +302,345 @@ func resolveFromPrompt(
 	return val, nil
 }
 
-// renderDefault renders a default value through the HCL2 renderer with the
-// current variable values. Defaults without `${` or `%{` markers short-circuit
-// and pass through unchanged.
-func renderDefault(defaultTmpl string, current map[string]any) (string, error) {
-	if defaultTmpl == "" || (!strings.Contains(defaultTmpl, "${") && !strings.Contains(defaultTmpl, "%{")) {
-		return defaultTmpl, nil
+// resolveObjectFromPrompt unfolds an object-typed variable into
+// per-field prompts, then reconstructs the resolved value as a
+// cty.ObjectVal in the author-declared field order
+// (Variable.TypeFieldOrder).
+//
+// Each prompt callback receives a synthesised Variable with name
+// `parent.field` and the field's declared scalar type; that lets
+// existing prompt callbacks (huh, tests) render a labelled prompt
+// per leaf without needing object-aware UI changes.
+//
+// Defaults flow through by projecting the parent object default
+// (already evaluated by renderDefault) per field. Fields whose
+// declared type is itself an object recurse via a synthesised
+// Variable with its own TypeFieldOrder; list / map fields inside
+// an object follow the non-interactive rule
+// (resolveListOrMapFromPrompt).
+func resolveObjectFromPrompt(
+	parent *config.Variable,
+	current map[string]any,
+	defaultVal any,
+	promptFn PromptFn,
+) (any, error) {
+	defaultObj, ok := defaultVal.(cty.Value)
+	if !ok {
+		defaultObj = cty.NilVal
 	}
 
-	ctyVars := make(map[string]cty.Value, len(current))
+	resolved, err := promptObjectFields(parent.Name, parent.Type, parent.TypeFieldOrder, defaultObj, current, promptFn)
+	if err != nil {
+		return nil, fmt.Errorf("collecting %q: %w", parent.Name, err)
+	}
 
-	for k, v := range current {
-		switch x := v.(type) {
-		case string:
-			ctyVars[k] = cty.StringVal(x)
-		case bool:
-			ctyVars[k] = cty.BoolVal(x)
-		case int:
-			ctyVars[k] = cty.NumberIntVal(int64(x))
-		case int64:
-			ctyVars[k] = cty.NumberIntVal(x)
-		default:
-			ctyVars[k] = cty.StringVal(fmt.Sprintf("%v", v))
+	return resolved, nil
+}
+
+// promptObjectFields is the recursive worker: for each declared
+// attribute on the object type, prompt (or recurse for nested
+// objects) and collect into a cty.ObjectVal. Field iteration follows
+// fieldOrder when provided; otherwise the cty AttributeTypes() map
+// iteration order — non-deterministic but at least covers the case
+// where TypeFieldOrder wasn't captured.
+func promptObjectFields(
+	parentName string,
+	objType cty.Type,
+	fieldOrder []string,
+	defaultObj cty.Value,
+	current map[string]any,
+	promptFn PromptFn,
+) (cty.Value, error) {
+	attrs := objType.AttributeTypes()
+	order := fieldOrder
+
+	if len(order) == 0 {
+		order = make([]string, 0, len(attrs))
+		for name := range attrs {
+			order = append(order, name)
 		}
 	}
 
-	out, err := defaultRenderer.RenderString(defaultTmpl, ctyVars)
+	out := make(map[string]cty.Value, len(order))
+
+	for _, name := range order {
+		fieldType, ok := attrs[name]
+		if !ok {
+			continue
+		}
+
+		fieldDefault := projectField(defaultObj, name)
+		dotted := parentName + "." + name
+
+		val, err := promptOneField(dotted, fieldType, fieldDefault, current, promptFn)
+		if err != nil {
+			return cty.NilVal, err
+		}
+
+		out[name] = val
+	}
+
+	return cty.ObjectVal(out), nil
+}
+
+// promptOneField handles a single field of an object: nested object
+// recurses, list/map errors with the vars-file snippet, scalar goes
+// through the existing prompt-then-coerce path.
+func promptOneField(
+	label string,
+	fieldType cty.Type,
+	fieldDefault cty.Value,
+	current map[string]any,
+	promptFn PromptFn,
+) (cty.Value, error) {
+	if fieldType.IsObjectType() {
+		// Nested object — no TypeFieldOrder captured at this level
+		// (only the top declaration carries it), so fall back to the
+		// cty AttributeTypes iteration order.
+		return promptObjectFields(label, fieldType, nil, fieldDefault, current, promptFn)
+	}
+
+	if fieldType.IsListType() || fieldType.IsMapType() {
+		return cty.NilVal, listMapVarsFileError(label, fieldType)
+	}
+
+	syntheticVar := &config.Variable{
+		Name: label,
+		Type: fieldType,
+	}
+
+	defaultStr := ""
+
+	if fieldDefault != cty.NilVal && !fieldDefault.IsNull() && fieldDefault.IsKnown() {
+		if asStr, err := convertx(fieldDefault, cty.String); err == nil {
+			defaultStr = asStr.AsString()
+		}
+	}
+
+	raw, err := promptFn(syntheticVar, current)
 	if err != nil {
-		return "", fmt.Errorf("rendering default %q: %w", defaultTmpl, err)
+		return cty.NilVal, fmt.Errorf("prompting for %q: %w", label, err)
+	}
+
+	if raw == "" {
+		raw = defaultStr
+	}
+
+	goVal, err := coerceValue(raw, fieldType)
+	if err != nil {
+		return cty.NilVal, fmt.Errorf("invalid value for %q: %w", label, err)
+	}
+
+	return goToCty(goVal), nil
+}
+
+// projectField extracts a named attribute from an object default,
+// returning cty.NilVal when the default isn't a known object or
+// doesn't declare the attribute (the caller treats nil-val as "no
+// default").
+func projectField(defaultObj cty.Value, name string) cty.Value {
+	if defaultObj == cty.NilVal || defaultObj.IsNull() || !defaultObj.IsKnown() {
+		return cty.NilVal
+	}
+
+	if !defaultObj.Type().IsObjectType() {
+		return cty.NilVal
+	}
+
+	if !defaultObj.Type().HasAttribute(name) {
+		return cty.NilVal
+	}
+
+	return defaultObj.GetAttr(name)
+}
+
+// convertx is a thin wrapper over convert.Convert that keeps the
+// import-cycle-free shape this file's helpers use. The cty package
+// has no public reexport so the wrapper exists purely to avoid an
+// extra import line in promptOneField.
+func convertx(v cty.Value, target cty.Type) (cty.Value, error) {
+	return convert.Convert(v, target)
+}
+
+// resolveListOrMapFromPrompt is the non-interactive code path for
+// list(T) and map(T) typed variables (E.2). When a default exists
+// (cty.Value), passthrough; when no value was supplied and the
+// variable is required, surface a copy-pasteable vars-file snippet
+// rather than block on an interactive prompt the TUI can't render
+// for collection types.
+func resolveListOrMapFromPrompt(v *config.Variable, defaultVal any) (any, error) {
+	if ctyVal, ok := defaultVal.(cty.Value); ok {
+		return ctyVal, nil
+	}
+
+	if !v.Required {
+		return cty.NullVal(v.Type), nil
+	}
+
+	return nil, listMapVarsFileError(v.Name, v.Type)
+}
+
+// listMapVarsFileError builds the canonical IMPL-0009 E.2 error
+// message: a single line of `Error: …` plus a 4-space-indented
+// `# project.forge-vars.hcl` snippet showing how to supply the
+// value via --var-file.
+func listMapVarsFileError(name string, ty cty.Type) error {
+	example := vrsFileExample(name, ty)
+
+	return fmt.Errorf(
+		"variable %q (%s) is required but cannot be supplied interactively;\n"+
+			"provide it via --var-file:\n\n"+
+			"    # project.forge-vars.hcl\n"+
+			"    %s\n\n"+
+			"    forge create ... --var-file ./project.forge-vars.hcl",
+		name, ty.FriendlyName(), example,
+	)
+}
+
+// vrsFileExample returns a one-line "name = …" example value for
+// the given list/map type. Keeps the error message snippet
+// copy-pasteable for the two most common shapes
+// (list(number) → `[8080, 9090]`, map(string) → `{linux = "amd64"}`).
+func vrsFileExample(name string, ty cty.Type) string {
+	switch {
+	case ty.IsListType():
+		return fmt.Sprintf("%s = [...]", name)
+	case ty.IsMapType():
+		return fmt.Sprintf(`%s = { key = "value" }`, name)
+	default:
+		return fmt.Sprintf("%s = ...", name)
+	}
+}
+
+// renderDefault resolves a default value for the resolution chain.
+//
+// Returns `any`: a cty.Value for structured-typed defaults
+// (object/list/map) so they pass through downstream resolvers
+// unchanged, and a string for scalar-typed defaults so the existing
+// coerceValue path keeps working.
+//
+// IMPL-0009 C.1 / D.1: when DefaultExpr is set, evaluate it against
+// an hcl.EvalContext seeded with the already-bound variables under
+// both bare names and the `var.*` namespace
+// (config.BuildEvalContext). On evaluation failure — typically a
+// `${tmpl}` style default that references a not-yet-bound variable
+// or a runtime function — fall back to the legacy template-render
+// path so the v0.7 transition fixtures keep working.
+//
+// A nil DefaultExpr (no default declared, or a Variable constructed
+// directly in test code rather than via the loader) falls through to
+// the same template-render path, treating DefaultSource as the inline
+// template.
+func renderDefault(v *config.Variable, current map[string]any) (any, error) {
+	ctyCurrent := bareValuesToCty(current)
+
+	if v.DefaultExpr != nil {
+		ctx := config.BuildEvalContext(ctyCurrent)
+		if val, diags := v.DefaultExpr.Value(ctx); !diags.HasErrors() {
+			return defaultValueFromCty(val)
+		}
+	}
+
+	return renderLegacyDefaultTemplate(v.DefaultSource, ctyCurrent)
+}
+
+// defaultValueFromCty splits the post-eval cty.Value into the right
+// chain shape: non-primitive types (object/list/map/tuple) stay as
+// cty.Value so the downstream resolver can passthrough and
+// lockfile.convertValue can coerce tuple→list etc. against the
+// declared shape; scalars project to their string form so the
+// existing scalar coerce path keeps working.
+func defaultValueFromCty(val cty.Value) (any, error) {
+	if val.IsNull() || !val.IsKnown() {
+		return "", nil
+	}
+
+	if !val.Type().IsPrimitiveType() {
+		return val, nil
+	}
+
+	if asStr, err := convert.Convert(val, cty.String); err == nil {
+		return asStr.AsString(), nil
+	}
+
+	return val.GoString(), nil
+}
+
+// bareValuesToCty projects the in-flight `any` resolution map into
+// cty values so it can be fed into hcl.EvalContext. Mirrors the
+// scalar-conversion shape already used by lockfile.ToCtyValues.
+func bareValuesToCty(current map[string]any) map[string]cty.Value {
+	out := make(map[string]cty.Value, len(current))
+
+	for k, v := range current {
+		out[k] = goToCty(v)
+	}
+
+	return out
+}
+
+func goToCty(v any) cty.Value {
+	switch x := v.(type) {
+	case string:
+		return cty.StringVal(x)
+	case bool:
+		return cty.BoolVal(x)
+	case int:
+		return cty.NumberIntVal(int64(x))
+	case int64:
+		return cty.NumberIntVal(x)
+	case float64:
+		return cty.NumberFloatVal(x)
+	default:
+		return cty.StringVal(fmt.Sprintf("%v", v))
+	}
+}
+
+// renderLegacyDefaultTemplate is the v0.7 backwards-compat shim:
+// re-parses DefaultSource as an inline template and renders it
+// through the established template renderer. Reached only when
+// hcl.Expression.Value() failed on the parsed default (typically a
+// `${name}` template referencing an earlier variable bound only at
+// the bare-name level, which cty.Convert + bareValuesToCty handle but
+// the v0.7 transition window keeps available).
+func renderLegacyDefaultTemplate(src string, ctyCurrent map[string]cty.Value) (string, error) {
+	if src == "" || (!strings.Contains(src, "${") && !strings.Contains(src, "%{")) {
+		return src, nil
+	}
+
+	out, err := defaultRenderer.RenderString(src, ctyCurrent)
+	if err != nil {
+		return "", fmt.Errorf("rendering default %q: %w", src, err)
 	}
 
 	return out, nil
 }
 
-// coerceValue converts a string value to the appropriate Go type based on the variable type.
-func coerceValue(raw, varType string) (any, error) {
-	switch varType {
-	case "bool":
+// coerceValue converts a string value to the appropriate Go type based on
+// the declared cty.Type. Scalar-only — list / map / object inputs come
+// through the vars-file path (IMPL-0009 Phase D) and never hit this
+// helper.
+func coerceValue(raw string, varType cty.Type) (any, error) {
+	switch {
+	case varType.Equals(cty.Bool):
 		return strconv.ParseBool(raw)
-	case "int":
+	case varType.Equals(cty.Number):
 		return strconv.Atoi(raw)
-	case "string", "choice", "":
-		return raw, nil
 	default:
 		return raw, nil
 	}
 }
 
-// zeroValue returns the zero value for a variable type.
-func zeroValue(varType string) any {
-	switch varType {
-	case "bool":
+// zeroValue returns the zero value for a scalar cty.Type. Structured
+// types resolve through the vars-file path and never need this helper
+// in Phase B.
+func zeroValue(varType cty.Type) any {
+	switch {
+	case varType.Equals(cty.Bool):
 		return false
-	case "int":
+	case varType.Equals(cty.Number):
 		return 0
 	default:
 		return ""
 	}
-}
-
-// validateValue checks a string value against the variable's validation regex.
-func validateValue(raw string, v *config.Variable) error {
-	if v.Validate == "" {
-		return nil
-	}
-
-	re, err := regexp.Compile(v.Validate)
-	if err != nil {
-		return fmt.Errorf("invalid validation regex %q: %w", v.Validate, err)
-	}
-
-	if !re.MatchString(raw) {
-		return fmt.Errorf("value %q does not match pattern %q", raw, v.Validate)
-	}
-
-	return nil
 }

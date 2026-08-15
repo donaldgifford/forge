@@ -51,6 +51,12 @@ type Result struct {
 	// that don't correspond to a declared blueprint variable. The CLI
 	// surfaces these as a warning (IMPL-0008 OQ-7).
 	UnknownVarsFileKeys []string
+
+	// Deprecations are non-fatal v0.7 transition notices produced by
+	// the blueprint loader (today: the `int`-as-alias-for-`number`
+	// warning). The CLI surfaces these via ui.Warningf per
+	// IMPL-0009 OQ-3.
+	Deprecations []config.Deprecation
 }
 
 // Run executes the sync workflow.
@@ -70,7 +76,8 @@ func Run(opts *Opts) (*Result, error) {
 	result := &Result{}
 	renderer := tmpl.NewRenderer()
 
-	bpVars := loadBlueprintVariables(opts.RegistryDir, lock.Blueprint.Path)
+	bpVars, deprecations := loadBlueprintVariables(opts.RegistryDir, lock.Blueprint.Path)
+	result.Deprecations = deprecations
 
 	ctyVars, err := lockfile.ToCtyValues(lock.Variables, bpVars)
 	if err != nil {
@@ -82,6 +89,14 @@ func Run(opts *Opts) (*Result, error) {
 	// before reaching here; sync just needs to merge and persist.
 	if err := applyVarsFileOverlay(opts.VarsFiles, bpVars, ctyVars, result); err != nil {
 		return nil, err
+	}
+
+	// IMPL-0009 Phase C: re-validate against the (possibly
+	// vars-file-overlaid) scope before touching any files. Sync paths
+	// that flow through here treat the lockfile as authoritative
+	// state, so a bad overlay should abort early.
+	if errs := config.EvaluateValidations(bpVars, ctyVars); len(errs) > 0 {
+		return nil, fmt.Errorf("validating variables: %w", config.JoinErrors(errs))
 	}
 
 	// Sync defaults.
@@ -344,22 +359,23 @@ func findSourceFile(registryDir, relPath string) string {
 }
 
 // loadBlueprintVariables reads the blueprint.hcl under the registry directory
-// to recover the declared variable types. Returns nil when no registry is
+// to recover the declared variable types plus any non-fatal Deprecation
+// notices for the caller to surface. Returns nil/nil when no registry is
 // configured or the blueprint cannot be loaded — callers fall back to runtime
 // type inference in that case.
-func loadBlueprintVariables(registryDir, blueprintPath string) []config.Variable {
+func loadBlueprintVariables(registryDir, blueprintPath string) ([]config.Variable, []config.Deprecation) {
 	if registryDir == "" || blueprintPath == "" {
-		return nil
+		return nil, nil
 	}
 
 	bpPath := filepath.Join(registryDir, blueprintPath, "blueprint.hcl")
 
 	bp, err := config.LoadBlueprint(bpPath)
 	if err != nil {
-		return nil
+		return nil, nil
 	}
 
-	return bp.Variables
+	return bp.Variables, bp.Deprecations
 }
 
 func readSourceContent(sourcePath string, vars map[string]cty.Value, renderer tmpl.Renderer) ([]byte, error) {
