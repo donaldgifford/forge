@@ -1,7 +1,7 @@
 ---
 id: IMPL-0009
 title: "object and collection variable types"
-status: Draft
+status: Completed
 author: Donald Gifford
 created: 2026-06-29
 ---
@@ -9,7 +9,7 @@ created: 2026-06-29
 
 # IMPL 0009: object and collection variable types
 
-**Status:** Draft
+**Status:** Completed
 **Author:** Donald Gifford
 **Date:** 2026-06-29
 
@@ -20,13 +20,29 @@ created: 2026-06-29
   - [Out of Scope](#out-of-scope)
 - [Implementation Phases](#implementation-phases)
   - [Phase A: type expression parser](#phase-a-type-expression-parser)
+    - [Tasks](#tasks)
+    - [Success Criteria](#success-criteria)
   - [Phase B: variable struct + HCL schema refactor](#phase-b-variable-struct--hcl-schema-refactor)
+    - [Tasks](#tasks-1)
+    - [Success Criteria](#success-criteria-1)
   - [Phase C: default expression + validation evaluation](#phase-c-default-expression--validation-evaluation)
+    - [Tasks](#tasks-2)
+    - [Success Criteria](#success-criteria-2)
   - [Phase D: input integration (vars-file + --set)](#phase-d-input-integration-vars-file----set)
+    - [Tasks](#tasks-3)
+    - [Success Criteria](#success-criteria-3)
   - [Phase E: prompt UX](#phase-e-prompt-ux)
+    - [Tasks](#tasks-4)
+    - [Success Criteria](#success-criteria-4)
   - [Phase F: lockfile + template integration](#phase-f-lockfile--template-integration)
+    - [Tasks](#tasks-5)
+    - [Success Criteria](#success-criteria-5)
   - [Phase G: documentation + release prep](#phase-g-documentation--release-prep)
+    - [Tasks](#tasks-6)
+    - [Success Criteria](#success-criteria-6)
 - [File Changes](#file-changes)
+  - [New files](#new-files)
+  - [Modified files](#modified-files)
 - [Testing Plan](#testing-plan)
 - [Quality Gates](#quality-gates)
 - [Dependencies](#dependencies)
