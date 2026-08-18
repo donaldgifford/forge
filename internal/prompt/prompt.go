@@ -43,9 +43,9 @@ type PromptFn func(v *config.Variable, current map[string]any) (string, error)
 // CollectVariables accepts both for flexibility (tests may stub either
 // path) but does not enforce that exclusion itself.
 //
-// IMPL-0009 Phase B: this function still operates on the legacy
-// scalar-only resolution shape. Structured-type (object / list / map)
-// support and validation-block evaluation land in Phases C and E.
+// Resolved values are `any`: scalars unwrap to string/bool/int64/float64,
+// structural types (object / list / map) stay cty.Value on every branch
+// of the chain.
 func CollectVariables(
 	vars []config.Variable,
 	overrides map[string]string,
@@ -113,7 +113,8 @@ func resolveVariable(
 // resolveFromVarsFile converts a cty.Value supplied via --var-file into
 // the `any` form used throughout the variable resolution chain. The
 // value is already coerced to the declared blueprint type by
-// varsfile.Load, so this is a straightforward Go-type unwrap.
+// varsfile.Load, so this is a straightforward Go-type unwrap for
+// scalars; structural types stay cty.Value (see ctyToGo).
 func resolveFromVarsFile(val cty.Value, v *config.Variable) (any, error) {
 	if !val.IsKnown() || val.IsNull() {
 		if v.Required {
@@ -128,9 +129,18 @@ func resolveFromVarsFile(val cty.Value, v *config.Variable) (any, error) {
 
 // ctyToGo converts a cty.Value to the Go `any` shape this package uses
 // for the resolution chain. Mirrors lockfile.FromCtyValues for the
-// primitive cty types; vars files are scalar-only in IMPL-0008 so
-// nested/structural types don't appear here.
+// primitive cty types.
+//
+// Structural values (object / list / map) pass through as cty.Value —
+// the same shape `--set` object overrides and structured defaults use,
+// and what lockfile.convertValue and the HCL renderer expect. Flattening
+// them to GoString() here produced a Go debug literal that later failed
+// re-conversion with `object required, but have string`.
 func ctyToGo(val cty.Value) any {
+	if !val.Type().IsPrimitiveType() {
+		return val
+	}
+
 	switch val.Type() {
 	case cty.String:
 		return val.AsString()
@@ -581,6 +591,11 @@ func bareValuesToCty(current map[string]any) map[string]cty.Value {
 
 func goToCty(v any) cty.Value {
 	switch x := v.(type) {
+	case cty.Value:
+		// Structural values (and any already-cty scalar) resolved
+		// earlier in the chain. Passing through keeps them traversable,
+		// so a later variable's default can reference `git_provider.org`.
+		return x
 	case string:
 		return cty.StringVal(x)
 	case bool:
