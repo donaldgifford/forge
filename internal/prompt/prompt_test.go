@@ -376,3 +376,100 @@ func TestCollectVariables_ZeroValues(t *testing.T) {
 	assert.Equal(t, false, result["flag"])
 	assert.Equal(t, 0, result["count"])
 }
+
+// TestCollectVariables_VarsFileObject is the regression guard for #42:
+// an object supplied through --var-file must survive the resolution
+// chain as a cty.Value. It used to come back as a GoString() debug
+// literal, which lockfile.ToCtyValues then rejected with
+// `object required, but have string`.
+func TestCollectVariables_VarsFileObject(t *testing.T) {
+	t.Parallel()
+
+	objType := cty.Object(map[string]cty.Type{
+		"name": cty.String,
+		"org":  cty.String,
+		"host": cty.String,
+	})
+
+	vars := []config.Variable{
+		{Name: "git_provider", Type: objType},
+	}
+
+	varsFile := map[string]cty.Value{
+		"git_provider": cty.ObjectVal(map[string]cty.Value{
+			"name": cty.StringVal("forgejo"),
+			"org":  cty.StringVal("homelab"),
+			"host": cty.StringVal("git.fartlab.dev"),
+		}),
+	}
+
+	result, err := prompt.CollectVariables(vars, nil, varsFile, false, nil)
+	require.NoError(t, err)
+
+	got, ok := result["git_provider"].(cty.Value)
+	require.True(t, ok, "object from a vars file must stay a cty.Value")
+	assert.Equal(t, cty.StringVal("forgejo"), got.GetAttr("name"))
+	assert.Equal(t, cty.StringVal("homelab"), got.GetAttr("org"))
+	assert.Equal(t, cty.StringVal("git.fartlab.dev"), got.GetAttr("host"))
+}
+
+// TestCollectVariables_VarsFileCollections covers the list and map
+// arms of the same #42 stringification bug.
+func TestCollectVariables_VarsFileCollections(t *testing.T) {
+	t.Parallel()
+
+	vars := []config.Variable{
+		{Name: "topics", Type: cty.List(cty.String)},
+		{Name: "labels", Type: cty.Map(cty.String)},
+	}
+
+	varsFile := map[string]cty.Value{
+		"topics": cty.ListVal([]cty.Value{cty.StringVal("go"), cty.StringVal("k8s")}),
+		"labels": cty.MapVal(map[string]cty.Value{"tier": cty.StringVal("backend")}),
+	}
+
+	result, err := prompt.CollectVariables(vars, nil, varsFile, false, nil)
+	require.NoError(t, err)
+
+	topics, ok := result["topics"].(cty.Value)
+	require.True(t, ok, "list from a vars file must stay a cty.Value")
+	assert.Equal(t, 2, topics.LengthInt())
+
+	labels, ok := result["labels"].(cty.Value)
+	require.True(t, ok, "map from a vars file must stay a cty.Value")
+	assert.Equal(t, cty.StringVal("backend"), labels.Index(cty.StringVal("tier")))
+}
+
+// TestCollectVariables_ObjectAttrInLaterDefault covers the second half
+// of #42: goToCty stringified an already-resolved cty.Value when
+// building the EvalContext, so a later variable's default could not
+// traverse into an object attribute.
+func TestCollectVariables_ObjectAttrInLaterDefault(t *testing.T) {
+	t.Parallel()
+
+	objType := cty.Object(map[string]cty.Type{
+		"org":  cty.String,
+		"host": cty.String,
+	})
+
+	vars := []config.Variable{
+		{Name: "git_provider", Type: objType},
+		{
+			Name:          "module_path",
+			Type:          cty.String,
+			DefaultSource: "${git_provider.host}/${git_provider.org}/demo",
+		},
+	}
+
+	varsFile := map[string]cty.Value{
+		"git_provider": cty.ObjectVal(map[string]cty.Value{
+			"org":  cty.StringVal("homelab"),
+			"host": cty.StringVal("git.fartlab.dev"),
+		}),
+	}
+
+	result, err := prompt.CollectVariables(vars, nil, varsFile, true, nil)
+	require.NoError(t, err)
+
+	assert.Equal(t, "git.fartlab.dev/homelab/demo", result["module_path"])
+}
