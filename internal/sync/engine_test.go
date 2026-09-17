@@ -38,7 +38,7 @@ func setupSyncTest(t *testing.T) (projectDir, registryDir string) {
 		Variables: map[string]any{},
 	}
 
-	require.NoError(t, lockfile.Write(filepath.Join(projectDir, lockfile.FileName), lock))
+	require.NoError(t, lockfile.WriteHCL(filepath.Join(projectDir, lockfile.HCLFileName), lock))
 
 	// Create local files (initially matching).
 	require.NoError(t, os.WriteFile(
@@ -189,7 +189,7 @@ func TestSync_MergeStrategy_CleanMerge(t *testing.T) {
 		Variables: map[string]any{},
 	}
 
-	require.NoError(t, lockfile.Write(filepath.Join(projectDir, lockfile.FileName), lock))
+	require.NoError(t, lockfile.WriteHCL(filepath.Join(projectDir, lockfile.HCLFileName), lock))
 
 	opts := &forgesync.Opts{
 		ProjectDir:  projectDir,
@@ -255,7 +255,7 @@ func TestSync_MergeStrategy_Conflict(t *testing.T) {
 		Variables: map[string]any{},
 	}
 
-	require.NoError(t, lockfile.Write(filepath.Join(projectDir, lockfile.FileName), lock))
+	require.NoError(t, lockfile.WriteHCL(filepath.Join(projectDir, lockfile.HCLFileName), lock))
 
 	opts := &forgesync.Opts{
 		ProjectDir:  projectDir,
@@ -312,7 +312,7 @@ func TestSync_MergeStrategy_NoBaseDir_FallsBackToOverwrite(t *testing.T) {
 		Variables: map[string]any{},
 	}
 
-	require.NoError(t, lockfile.Write(filepath.Join(projectDir, lockfile.FileName), lock))
+	require.NoError(t, lockfile.WriteHCL(filepath.Join(projectDir, lockfile.HCLFileName), lock))
 
 	// No BaseDir — should fall back to overwrite.
 	opts := &forgesync.Opts{
@@ -348,7 +348,7 @@ func TestSync_MissingSource(t *testing.T) {
 		Variables: map[string]any{},
 	}
 
-	require.NoError(t, lockfile.Write(filepath.Join(projectDir, lockfile.FileName), lock))
+	require.NoError(t, lockfile.WriteHCL(filepath.Join(projectDir, lockfile.HCLFileName), lock))
 
 	opts := &forgesync.Opts{
 		ProjectDir:  projectDir,

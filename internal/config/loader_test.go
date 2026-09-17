@@ -11,10 +11,10 @@ import (
 	"github.com/donaldgifford/forge/internal/config"
 )
 
-// TestLoadBlueprint_RejectsBareYAML covers the IMPL-0005 C.1 contract:
-// a .yaml path with no .hcl sibling returns a migration-pointer error
-// directing the user to `forge migrate config` and docs/MIGRATION.md.
-// Doubles as the C.7 regression test.
+// TestLoadBlueprint_RejectsBareYAML covers the IMPL-0007 rejection
+// contract: a .yaml path with no .hcl sibling returns the
+// rescaffold-or-pin error (the in-tool `forge migrate` command was
+// removed in IMPL-0007 per ADR-0002).
 func TestLoadBlueprint_RejectsBareYAML(t *testing.T) {
 	t.Parallel()
 
@@ -27,9 +27,9 @@ func TestLoadBlueprint_RejectsBareYAML(t *testing.T) {
 
 	msg := err.Error()
 	assert.Contains(t, msg, "YAML config files are no longer supported")
-	assert.Contains(t, msg, "forge migrate config")
+	assert.Contains(t, msg, "Rescaffold from the current blueprint")
+	assert.Contains(t, msg, "go install github.com/donaldgifford/forge@v0.4.1")
 	assert.Contains(t, msg, "docs/MIGRATION.md")
-	assert.Contains(t, msg, "blueprint.hcl")
 }
 
 // TestLoadRegistry_RejectsBareYAML mirrors the blueprint case for
@@ -46,15 +46,15 @@ func TestLoadRegistry_RejectsBareYAML(t *testing.T) {
 
 	msg := err.Error()
 	assert.Contains(t, msg, "YAML config files are no longer supported")
-	assert.Contains(t, msg, "forge migrate config")
+	assert.Contains(t, msg, "Rescaffold from the current blueprint")
+	assert.Contains(t, msg, "go install github.com/donaldgifford/forge@v0.4.1")
 	assert.Contains(t, msg, "docs/MIGRATION.md")
-	assert.Contains(t, msg, "registry.hcl")
 }
 
 // TestLoadBlueprint_RejectsV1Fixture: even a v1-shaped blueprint.yaml
-// hits the YAML-rejection path now. Users coming from v0.2.x or
-// earlier read MIGRATION.md to learn the two-step path
-// (`forge migrate templates` then `forge migrate config`).
+// hits the rescaffold-or-pin path now. Users coming from v0.2.x or
+// earlier need to pin to v0.4.1, run `forge migrate templates` then
+// `forge migrate config` against that binary, and then upgrade.
 func TestLoadBlueprint_RejectsV1Fixture(t *testing.T) {
 	t.Parallel()
 
@@ -65,7 +65,7 @@ func TestLoadBlueprint_RejectsV1Fixture(t *testing.T) {
 
 	msg := err.Error()
 	assert.Contains(t, msg, "YAML config files are no longer supported")
-	assert.Contains(t, msg, "forge migrate config")
+	assert.Contains(t, msg, "go install github.com/donaldgifford/forge@v0.4.1")
 	assert.Contains(t, msg, "docs/MIGRATION.md")
 }
 

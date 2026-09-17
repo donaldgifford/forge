@@ -94,17 +94,39 @@ var managedFileSpec = hcldec.ObjectSpec{
 }
 
 // variableBlockBodySchema is the body schema for a `variable "name" { ... }`
-// block. The loader hand-decodes these because `default` and `validate`
-// must be captured as raw source text (they may carry templates that
-// reference later-bound variables).
+// block. The loader hand-decodes these so that `type` parses through
+// ParseVariableType, `default` is captured as an hcl.Expression (lazy
+// evaluation against the resolved-variable scope), and `validation { ... }`
+// nested blocks decode into Variable.Validations.
+//
+// The legacy `choices` and `validate` attributes are intentionally absent
+// from the accepted set so the hand-decoder's lookup against
+// `content.Attributes` fails cleanly and surfaces a forge-specific
+// migration error pointing at MIGRATION.md (per IMPL-0009 OQ-4).
 var variableBlockBodySchema = &hcl.BodySchema{
 	Attributes: []hcl.AttributeSchema{
 		{Name: "description"},
 		{Name: "type"},
 		{Name: "required"},
-		{Name: "choices"},
 		{Name: "default"},
-		{Name: "validate"},
+		// Legacy `choices` / `validate` are not declared here — see
+		// rejectLegacyVariableAttrs in loader_hcl.go for how the
+		// removed fields are detected and reported.
+	},
+	Blocks: []hcl.BlockHeaderSchema{
+		{Type: "validation"},
+	},
+}
+
+// validationBlockBodySchema is the body schema for a `validation { ... }`
+// block nested inside a `variable`. Both `condition` and `error_message`
+// are required; the hand-decoder captures `condition` as an
+// hcl.Expression for lazy evaluation against the resolved-variable scope
+// (IMPL-0009 Phase C) and decodes `error_message` as a static string.
+var validationBlockBodySchema = &hcl.BodySchema{
+	Attributes: []hcl.AttributeSchema{
+		{Name: "condition", Required: true},
+		{Name: "error_message", Required: true},
 	},
 }
 

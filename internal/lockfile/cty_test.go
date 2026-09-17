@@ -15,15 +15,15 @@ func TestToCtyValues_DeclaredTypesWin(t *testing.T) {
 	t.Parallel()
 
 	vars := []config.Variable{
-		{Name: "use_grpc", Type: "bool"},
-		{Name: "replicas", Type: "int"},
-		{Name: "project_name", Type: "string"},
-		{Name: "license", Type: "choice"},
+		{Name: "use_grpc", Type: cty.Bool},
+		{Name: "replicas", Type: cty.Number},
+		{Name: "project_name", Type: cty.String},
+		{Name: "license", Type: cty.String},
 	}
 
 	raw := map[string]any{
-		"use_grpc":     "true", // string in YAML, should coerce to bool
-		"replicas":     "3",    // string in YAML, should coerce to int
+		"use_grpc":     "true", // legacy YAML shape, should coerce to bool
+		"replicas":     "3",    // legacy YAML shape, should coerce to number
 		"project_name": "myapp",
 		"license":      "MIT",
 	}
@@ -32,7 +32,13 @@ func TestToCtyValues_DeclaredTypesWin(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, cty.True, got["use_grpc"])
-	assert.Equal(t, cty.NumberIntVal(3), got["replicas"])
+	// Number values from a string→number conversion carry a
+	// higher-precision big.Float than NumberIntVal's default
+	// precision, so compare via cty's semantic equality rather
+	// than reflect.DeepEqual on the big.Float internals.
+	assert.True(t,
+		got["replicas"].Equals(cty.NumberIntVal(3)).True(),
+		"expected replicas to equal 3, got %#v", got["replicas"])
 	assert.Equal(t, cty.StringVal("myapp"), got["project_name"])
 	assert.Equal(t, cty.StringVal("MIT"), got["license"])
 }
@@ -41,8 +47,8 @@ func TestToCtyValues_PreservesNativeTypes(t *testing.T) {
 	t.Parallel()
 
 	vars := []config.Variable{
-		{Name: "use_grpc", Type: "bool"},
-		{Name: "replicas", Type: "int"},
+		{Name: "use_grpc", Type: cty.Bool},
+		{Name: "replicas", Type: cty.Number},
 	}
 
 	raw := map[string]any{
@@ -61,8 +67,8 @@ func TestToCtyValues_BackfillsMissingDeclared(t *testing.T) {
 	t.Parallel()
 
 	vars := []config.Variable{
-		{Name: "project_name", Type: "string"},
-		{Name: "use_grpc", Type: "bool"},
+		{Name: "project_name", Type: cty.String},
+		{Name: "use_grpc", Type: cty.Bool},
 	}
 
 	raw := map[string]any{
@@ -117,7 +123,7 @@ func TestToCtyValues_RejectsBadCoercion(t *testing.T) {
 	t.Parallel()
 
 	vars := []config.Variable{
-		{Name: "use_grpc", Type: "bool"},
+		{Name: "use_grpc", Type: cty.Bool},
 	}
 
 	raw := map[string]any{

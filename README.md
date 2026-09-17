@@ -33,8 +33,19 @@ make build
 ## Quick Start
 
 ```bash
-# Create a project from a blueprint
+# Create a project from a blueprint, with ad-hoc CLI overrides
 forge create go/api --set project_name=my-service --set go_module=github.com/me/my-service
+
+# Or load variable values from an HCL vars file (preferred for non-trivial inputs)
+cat > my-svc.forge-vars.hcl <<'EOF'
+project_name = "my-service"
+go_module    = "github.com/me/my-service"
+replicas     = 3
+EOF
+forge create go/api --var-file ./my-svc.forge-vars.hcl
+
+# --var-file is repeatable; later files win on key collision.
+# --var-file and --set are mutually exclusive on a single invocation.
 
 # List available blueprints
 forge list --registry /path/to/registry
@@ -69,18 +80,16 @@ forge cache clean
 
 | Command | Description |
 |---------|-------------|
-| `forge create <blueprint>` | Scaffold a new project from a blueprint |
+| `forge create <blueprint>` | Scaffold a new project from a blueprint (`--set`, `--var-file`) |
 | `forge list` | List available blueprints in a registry |
 | `forge search <query>` | Search blueprints by name, description, or tags |
 | `forge info <blueprint.hcl>` | Show detailed blueprint information |
-| `forge check` | Check project for drift against the source blueprint |
-| `forge sync` | Sync project files with the latest blueprint version |
+| `forge check` | Check project for drift against the source blueprint (`--var-file` rejected) |
+| `forge sync` | Sync project files with the latest blueprint version (`--var-file` requires `--force`) |
 | `forge init` | Initialize a new blueprint |
 | `forge registry init <path>` | Scaffold a new blueprint registry |
 | `forge registry blueprint` | Scaffold a new blueprint in a registry |
 | `forge registry update` | Sync blueprint metadata in `registry.hcl` |
-| `forge migrate templates` | Rewrite legacy v1 (`text/template`) blueprints to v2 (HCL2 templates) — see [docs/MIGRATION.md](docs/MIGRATION.md) |
-| `forge migrate config` | Convert legacy YAML configs (`blueprint.yaml`, `registry.yaml`) to HCL — see [docs/MIGRATION.md](docs/MIGRATION.md) |
 | `forge cache clean` | Clear cached registries |
 
 ## Documentation
@@ -90,21 +99,36 @@ forge cache clean
 - [DESIGN-0003 — Migrate template engine to HCL2](docs/design/0003-migrate-template-engine-to-hcl2.md) -- Engine swap rationale
 - [DESIGN-0004 — Unify config file format after HCL2 cutover](docs/design/0004-unify-config-file-format-after-hcl2-cutover.md) -- Config-format unification
 - [ADR-0001 — Use HCL2 as the template engine](docs/adr/0001-use-hcl2-as-the-template-engine.md) -- Decision record
-- [docs/MIGRATION.md](docs/MIGRATION.md) -- v0.2.x/v0.3.x → v0.4.x migration guides
+- [docs/REFERENCE.md](docs/REFERENCE.md) -- Canonical HCL reference for `blueprint.hcl`, `registry.hcl`, `.forge-lock.hcl`, `.forge-vars.hcl`
+- [docs/MIGRATION.md](docs/MIGRATION.md) -- v0.2.x → v0.5.x migration guides
 - [RFC-0001 — Forge: Project Scaffolding CLI](docs/rfc/0001-forge-project-scaffolding-cli.md) -- High-level proposal and architecture
 
 ## Migrating from older releases
 
-Forge has had two on-disk format changes:
+Per [ADR-0002](docs/adr/0002-forge-does-not-ship-in-tool-migrators.md),
+forge no longer ships in-tool migrators. The `forge migrate` command
+was removed in v0.5.x (IMPL-0007). Users on legacy formats follow the
+**pin → migrate → upgrade** pattern instead:
 
-- **v0.2.x → v0.3.x:** template syntax migrated from Go `text/template` to
-  HCL2 — run `forge migrate templates --path /path/to/registry`.
-- **v0.3.x → v0.4.x:** config files migrated from YAML
-  (`blueprint.yaml`, `registry.yaml`) to HCL (`blueprint.hcl`,
-  `registry.hcl`) — run `forge migrate config --path /path/to/registry`.
+```sh
+# Install the last release that ships `forge migrate`:
+go install github.com/donaldgifford/forge@v0.4.1
+```
 
-Maintainers coming from v0.2.x or earlier should run **both** commands in
-order. See [docs/MIGRATION.md](docs/MIGRATION.md) for the complete
+Then, with that pinned binary:
+
+- **v0.2.x → v0.3.x (templates):** `forge migrate templates --path /path/to/registry`
+- **v0.3.x → v0.4.x (configs):** `forge migrate config --path /path/to/registry`
+
+Coming from v0.2.x or earlier? Run **both** in order — templates
+first, then config. Once the registry is on the v0.4 format, upgrade
+to current forge.
+
+**v0.4.x → v0.5.x (lockfiles)** is per-project, not per-registry, and
+has no in-tool path: rescaffold the project from the current
+blueprint, or stay pinned to v0.4.1.
+
+See [docs/MIGRATION.md](docs/MIGRATION.md) for the complete
 walkthrough.
 
 ## Development

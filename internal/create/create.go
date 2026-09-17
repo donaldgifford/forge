@@ -16,6 +16,7 @@ import (
 	"github.com/donaldgifford/forge/internal/prompt"
 	"github.com/donaldgifford/forge/internal/registry"
 	tmpl "github.com/donaldgifford/forge/internal/template"
+	"github.com/donaldgifford/forge/internal/varsfile"
 )
 
 // Opts holds the options for the create command.
@@ -26,8 +27,16 @@ type Opts struct {
 	// OutputDir is the target directory. If empty, derived from project_name variable.
 	OutputDir string
 
-	// Overrides are --set key=value pairs from the CLI.
+	// Overrides are --set key=value pairs from the CLI. Mutually
+	// exclusive with VarsFileValues at the CLI layer.
 	Overrides map[string]string
+
+	// VarsFiles is the ordered list of `--var-file` paths supplied at
+	// the CLI (IMPL-0008). create.Run loads and merges them after the
+	// blueprint is parsed, so the declared variable types are known
+	// for type coercion. Mutually exclusive with Overrides at the CLI
+	// layer; both can be empty (the no-CLI-input case).
+	VarsFiles []string
 
 	// UseDefaults skips interactive prompts and uses default values.
 	UseDefaults bool
@@ -66,6 +75,19 @@ type Result struct {
 	OutputDir    string
 	FilesCreated int
 	Blueprint    string
+
+	// UnknownVarsFileKeys lists keys declared in any --var-file input
+	// that don't correspond to a declared blueprint variable. The CLI
+	// surfaces these as a warning (per IMPL-0008 OQ-7 — no
+	// --strict-vars flag in v1). Empty when no --var-file paths were
+	// supplied or every key matched a declared variable.
+	UnknownVarsFileKeys []string
+
+	// Deprecations are non-fatal v0.7 transition notices produced by
+	// the blueprint loader (today: the `int`-as-alias-for-`number`
+	// warning). The CLI surfaces these via ui.Warningf before the
+	// success line per IMPL-0009 OQ-3.
+	Deprecations []config.Deprecation
 }
 
 // Run executes the create workflow.
@@ -85,8 +107,18 @@ func Run(opts *Opts) (*Result, error) {
 
 	logger.Debug("loaded blueprint", "name", bp.Name, "version", bp.Version)
 
+	// 5b. Load --var-file inputs (IMPL-0008). Vars-file values
+	//     short-circuit prompts the same way --set overrides do.
+	//     Mutually exclusive with Overrides at the CLI layer.
+	varsFileValues, unknownKeys, err := varsfile.Load(opts.VarsFiles, bp.Variables)
+	if err != nil {
+		return nil, fmt.Errorf("loading vars file: %w", err)
+	}
+
 	// 6. Collect variables.
-	vars, err := prompt.CollectVariables(bp.Variables, opts.Overrides, opts.UseDefaults, opts.PromptFn)
+	vars, err := prompt.CollectVariables(
+		bp.Variables, opts.Overrides, varsFileValues, opts.UseDefaults, opts.PromptFn,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("collecting variables: %w", err)
 	}
@@ -94,6 +126,14 @@ func Run(opts *Opts) (*Result, error) {
 	ctyVars, err := lockfile.ToCtyValues(vars, bp.Variables)
 	if err != nil {
 		return nil, fmt.Errorf("converting variables to cty: %w", err)
+	}
+
+	// 6b. Evaluate validation blocks against the fully resolved
+	//     variable scope (IMPL-0009 Phase C). Failures accumulate so
+	//     authors see every constraint violation at once; the flow
+	//     aborts before any files are touched.
+	if errs := config.EvaluateValidations(bp.Variables, ctyVars); len(errs) > 0 {
+		return nil, fmt.Errorf("validating variables: %w", config.JoinErrors(errs))
 	}
 
 	// 7. Resolve defaults inheritance.
@@ -130,20 +170,22 @@ func Run(opts *Opts) (*Result, error) {
 	}
 
 	// 10. Generate lockfile with content hashes.
-	lockPath := filepath.Join(outputDir, lockfile.FileName)
+	lockPath := filepath.Join(outputDir, lockfile.HCLFileName)
 	lock := buildLockfile(resolved, bp, ctyVars, fileSet, opts.ForgeVersion, opts.RegistryURL)
 	computeFileHashes(outputDir, lock)
 
-	if err := lockfile.Write(lockPath, lock); err != nil {
+	if err := lockfile.WriteHCL(lockPath, lock); err != nil {
 		return nil, fmt.Errorf("writing lockfile: %w", err)
 	}
 
 	logger.Info("project created", "dir", outputDir, "files", filesCreated)
 
 	return &Result{
-		OutputDir:    outputDir,
-		FilesCreated: filesCreated,
-		Blueprint:    bp.Name,
+		OutputDir:           outputDir,
+		FilesCreated:        filesCreated,
+		Blueprint:           bp.Name,
+		UnknownVarsFileKeys: unknownKeys,
+		Deprecations:        bp.Deprecations,
 	}, nil
 }
 

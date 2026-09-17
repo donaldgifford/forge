@@ -302,6 +302,110 @@ func TestStripTemplateExtension(t *testing.T) {
 	assert.Equal(t, ".gitignore", tmpl.StripTemplateExtension(".gitignore.tmpl"))
 }
 
+// --- IMPL-0009 Phase F.5: structured-type template access ---
+
+// structuredVars returns a small set of object/list/map values used
+// across the Phase F.5 template tests. Kept local so each test reads
+// top-to-bottom against the data it exercises.
+func structuredVars() map[string]cty.Value {
+	return map[string]cty.Value{
+		"project_name": cty.StringVal("my-api"),
+		"git_provider": cty.ObjectVal(map[string]cty.Value{
+			"repo_type": cty.StringVal("github"),
+			"repo_url":  cty.StringVal("github.com/acme/app"),
+		}),
+		"exposed_ports": cty.ListVal([]cty.Value{
+			cty.NumberIntVal(8080),
+			cty.NumberIntVal(9090),
+		}),
+		"build_targets": cty.MapVal(map[string]cty.Value{
+			"linux":  cty.StringVal("amd64"),
+			"darwin": cty.StringVal("arm64"),
+		}),
+	}
+}
+
+func TestRenderer_StructuredTypeAccess(t *testing.T) {
+	t.Parallel()
+
+	r := tmpl.NewRenderer()
+	vars := structuredVars()
+
+	tests := []struct {
+		name     string
+		template string
+		expected string
+	}{
+		{
+			name:     "object attribute via bare name",
+			template: `${git_provider.repo_type}`,
+			expected: "github",
+		},
+		{
+			name:     "object attribute via var.X namespace",
+			template: `${var.git_provider.repo_url}`,
+			expected: "github.com/acme/app",
+		},
+		{
+			name:     "list index via bare name",
+			template: `${exposed_ports[0]}`,
+			expected: "8080",
+		},
+		{
+			name:     "list index via var.X namespace",
+			template: `${var.exposed_ports[1]}`,
+			expected: "9090",
+		},
+		{
+			name:     "map key access via bare name",
+			template: `${build_targets["linux"]}`,
+			expected: "amd64",
+		},
+		{
+			name:     "map key access via var.X namespace",
+			template: `${var.build_targets["darwin"]}`,
+			expected: "arm64",
+		},
+		{
+			name:     "list iteration via for directive",
+			template: `%{ for p in exposed_ports ~}${p},%{ endfor ~}`,
+			expected: "8080,9090,",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := r.RenderString(tt.template, vars)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, got)
+		})
+	}
+}
+
+// TestRenderer_UndeclaredObjectAttributeErrors covers the strict-vars
+// behaviour for structured types: accessing an attribute that does not
+// exist on a declared object surfaces an HCL `Unsupported attribute`
+// diagnostic. The diagnostic is what end users see when they typo a
+// field name like `${git_provider.repo_tipe}`.
+func TestRenderer_UndeclaredObjectAttributeErrors(t *testing.T) {
+	t.Parallel()
+
+	r := tmpl.NewRenderer()
+
+	_, err := r.RenderString(`${git_provider.repo_tipe}`, structuredVars())
+	require.Error(t, err)
+	// HCL phrases the diagnostic as "Unsupported attribute" and
+	// quotes the unknown field name. Assert on stable substrings
+	// rather than an exact string match — the surrounding wording
+	// is owned by HCL and may shift between versions.
+	assert.Contains(t, err.Error(), "Unsupported attribute",
+		"expected an Unsupported attribute diagnostic, got: %s", err)
+	assert.Contains(t, err.Error(), `"repo_tipe"`,
+		"diagnostic should quote the unknown attribute name, got: %s", err)
+}
+
 func TestIsTemplate(t *testing.T) {
 	t.Parallel()
 

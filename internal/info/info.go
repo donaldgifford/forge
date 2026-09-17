@@ -8,6 +8,9 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/hashicorp/hcl/v2/ext/typeexpr"
+	"github.com/zclconf/go-cty/cty"
+
 	"github.com/donaldgifford/forge/internal/config"
 )
 
@@ -102,13 +105,15 @@ func renderVariables(w io.Writer, vars []config.Variable) error {
 		return err
 	}
 
-	for _, v := range vars {
+	for i := range vars {
+		v := &vars[i]
+
 		required := ""
 		if v.Required {
 			required = "yes"
 		}
 
-		if _, err := fmt.Fprintf(tw, "  %s\t%s\t%s\t%s\n", v.Name, v.Type, v.Default, required); err != nil {
+		if _, err := fmt.Fprintf(tw, "  %s\t%s\t%s\t%s\n", v.Name, variableTypeString(v), v.DefaultSource, required); err != nil {
 			return err
 		}
 	}
@@ -139,7 +144,17 @@ func renderJSON(w io.Writer, bp *config.Blueprint) error {
 		Version:     bp.Version,
 		Description: bp.Description,
 		Tags:        bp.Tags,
-		Variables:   bp.Variables,
+	}
+
+	for i := range bp.Variables {
+		v := &bp.Variables[i]
+		out.Variables = append(out.Variables, jsonVariable{
+			Name:        v.Name,
+			Description: v.Description,
+			Type:        variableTypeString(v),
+			Default:     v.DefaultSource,
+			Required:    v.Required,
+		})
 	}
 
 	for i := range bp.Sync.ManagedFiles {
@@ -156,13 +171,33 @@ func renderJSON(w io.Writer, bp *config.Blueprint) error {
 	return enc.Encode(out)
 }
 
+// variableTypeString returns the canonical HCL form of a variable's
+// declared type (e.g. `list(string)`, `object({port: number})`) for
+// the `forge info` outputs. IMPL-0009 OQ-6: round-trippable through
+// typeexpr so downstream tools can re-parse the JSON output.
+func variableTypeString(v *config.Variable) string {
+	if v.Type == cty.NilType {
+		return v.TypeSource
+	}
+
+	return typeexpr.TypeString(v.Type)
+}
+
 type jsonOutput struct {
 	Name         string            `json:"name"`
 	Version      string            `json:"version,omitempty"`
 	Description  string            `json:"description,omitempty"`
 	Tags         []string          `json:"tags,omitempty"`
-	Variables    []config.Variable `json:"variables,omitempty"`
+	Variables    []jsonVariable    `json:"variables,omitempty"`
 	ManagedFiles []jsonManagedFile `json:"managed_files,omitempty"`
+}
+
+type jsonVariable struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	Type        string `json:"type"`
+	Default     string `json:"default,omitempty"`
+	Required    bool   `json:"required,omitempty"`
 }
 
 type jsonManagedFile struct {

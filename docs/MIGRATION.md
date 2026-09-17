@@ -1,23 +1,54 @@
 # Migrating forge blueprints
 
-This guide walks blueprint authors through the on-disk format changes
-shipped between releases. Forge has two cumulative migration steps:
+This guide walks blueprint authors and project consumers through the
+on-disk format changes shipped between releases. Forge has three
+cumulative format changes; per
+[ADR-0002](adr/0002-forge-does-not-ship-in-tool-migrators.md) and
+[IMPL-0007](impl/0007-remove-forge-migrate-command.md), the
+in-tool `forge migrate` command was removed in **v0.5.x**.
 
-1. **v1 → v2 (template engine):** `text/template` → HCL2. The tool is
-   `forge migrate templates`. See
-   [Migrating template syntax (v0.2.x → v0.3.x)](#migrating-template-syntax-v02x--v03x).
+## The pin-then-migrate pattern
+
+For the two registry-side format changes, the supported workflow is
+**pin → migrate → upgrade**:
+
+```sh
+go install github.com/donaldgifford/forge@v0.4.1
+```
+
+`v0.4.1` is the last release that ships `forge migrate`. With that
+binary on your `$PATH`, run the migrators against your registry
+(commands below), commit the result, and then upgrade to current
+forge — `go install github.com/donaldgifford/forge@latest` — which
+will load the migrated tree directly.
+
+### By starting version
+
+| You are on… | Steps |
+|---|---|
+| **v0.2.x or earlier** | Pin to v0.4.1, run `forge migrate templates`, then `forge migrate config`, then upgrade to current forge. |
+| **v0.3.x** (HCL2 templates, YAML configs) | Pin to v0.4.1, run `forge migrate config`, then upgrade. |
+| **v0.4.x** (HCL templates and configs, YAML lockfile in projects) | No registry migration needed. For each forge-scaffolded **project** you maintain, either rescaffold from the current blueprint or stay pinned to v0.4.1 — there is no in-tool lockfile migrator. |
+
+### Format-change sections
+
+1. **v1 → v2 (template engine):** `text/template` → HCL2.
+   See [Migrating template syntax (v0.2.x → v0.3.x)](#migrating-template-syntax-v02x--v03x).
 2. **v2 YAML → v2 HCL (config files):** `blueprint.yaml` /
-   `registry.yaml` → `blueprint.hcl` / `registry.hcl`. The tool is
-   `forge migrate config`. See
-   [Migrating config files from YAML to HCL (v0.3.x → v0.4.x)](#migrating-config-files-from-yaml-to-hcl-v03x--v04x).
+   `registry.yaml` → `blueprint.hcl` / `registry.hcl`.
+   See [Migrating config files from YAML to HCL (v0.3.x → v0.4.x)](#migrating-config-files-from-yaml-to-hcl-v03x--v04x).
+3. **YAML lockfile → HCL lockfile (project state):** `.forge-lock.yaml`
+   → `.forge-lock.hcl`. Per ADR-0002, **no in-tool migrator**;
+   rescaffold or stay pinned. See
+   [Migrating lockfiles from YAML to HCL (v0.4.x → v0.5.x)](#migrating-lockfiles-from-yaml-to-hcl-v04x--v05x).
 
-If you are coming from **v0.2.x or earlier**, run **both** steps in
-order — `forge migrate templates` first, then `forge migrate config`.
-If you are already on v0.3.x (HCL2 templates, YAML config), only the
-second step is required. If you ran the steps **out of order** and
-ended up with v1 template syntax stranded in a `blueprint.hcl`-rooted
-registry, `forge migrate templates` (v0.4.1+) walks HCL-rooted
-blueprints too — re-run it against your registry to clean up.
+Steps 1 and 2 apply to **registries**; step 3 applies to **projects
+scaffolded from a registry** and is handled per-project, not via a
+single CLI sweep.
+
+The command examples that follow (`forge migrate templates …`,
+`forge migrate config …`) only work when forge is pinned to v0.4.1 —
+the binary built from current `main` no longer has those subcommands.
 
 ## Migrating template syntax (v0.2.x → v0.3.x)
 
@@ -359,13 +390,389 @@ Older forge releases (the last YAML-config versions) continue to
 load `blueprint.yaml` / `registry.yaml` — pin to v0.3.x if you need
 to delay the cutover.
 
+## Migrating lockfiles from YAML to HCL (v0.4.x → v0.5.x)
+
+The third — and final — format cut: `.forge-lock.yaml` becomes
+`.forge-lock.hcl`. With templates already on HCL2 (v0.3.0) and
+configs on HCL (v0.4.0), the lockfile was the last YAML touchpoint
+in a forge-managed project. v0.5.0 brings it into the same syntax.
+
+### Why the change
+
+- **Format parity.** `blueprint.hcl`, `registry.hcl`, and the
+  rendered templates all speak HCL2. A YAML lockfile sitting at the
+  project root broke that uniformity for no operational gain.
+- **Typed variables round-trip cleanly.** HCL natively carries
+  numbers, bools, lists, and maps — the YAML lockfile lost some of
+  that type information on disk and had to recover it via inference
+  on read. HCL keeps the declared types intact.
+- **Diffability.** HCL block syntax (one `default "path" { … }`
+  block per file) reviews more clearly than a YAML list of
+  identically-keyed objects.
+
+### No in-tool migrator
+
+Per [ADR-0002](adr/0002-forge-does-not-ship-in-tool-migrators.md),
+there is **no `forge migrate lockfile` command**. The lockfile is a
+generated artifact, not authored content — converting it does not
+preserve user intent. You have two supported paths:
+
+#### Path A: Rescaffold (recommended)
+
+The cleanest option for actively-maintained projects:
+
+```sh
+forge create <blueprint> --output-dir <new-dir>
+# Move / merge the new tree into your existing project.
+# Diff and resolve any local edits as you would on any `forge sync`.
+git add . && git commit -m "chore: rescaffold from blueprint on forge v0.5"
+```
+
+A rescaffold produces a fresh `.forge-lock.hcl` whose blueprint
+reference matches the current registry state. From there `forge
+sync` and `forge check` behave normally.
+
+#### Path B: Pin to v0.4.1
+
+If you need to delay the cutover (e.g. mid-release, frozen project),
+pin to the last YAML-lockfile release:
+
+```sh
+go install github.com/donaldgifford/forge@v0.4.1
+```
+
+`v0.4.1` is the final v0.4 release. It continues to read and write
+`.forge-lock.yaml` indefinitely, and it's also the last release that
+ships `forge migrate` — handy if you happen to need both at once.
+
+### What changes on disk
+
+| Before (v0.4.x) | After (v0.5.x) |
+|-----------------|----------------|
+| `.forge-lock.yaml` | `.forge-lock.hcl` |
+| YAML mapping with sequence values | HCL `blueprint { … }` block + labeled `default "<path>" { … }` / `managed_file "<path>" { … }` blocks |
+| Variables encoded as YAML scalars | Variables encoded as native HCL primitives (string / number / bool / list / map) |
+
+The file is generated by forge; you don't author it. The
+on-disk layout is documented for review and diffing purposes only.
+
+### Verifying the lockfile migration
+
+After rescaffolding:
+
+```sh
+forge check          # surfaces drift between project state and the new lockfile
+forge sync           # picks up registry changes; lockfile timestamps update
+```
+
+Both commands operate against `.forge-lock.hcl` exclusively in
+v0.5+. A bare `.forge-lock.yaml` produces the rescaffold-or-pin
+error described under Troubleshooting below.
+
+### Rolling back the lockfile migration
+
+```sh
+# If you've already committed v0.5 lockfile output:
+git revert <commit>             # or
+git reset --hard <pre-v0.5-sha>
+go install github.com/donaldgifford/forge@v0.4.1
+```
+
+There is no "downgrade" path from `.forge-lock.hcl` back to
+`.forge-lock.yaml` — pin the forge binary to v0.4.1 if you need to
+keep operating against legacy lockfiles.
+
+## Variable input: preferred pattern (v0.6+)
+
+> **No migration required** — this section is *guidance* for new
+> invocations on v0.6+, not a required upgrade step. Existing
+> `--set` users keep working unchanged.
+
+`--set key=value` is still supported for ad-hoc CLI overrides, but
+**non-trivial inputs should live in a `.forge-vars.hcl` file** loaded
+via `--var-file`. The file is plain HCL, plays nicely with version
+control and CI/CD pipelines, and supports the same scalar types
+declared in `blueprint.hcl` (string / number / bool / list / map).
+
+```hcl
+# ./my-svc.forge-vars.hcl
+project_name = "mockta-staging"
+replicas     = 3
+tags         = ["beta", "staging"]
+```
+
+```sh
+forge create go/ext --var-file ./my-svc.forge-vars.hcl
+```
+
+`--var-file` is repeatable; later files win on key collision. The
+flag is mutually exclusive with `--set` on any single invocation —
+the CLI rejects the combination with a clear message.
+
+**Inline overrides (tempfile pattern).** Process substitution is *not*
+supported (forge enforces a strict `.hcl` extension on the path).
+The supported escape hatch is a tempfile:
+
+```sh
+cat > /tmp/override.forge-vars.hcl <<EOF
+project_name = "mockta-staging"
+EOF
+forge create go/ext \
+  --var-file ./base.forge-vars.hcl \
+  --var-file /tmp/override.forge-vars.hcl
+```
+
+**On `forge sync`.** `--var-file` requires `--force` because it
+rewrites the lockfile with the new resolved values. Type-coercion
+errors abort the sync before any files are touched; unknown keys
+surface as a warning, not an error.
+
+**On `forge check`.** `--var-file` is rejected — `forge check` is a
+drift-detection command that reads variables from the lockfile only.
+Use `forge sync --var-file FILE --force --dry-run` to preview drift
+against alternative values.
+
+See [DESIGN-0005](design/0005-variable-input-via-vars-file.md) for
+the contract and [IMPL-0008](impl/0008-variable-input-via-vars-file.md)
+for the implementation details.
+
+## Variable type system upgrade (v0.7+)
+
+v0.7 reshapes how blueprint authors declare variable types. The change
+is breaking for blueprints that use `type = "choice"` or `validate =
+"regex"`; it is additive for everything else, with one soft deprecation
+warning. There is no in-tool migrator — the patterns are mechanical and
+fit on one screen.
+
+### Why the change
+
+The pre-v0.7 type surface was a shallow string allow-list (`string`,
+`bool`, `int`, `choice`) with two ad-hoc validation hooks bolted on
+(`validate = "regex"` and `choices = [...]`). Two pain points
+accumulated:
+
+- **Structured config could not be expressed.** A blueprint that
+  scaffolds a Renovate config has to capture four related strings
+  (`repo_type`, `repo_url`, `project_org`, `team`) as four flat
+  variables — the structural relationship between them is invisible
+  to the prompt UX, to validation, and to downstream templates.
+- **Validation was an enum.** `validate = "regex"` could only run a
+  regex; `choices = [...]` could only enumerate strings. There was
+  no way to express *"must be a valid semver"* via a function call,
+  no way to stack two constraints on the same variable, no way to
+  cross-reference another variable.
+
+v0.7 swaps the string-tag allow-list for the cty type-expression
+grammar (`hashicorp/hcl/v2/ext/typeexpr`), introduces `validation { ... }`
+blocks evaluated against a full `cty.Value` scope, and exposes the
+`var.X` namespace in templates so authors can traverse structured
+values naturally. The full design lives in
+[DESIGN-0006](design/0006-object-and-collection-variable-types.md).
+
+### Migration: `type = "choice"` → `validation { contains(...) }`
+
+The `choice` shape was a string enum dressed up as a type. v0.7
+removes it. Re-declare as `type = string` plus a `validation` block:
+
+**Before (v0.6):**
+```hcl
+variable "license" {
+  type        = "choice"
+  description = "License to scaffold"
+  choices     = ["MIT", "Apache-2.0", "BSD-3-Clause", "GPL-3.0"]
+}
+```
+
+**After (v0.7):**
+```hcl
+variable "license" {
+  type        = string
+  description = "License to scaffold"
+
+  validation {
+    condition     = contains(["MIT", "Apache-2.0", "BSD-3-Clause", "GPL-3.0"], var.license)
+    error_message = "license must be one of MIT, Apache-2.0, BSD-3-Clause, GPL-3.0."
+  }
+}
+```
+
+The string list is now under your control — combine, parameterise via
+another variable, or stack multiple `validation` blocks.
+
+### Migration: `validate = "regex"` → `validation { can(regex(...)) }`
+
+The single-regex `validate` attribute is removed. Re-declare as a
+`validation` block whose condition wraps `regex` in `can` (so a
+non-match becomes a `false` rather than a panic-style diagnostic):
+
+**Before (v0.6):**
+```hcl
+variable "project_name" {
+  type        = string
+  description = "Project slug"
+  validate    = "^[a-z][a-z0-9-]*$"
+}
+```
+
+**After (v0.7):**
+```hcl
+variable "project_name" {
+  type        = string
+  description = "Project slug"
+
+  validation {
+    condition     = can(regex("^[a-z][a-z0-9-]*$", var.project_name))
+    error_message = "project_name must be lowercase letters, digits, and hyphens, starting with a letter."
+  }
+}
+```
+
+Stack additional `validation` blocks on the same variable to layer
+constraints — each failing block surfaces independently rather than
+short-circuiting on the first one.
+
+### Migration: `type = int` → `type = number` (warning only)
+
+`int` is now a deprecated alias for `number`. The forge loader emits
+a one-line warning and continues. No file changes are required to
+keep working today; update at your own pace to clear the warning:
+
+```hcl
+# Before — still works, emits a deprecation warning
+variable "port" {
+  type = int
+}
+
+# After — no warning
+variable "port" {
+  type = number
+}
+```
+
+The warning text points back to this section. The `int` form may be
+removed in a future release; there is no scheduled removal date.
+
+### Variable type expressiveness gain
+
+The new type surface adds `object({...})`, `list(T)`, and `map(T)`
+constructors (and continues to accept `string`, `bool`, `number`).
+The motivating use case — a Renovate-config blueprint — collapses
+from four flat scalars to one structured object:
+
+**Before (v0.6) — four flat scalars:**
+```hcl
+variable "git_provider_repo_type" {
+  type    = "choice"
+  choices = ["github", "gitlab", "bitbucket"]
+}
+
+variable "git_provider_repo_url" {
+  type = string
+}
+
+variable "git_provider_project_org" {
+  type = string
+}
+
+variable "git_provider_team" {
+  type = string
+}
+```
+
+**After (v0.7) — one object:**
+```hcl
+variable "git_provider" {
+  type = object({
+    repo_type   = string
+    repo_url    = string
+    project_org = string
+    team        = string
+  })
+
+  validation {
+    condition     = contains(["github", "gitlab", "bitbucket"], var.git_provider.repo_type)
+    error_message = "git_provider.repo_type must be one of github, gitlab, bitbucket."
+  }
+}
+```
+
+Templates traverse the structured value natively — both
+`${git_provider.repo_url}` and `${var.git_provider.repo_url}` resolve
+identically.
+
+`list(T)` and `map(T)` follow the same shape. For example:
+
+```hcl
+variable "exposed_ports" {
+  type    = list(number)
+  default = [8080, 9090]
+}
+
+variable "build_targets" {
+  type = map(string)
+  default = {
+    linux  = "amd64"
+    darwin = "arm64"
+  }
+}
+```
+
+### Prompt UX and `--set` for structured types
+
+Object variables unfold interactively into per-field prompts in
+declaration order. List and map variables *cannot* be supplied
+interactively in v0.7 — supply them via `--var-file` or as a
+`default`. A required list/map without a value fails fast with a
+copy-pasteable `.forge-vars.hcl` snippet pointing at the escape
+hatch.
+
+`--set` behaviour on structured types:
+
+- **Object-typed variables** accept an HCL object literal:
+  `--set 'git_provider={repo_type="github",repo_url="github.com/acme/app",project_org="acme"}'`.
+  Mind the shell quoting.
+- **List- and map-typed variables** reject `--set` with the same
+  `--var-file` pointer error documented above. The shell-quoting
+  burden made inline support not worth it; use `--var-file` instead.
+
+### Lockfile compatibility
+
+Structured-typed variables round-trip cleanly through the v0.7
+lockfile (`.forge-lock.hcl`). Existing scalar-only lockfiles are
+unaffected and continue to load without changes. If you migrate an
+in-flight project from `type = "choice"` to `type = string` +
+validation, the next `forge sync` rewrites the lockfile to the new
+shape with no manual intervention.
+
+### Why no in-tool migrator
+
+Per [ADR-0002](adr/0002-forge-does-not-ship-in-tool-migrators.md),
+forge does not ship in-tool migrators. The patterns above are
+mechanical (search-and-replace within a `variable { ... }` block)
+and the error path on outdated blueprints is explicit:
+
+- `choices` / `validate` attributes are rejected at load time with
+  an error pointing back at this section.
+- `int` emits a one-line warning and continues.
+
+If you need to keep running an unmigrated blueprint while you stage
+the upgrade, pin forge to v0.6 — the v0.7 loader will refuse the
+legacy attributes outright, not silently coerce. The same path
+covers in-flight projects whose lockfile was produced against a
+`type = "choice"` variable: pin forge to v0.6 until you migrate
+the blueprint, then upgrade to v0.7 and run `forge sync` — the
+sync rewrites the lockfile to the new resolved-value shape with no
+manual cleanup.
+
 ## Troubleshooting
 
 ### `apiVersion v1 is no longer supported`
 
 You're on a forge release that requires v2 but the registry is still
-v1. Run `forge migrate templates --path <registry>`, commit the
-result, retry.
+v1. Pin forge to v0.4.1
+(`go install github.com/donaldgifford/forge@v0.4.1`), run
+`forge migrate templates --path <registry>` against that pinned
+binary, commit the result, then upgrade.
 
 ### `YAML config files are no longer supported`
 
@@ -373,15 +780,43 @@ The full message reads:
 
 ```text
 blueprint file path/to/blueprint.yaml: YAML config files are no longer
-supported. Run `forge migrate config --path path/to` to convert this
-file to blueprint.hcl. See docs/MIGRATION.md in the forge repository
-for the YAML→HCL migration guide
+supported in this version of forge.
+
+To upgrade:
+  - Rescaffold from the current blueprint, OR
+  - Pin forge to v0.4.1 and run `forge migrate config`:
+      go install github.com/donaldgifford/forge@v0.4.1
+
+See docs/MIGRATION.md for the full upgrade guide
 ```
 
-You're on a forge release that requires HCL config files but the
-registry still has YAML. Run the suggested `forge migrate config`
-command, commit the result, retry. The same applies to bare
-`registry.yaml` files.
+You're on forge v0.5+ but the registry still has YAML configs. The
+`forge migrate` command was removed in IMPL-0007 — pin to v0.4.1,
+run `forge migrate config` against that binary, commit the result,
+then upgrade. The same applies to bare `registry.yaml` files.
+
+### `YAML lockfiles are no longer supported`
+
+The full message reads:
+
+```text
+lockfile .forge-lock.yaml: YAML lockfiles are no longer supported in
+this version of forge.
+
+To upgrade:
+  - Rescaffold this project from the current blueprint, OR
+  - Pin forge to v0.4.1:
+      go install github.com/donaldgifford/forge@v0.4.1
+
+See docs/MIGRATION.md
+```
+
+You're on forge v0.5+ but the project still has a v0.4-era
+`.forge-lock.yaml`. Follow one of the paths in
+[Migrating lockfiles from YAML to HCL](#migrating-lockfiles-from-yaml-to-hcl-v04x--v05x):
+rescaffold the project (preferred), or stay pinned to v0.4.1. There
+is no in-tool lockfile converter per
+[ADR-0002](adr/0002-forge-does-not-ship-in-tool-migrators.md).
 
 ### `parsing template "..." Unknown variable`
 
@@ -414,3 +849,8 @@ needed.
 - [DESIGN-0004](design/0004-unify-config-file-format-after-hcl2-cutover.md) — Config-format unification.
 - [IMPL-0004](impl/0004-migrate-template-engine-to-hcl2.md) — Engine cutover implementation.
 - [IMPL-0005](impl/0005-unify-config-file-format-to-hcl2.md) — Config-format cutover implementation.
+- [ADR-0002](adr/0002-forge-does-not-ship-in-tool-migrators.md) — Why forge no longer ships in-tool migrators.
+- [IMPL-0006](impl/0006-migrate-lockfile-from-yaml-to-hcl.md) — Lockfile cutover implementation (v0.5.0).
+- [DESIGN-0006](design/0006-object-and-collection-variable-types.md) — Object and collection variable types (v0.7.0 design).
+- [IMPL-0009](impl/0009-object-and-collection-variable-types.md) — Object and collection variable types (v0.7.0 implementation).
+- [docs/REFERENCE.md § Variable types](REFERENCE.md#variable-types) — canonical type table including object/list/map.

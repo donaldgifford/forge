@@ -2,17 +2,8 @@ package config
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 )
-
-// validVariableTypes are the allowed types for blueprint variables.
-var validVariableTypes = map[string]bool{
-	"string": true,
-	"bool":   true,
-	"choice": true,
-	"int":    true,
-}
 
 // validSyncStrategies are the allowed sync strategies.
 var validSyncStrategies = map[string]bool{
@@ -23,6 +14,11 @@ var validSyncStrategies = map[string]bool{
 // ValidateBlueprint checks a Blueprint for required fields and valid
 // values. Format gating (HCL-only) lives in LoadBlueprint, not here —
 // this validator runs against the in-memory shape and is encoding-agnostic.
+//
+// Per-variable type validation is owned by ParseVariableType (vartype.go);
+// this validator only enforces blueprint-level invariants that aren't
+// expressible in the load-time HCL schema (variable name non-empty,
+// sync strategies in the allowed set, managed file paths non-empty).
 func ValidateBlueprint(bp *Blueprint) error {
 	if strings.TrimSpace(bp.Name) == "" {
 		return fmt.Errorf("blueprint name is required")
@@ -75,24 +71,6 @@ func ValidateRegistry(reg *Registry) error {
 func validateVariable(v *Variable, index int) error {
 	if strings.TrimSpace(v.Name) == "" {
 		return fmt.Errorf("variables[%d]: name is required", index)
-	}
-
-	if v.Type == "" {
-		return fmt.Errorf("variables[%d] (%s): type is required", index, v.Name)
-	}
-
-	if !validVariableTypes[v.Type] {
-		return fmt.Errorf("variables[%d] (%s): invalid type %q, must be one of: string, bool, choice, int", index, v.Name, v.Type)
-	}
-
-	if v.Type == "choice" && len(v.Choices) == 0 {
-		return fmt.Errorf("variables[%d] (%s): choices are required for type \"choice\"", index, v.Name)
-	}
-
-	if v.Validate != "" {
-		if _, err := regexp.Compile(v.Validate); err != nil {
-			return fmt.Errorf("variables[%d] (%s): invalid validate regex %q: %w", index, v.Name, v.Validate, err)
-		}
 	}
 
 	return nil

@@ -36,14 +36,22 @@ package config
 //     create/sync time (per OQ-7). The loader pulls it from the block
 //     body via hcl.Body.Content with a small inline schema.
 //
-//   - `variable.default` and `variable.validate` are template strings
-//     that may reference later-bound variables. We capture them as raw
-//     source bytes (with outer quotes stripped) so the prompt renderer
-//     can re-parse them with the right eval context later.
+//   - `variable.type` and `variable.default` are HCL expressions that
+//     need lazy access: `type` parses through ParseVariableType (which
+//     understands forge's type surface plus the v0.7 transition shims),
+//     and `default` is kept as an hcl.Expression so it can evaluate
+//     against the resolved-variable scope at prompt time. The raw
+//     source bytes for both are also retained for diagnostics, lockfile
+//     snapshots, and `forge info --output json` (IMPL-0009 OQ-6).
 //
-// For both, the loader uses hcl.Body.PartialContent to peel the
-// expression-bearing blocks off the top-level body, then runs hcldec
-// on the remaining body for everything else.
+//   - Each `variable` block can also carry one or more nested
+//     `validation { condition, error_message }` blocks; the loader
+//     keeps `condition` as an unevaluated hcl.Expression for Phase C's
+//     post-resolution evaluation flow.
+//
+// For all of these, the loader uses hcl.Body.PartialContent to peel
+// the expression-bearing blocks off the top-level body, then runs
+// hcldec on the remaining body for everything else.
 
 import (
 	"errors"
@@ -119,6 +127,8 @@ func LoadRegistryHCL(path string) (*Registry, error) {
 // decodeBlueprintBody splits the body into eager content (decoded via
 // hcldec) and lazy blocks (variable, condition, rename — decoded by
 // hand to preserve expressions, source text, and templated labels).
+// Returns a Blueprint with any non-fatal Deprecation notices attached
+// for the caller to surface via ui.Warningf.
 func decodeBlueprintBody(body hcl.Body, src []byte) (*Blueprint, error) {
 	lazyContent, eagerBody, diags := body.PartialContent(&hcl.BodySchema{
 		Blocks: []hcl.BlockHeaderSchema{
@@ -140,12 +150,13 @@ func decodeBlueprintBody(body hcl.Body, src []byte) (*Blueprint, error) {
 	assignEagerBlueprint(eagerVal, bp)
 
 	for _, block := range lazyContent.Blocks.OfType("variable") {
-		v, err := decodeVariableBlock(block, src)
+		v, deps, err := decodeVariableBlock(block, src)
 		if err != nil {
 			return nil, err
 		}
 
 		bp.Variables = append(bp.Variables, v)
+		bp.Deprecations = append(bp.Deprecations, deps...)
 	}
 
 	for _, block := range lazyContent.Blocks.OfType("condition") {
@@ -247,63 +258,186 @@ func assignEagerBlueprint(val cty.Value, bp *Blueprint) {
 	}
 }
 
-// decodeVariableBlock parses a `variable "name" { ... }` block. Eager
-// attributes (description/type/required/choices) evaluate against an
-// empty context; default and validate are stored as raw source text so
-// the prompt renderer can re-render them with the user's variables.
-func decodeVariableBlock(block *hcl.Block, src []byte) (Variable, error) {
+// decodeVariableBlock parses a `variable "name" { ... }` block.
+//
+// The type expression flows through ParseVariableType (vartype.go) so
+// the loader gets a resolved cty.Type plus any DiagWarning entries
+// (today: the `int`-as-alias-for-`number` notice). The `default`
+// attribute is captured as the parsed hcl.Expression itself so the
+// resolution flow can evaluate it lazily against the resolved-variable
+// scope at create/sync time (DESIGN-0006 Phase C).
+//
+// Legacy `choices = [...]` and `validate = "regex"` attributes are
+// rejected with an actionable error pointing at MIGRATION.md per
+// IMPL-0009 OQ-4; both fields were removed in favour of the
+// `validation { condition, error_message }` nested block.
+//
+// Returns the populated Variable, any non-fatal Deprecation notices,
+// and a fatal error if the block fails to decode.
+func decodeVariableBlock(block *hcl.Block, src []byte) (Variable, []Deprecation, error) {
 	v := Variable{Name: block.Labels[0]}
+
+	if err := rejectLegacyVariableAttrs(block.Body, v.Name); err != nil {
+		return v, nil, err
+	}
 
 	content, diags := block.Body.Content(variableBlockBodySchema)
 	if diags.HasErrors() {
-		return v, fmt.Errorf("decoding variable %q: %s", v.Name, diags.Error())
+		return v, nil, fmt.Errorf("decoding variable %q: %s", v.Name, diags.Error())
 	}
 
 	if attr, ok := content.Attributes["description"]; ok {
 		s, err := evalAttrAsString(attr)
 		if err != nil {
-			return v, fmt.Errorf("variable %q description: %w", v.Name, err)
+			return v, nil, fmt.Errorf("variable %q description: %w", v.Name, err)
 		}
 
 		v.Description = s
 	}
 
-	if attr, ok := content.Attributes["type"]; ok {
-		s, err := evalAttrAsString(attr)
-		if err != nil {
-			return v, fmt.Errorf("variable %q type: %w", v.Name, err)
-		}
-
-		v.Type = s
+	deps, err := decodeVariableType(content.Attributes["type"], &v, src)
+	if err != nil {
+		return v, nil, err
 	}
 
 	if attr, ok := content.Attributes["required"]; ok {
-		b, err := evalAttrAsBool(attr)
-		if err != nil {
-			return v, fmt.Errorf("variable %q required: %w", v.Name, err)
+		b, evalErr := evalAttrAsBool(attr)
+		if evalErr != nil {
+			return v, nil, fmt.Errorf("variable %q required: %w", v.Name, evalErr)
 		}
 
 		v.Required = b
 	}
 
-	if attr, ok := content.Attributes["choices"]; ok {
-		ss, err := evalAttrAsStringSlice(attr)
-		if err != nil {
-			return v, fmt.Errorf("variable %q choices: %w", v.Name, err)
+	if attr, ok := content.Attributes["default"]; ok {
+		v.DefaultExpr = attr.Expr
+		v.DefaultSource = sourceText(attr.Expr, src)
+	}
+
+	for _, vblock := range content.Blocks.OfType("validation") {
+		val, vErr := decodeValidationBlock(vblock, v.Name, src)
+		if vErr != nil {
+			return v, nil, vErr
 		}
 
-		v.Choices = ss
+		v.Validations = append(v.Validations, val)
 	}
 
-	if attr, ok := content.Attributes["default"]; ok {
-		v.Default = sourceText(attr.Expr, src)
+	return v, deps, nil
+}
+
+// decodeVariableType parses the `type` attribute through
+// ParseVariableType, separating DiagWarning entries (returned as
+// Deprecation notices) from DiagError entries (returned as a Go error).
+// A missing `type` attribute is treated as a fatal error to match the
+// pre-IMPL-0009 contract.
+func decodeVariableType(attr *hcl.Attribute, v *Variable, src []byte) ([]Deprecation, error) {
+	if attr == nil {
+		return nil, fmt.Errorf("variable %q: type is required", v.Name)
 	}
 
-	if attr, ok := content.Attributes["validate"]; ok {
-		v.Validate = sourceText(attr.Expr, src)
+	ty, diags := ParseVariableType(v.Name, attr.Expr)
+	if diags.HasErrors() {
+		return nil, fmt.Errorf("variable %q type: %s", v.Name, diags.Error())
 	}
 
-	return v, nil
+	v.Type = ty
+	v.TypeSource = sourceText(attr.Expr, src)
+	v.TypeFieldOrder = ObjectFieldOrder(attr.Expr)
+
+	return diagsToDeprecations(v.Name, diags), nil
+}
+
+// decodeValidationBlock parses a single `validation { condition,
+// error_message }` block. The condition stays as an unevaluated
+// hcl.Expression so it can run against the resolved-variable scope at
+// create/sync time; error_message is captured as a static string
+// (DESIGN-0006 OQ-3 — template interpolation is a v0.8+ concern).
+func decodeValidationBlock(block *hcl.Block, varName string, _ []byte) (Validation, error) {
+	val := Validation{DefRange: block.DefRange}
+
+	content, diags := block.Body.Content(validationBlockBodySchema)
+	if diags.HasErrors() {
+		return val, fmt.Errorf("variable %q validation: %s", varName, diags.Error())
+	}
+
+	val.Condition = content.Attributes["condition"].Expr
+
+	msg, err := evalAttrAsString(content.Attributes["error_message"])
+	if err != nil {
+		return val, fmt.Errorf("variable %q validation error_message: %w", varName, err)
+	}
+
+	val.ErrorMessage = msg
+
+	return val, nil
+}
+
+// rejectLegacyVariableAttrs scans the raw body for the removed
+// `choices` and `validate` attributes before hcldec runs, so the
+// error surfaces with the original migration-pointer wording rather
+// than the generic "unsupported argument" diagnostic that hcldec
+// would produce. Pattern matches the v0.5/v0.6 rejection style
+// referenced in IMPL-0009 OQ-4.
+//
+// JustAttributes' diagnostics are intentionally ignored — a body with
+// nested blocks (the `validation { ... }` block) produces an
+// "unexpected block" diagnostic that the subsequent Content() call
+// surfaces with a proper diagnostic; this helper only cares about
+// presence of the two removed attribute names.
+func rejectLegacyVariableAttrs(body hcl.Body, varName string) error {
+	attrs, _ := body.JustAttributes() //nolint:errcheck // see godoc above — only attribute presence matters here
+
+	if attr, ok := attrs["choices"]; ok {
+		return fmt.Errorf(
+			"variable %q: the `choices` field was removed in v0.7; re-declare as "+
+				"`type = string` plus a `validation { condition = contains([...], var.%s) "+
+				"error_message = \"...\" }` block (see %s at %s)",
+			varName, varName, migrationAnchor, attr.Range.String(),
+		)
+	}
+
+	if attr, ok := attrs["validate"]; ok {
+		return fmt.Errorf(
+			"variable %q: the `validate` regex field was removed in v0.7; re-declare "+
+				"as a `validation { condition = can(regex(\"...\", var.%s)) "+
+				"error_message = \"...\" }` block (see %s at %s)",
+			varName, varName, migrationAnchor, attr.Range.String(),
+		)
+	}
+
+	return nil
+}
+
+// diagsToDeprecations converts the DiagWarning entries emitted by
+// ParseVariableType into the forge-owned Deprecation shape carried on
+// Blueprint.Deprecations. DiagError entries are dropped — the caller
+// has already short-circuited on diags.HasErrors() before this runs.
+func diagsToDeprecations(varName string, diags hcl.Diagnostics) []Deprecation {
+	if len(diags) == 0 {
+		return nil
+	}
+
+	out := make([]Deprecation, 0, len(diags))
+
+	for _, d := range diags {
+		if d.Severity != hcl.DiagWarning {
+			continue
+		}
+
+		dep := Deprecation{
+			Variable: varName,
+			Summary:  d.Summary,
+			Detail:   d.Detail,
+		}
+		if d.Subject != nil {
+			dep.Subject = *d.Subject
+		}
+
+		out = append(out, dep)
+	}
+
+	return out
 }
 
 // decodeConditionBlock parses a `condition { ... }` block. The `when`

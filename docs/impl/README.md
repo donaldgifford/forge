@@ -28,7 +28,7 @@ docz create impl "Your Implementation Title"
 - **Cancelled**: Plan was abandoned
 
 <!-- BEGIN DOCZ AUTO-GENERATED -->
-## All IMPLs
+## All Implementation Plans
 
 | ID | Title | Status | Date | Author | Link |
 |----|-------|--------|------|--------|------|
@@ -37,4 +37,8 @@ docz create impl "Your Implementation Title"
 | IMPL-0003 | Registry Commands | Completed | 2026-05-07 | Donald Gifford | [0003-registry-commands.md](0003-registry-commands.md) |
 | IMPL-0004 | Migrate Template Engine to HCL2 | Draft | 2026-05-07 | Donald Gifford | [0004-migrate-template-engine-to-hcl2.md](0004-migrate-template-engine-to-hcl2.md) |
 | IMPL-0005 | Unify Config File Format to HCL2 | Draft | 2026-05-12 | Donald Gifford | [0005-unify-config-file-format-to-hcl2.md](0005-unify-config-file-format-to-hcl2.md) |
+| IMPL-0006 | Migrate lockfile from YAML to HCL | Draft | 2026-05-18 | Donald Gifford | [0006-migrate-lockfile-from-yaml-to-hcl.md](0006-migrate-lockfile-from-yaml-to-hcl.md) |
+| IMPL-0007 | Remove forge migrate command | Implemented | 2026-05-18 | Donald Gifford | [0007-remove-forge-migrate-command.md](0007-remove-forge-migrate-command.md) |
+| IMPL-0008 | Variable input via vars file | Accepted | 2026-05-19 | Donald Gifford | [0008-variable-input-via-vars-file.md](0008-variable-input-via-vars-file.md) |
+| IMPL-0009 | object and collection variable types | Completed | 2026-06-29 | Donald Gifford | [0009-object-and-collection-variable-types.md](0009-object-and-collection-variable-types.md) |
 <!-- END DOCZ AUTO-GENERATED -->

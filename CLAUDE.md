@@ -45,14 +45,36 @@ packages:
 
 - **cmd/forge/** — Entry point (`main.go`)
 - **cmd/** — Cobra command definitions (create, init, sync, check, list, search,
-  info, migrate, registry init/blueprint/update, cache)
+  info, registry init/blueprint/update, cache)
 - **internal/config/** — `blueprint.hcl` and `registry.hcl` parsing, validation,
   global config with multi-registry support. HCL is the only accepted format
   (`loader.go` dispatches `.hcl` directly and rejects bare `.yaml` with a
-  pointer to `forge migrate config`). The HCL decode spec lives in
+  rescaffold-or-pin-to-v0.4.1 error per ADR-0002). The HCL decode spec lives in
   `hcldec_spec.go` and the emitter for registry round-trip in `hclemit.go`.
   `Condition.When` is `hcl.Expression` parsed at load time, with the original
-  source kept on `WhenSource` for round-tripping
+  source kept on `WhenSource` for round-tripping. Variable typing is delegated
+  to `vartype.go::ParseVariableType` (DESIGN-0006 / IMPL-0009 Phase A) which
+  layers forge-specific concerns (legacy-quoted-scalar shim, `int` deprecation
+  warning, tuple/set/`choice` rejection) over `hcl/v2/ext/typeexpr`. The loader
+  routes the `type` attribute through `ParseVariableType`, captures `default`
+  as both an `hcl.Expression` (`Variable.DefaultExpr`) and raw source text
+  (`Variable.DefaultSource`), and decodes nested `validation { condition,
+  error_message }` blocks into `Variable.Validations`. Legacy `choices = [...]`
+  and `validate = "regex"` attributes are rejected pre-decode via
+  `rejectLegacyVariableAttrs` with errors pointing at
+  `docs/MIGRATION.md#variable-type-system-upgrade-v07` (IMPL-0009 OQ-4).
+  Non-fatal deprecation notices flow through `Blueprint.Deprecations` →
+  `create.Result.Deprecations` / `sync.Result.Deprecations` → `ui.Warningf`
+  (IMPL-0009 OQ-3, same pattern as IMPL-0008's `UnknownVarsFileKeys`).
+  Validation-block evaluation lives in `validation.go::EvaluateValidations`
+  (IMPL-0009 Phase C, OQ-2): runs each variable's `validation.condition`
+  expressions against an `hcl.EvalContext` built by `BuildEvalContext` that
+  exposes bound variables under both bare names AND the `var.X` namespace,
+  with a Terraform-aligned function set (`can`, `try`, `regex`, `contains`,
+  `length`, `lower`, `upper`, `coalesce`). Failures accumulate (not
+  short-circuit) and surface as
+  `<error_message> (variable "X", blueprint.hcl:L:C)`. Hooked into
+  `create.Run` and `sync.Run` before any file ops.
 - **internal/registry/** — Registry index (`registry.hcl`), blueprint
   resolution, local cache with TTL
 - **internal/defaults/** — `_defaults/` layered inheritance resolution
@@ -60,30 +82,71 @@ packages:
 - **internal/getter/** — Source fetching via `hashicorp/go-getter` (registry
   cloning, archive extraction, checksum verification)
 - **internal/template/** — HCL2 (`hashicorp/hcl/v2`) rendering with custom
-  functions; values flow as `cty.Value` (`zclconf/go-cty`)
+  functions; values flow as `cty.Value` (`zclconf/go-cty`). **IMPL-0009
+  Phase F.4** added the `var.X` namespace to the renderer's eval scope
+  alongside bare references — mirrors `config.BuildEvalContext` so
+  default expressions, validation conditions, and template bodies all
+  see the same shape. Object/list/map values flow through HCL2's native
+  attribute (`${var.git_provider.repo_type}`), index
+  (`${var.exposed_ports[0]}`, `${var.build_targets["linux"]}`), and
+  iteration (`%{ for p in exposed_ports ~}…%{ endfor ~}`) operators —
+  no custom strict-vars layer is needed; unknown attributes surface as
+  HCL's `Unsupported attribute` diagnostic.
 - **internal/prompt/** — Interactive variable collection via charmbracelet/huh;
-  default-value templates also render through HCL2
+  default-value templates also render through HCL2. **IMPL-0009 Phase E
+  structured-type UX:** `resolveFromPrompt` dispatches on `cty.Type`
+  before falling through to the scalar path:
+  - `IsObjectType()` → `resolveObjectFromPrompt` recursively unfolds the
+    object into per-field prompts in `Variable.TypeFieldOrder` order
+    (dotted labels like `git_provider.repo_type`); the resolved value
+    reconstructs as `cty.ObjectVal(...)`. Nested objects recurse via a
+    synthesised child `Variable`; list/map fields inside an object
+    follow the same non-interactive rule as top-level structured types.
+  - `IsListType() || IsMapType()` → `resolveListOrMapFromPrompt`. Required
+    variables abort with `listMapVarsFileError`, which surfaces a
+    copy-pasteable `--var-file` snippet; non-required variants
+    short-circuit with `cty.NullVal(v.Type)` so downstream consumers see
+    a stable typed null.
 - **internal/create/** — Full create workflow orchestration (resolve, prompt,
   render, conditions, lockfile)
 - **internal/sync/** — Three-way merge sync engine for managed files
   (overwrite/merge strategies), conflict detection and resolution
-- **internal/lockfile/** — `.forge-lock.yaml` state tracking for scaffolded
-  projects; YAML scalars on disk, `cty.Value` in memory (typed coercion via
-  `lockfile.ToCtyValues` using declared variable types)
+- **internal/lockfile/** — `.forge-lock.hcl` state tracking for scaffolded
+  projects (HCL is the only accepted on-disk format from v0.5+; bare
+  `.forge-lock.yaml` files trigger a rescaffold-or-pin error per ADR-0002).
+  Loader/emitter pair in `loader_hcl.go` + `emit_hcl.go` use `hcldec`
+  PartialContent on the eager fields and hand-decode the dynamic `variables`
+  block; `cty.Value` in memory with typed coercion via `lockfile.ToCtyValues`
+  using declared variable types
+- **internal/config/vartype.go** — Type expression parser (IMPL-0009 Phase A).
+  Single exported `ParseVariableType(varName, expr) (cty.Type, hcl.Diagnostics)`
+  that delegates the bareword parse to `hashicorp/hcl/v2/ext/typeexpr` and
+  adds forge-specific layers: handles legacy quoted-string scalars
+  (`"string"`, `"bool"`, `"number"`) during the v0.7 transition; emits a
+  `DiagWarning` for `int` (alias for `number` per DESIGN-0006 OQ-6);
+  rejects `"choice"`, `tuple([...])`, `set(T)`, optional fields, and `any`
+  with forge-specific errors pointing at MIGRATION.md / REFERENCE.md.
+  Rejection check walks the type tree so nested cases like
+  `object({tags = set(string)})` are also caught. Per-function coverage
+  averages ~94% (IMPL-0009 Phase A quality gate: ≥90%).
+- **internal/varsfile/** — `--var-file` input loading (IMPL-0008,
+  IMPL-0009 D.1). Single exported `Load(paths, declared)` that parses
+  one or more `.forge-vars.hcl` files (strict `.hcl` extension,
+  attributes-only, no functions or traversals), composes them
+  left-to-right with last-wins semantics, and coerces values against
+  the blueprint's declared `cty.Type` via `cty/convert`. Object, list,
+  and map values flow through the same path — `coerceToDeclared` takes
+  the declared `cty.Type` directly (the v0.7 shape) so structural
+  coercion is free. Returns the resolved `map[string]cty.Value` plus
+  an `unknown` slice for keys not declared in `blueprint.hcl` (warning,
+  not error). Used by `create.Run` and `sync.Run`; `forge check`
+  rejects the flag outright with an actionable error.
 - **internal/check/** — Drift detection comparing lockfile vs local files
 - **internal/hooks/** — Post-create hook execution with context cancellation
 - **internal/list/** — Blueprint listing with tag filtering
 - **internal/search/** — Blueprint search across name, description, tags
 - **internal/info/** — Blueprint inspection with text/JSON output
 - **internal/initcmd/** — Blueprint scaffolding (`init` is Go reserved keyword)
-- **internal/migratecmd/** — Two one-shot migrators:
-  `forge migrate templates` rewrites v1 (Go `text/template`) syntax to v2
-  (HCL2) inside `*.tmpl` files and the expression-bearing fields of legacy
-  `blueprint.yaml`/`registry.yaml`. `forge migrate config` then converts
-  those YAML files to `blueprint.hcl`/`registry.hcl`. Only place in the
-  tree that imports `text/template` (used to parse v1 input) and
-  `gopkg.in/yaml.v3` (used to parse legacy YAML configs via shadow types
-  in `yaml_types.go`)
 - **internal/registrycmd/** — Registry scaffolding (`forge registry init`),
   blueprint scaffolding (`forge registry blueprint`), and registry metadata
   update (`forge registry update`)
@@ -114,17 +177,44 @@ See `docs/impl/0002-mvp-cli-gap-closure.md` for the full history and rationale.
   upstream-changed, both-changed)
 - **`forge sync --ref`** pins to a specific registry version; outputs which ref
   is being synced against
-- **`forge migrate templates --path <registry>`** rewrites legacy v1
-  `text/template` blueprints to v2 (HCL2) in place. Documented in
-  [docs/MIGRATION.md](docs/MIGRATION.md); guarded by a dirty-worktree check
-  (override with `--force`).
-- **`forge migrate config --path <registry>`** rewrites legacy v2 YAML
-  configs (`blueprint.yaml`, `registry.yaml`) as their HCL equivalents
-  (`blueprint.hcl`, `registry.hcl`). Drops the `apiVersion` field on emit
-  (the file extension is the version signal). Same dirty-worktree guard,
-  same `--dry-run` / `--strict` / `--force` flags. v0.2.x users run
-  `migrate templates` first, then `migrate config`. Comments in source
-  YAML are not preserved (per IMPL-0005 OQ-3).
+- **`forge migrate` is gone (IMPL-0007 / ADR-0002).** The previous
+  `forge migrate templates` and `forge migrate config` commands were
+  removed from main in v0.5.x. Users on v0.2.x/v0.3.x format files
+  pin to v0.4.1, run the migrators there, then upgrade. The
+  load-time YAML-rejection errors in `internal/config/loader.go` and
+  `internal/lockfile/lock.go` surface this path inline — they include
+  the literal `go install github.com/donaldgifford/forge@v0.4.1`
+  invocation per IMPL-0007 OQ-3.
+- **`--var-file` (IMPL-0008 / DESIGN-0005).** Repeatable flag on
+  `forge create` and `forge sync` that loads variable values from
+  one or more `.forge-vars.hcl` files; mutually exclusive with
+  `--set` on a single invocation (manual check in
+  `cmd/create.go::requireSingleVarSource`, not Cobra's generic
+  `MarkFlagsMutuallyExclusive` — see IMPL-0008 OQ-2 for the
+  rationale). On `forge sync`, `--var-file` requires `--force`
+  because it rewrites the lockfile with the new resolved values
+  (`cmd/sync.go::requireForceForVarFile`). `forge check` rejects
+  the flag outright with an actionable error pointing at
+  `forge sync --var-file FILE --force --dry-run`
+  (`cmd/check.go::rejectVarFileOnCheck`). Process substitution
+  (`<(...)`) is **not** supported — strict `.hcl` extension check
+  on the path (IMPL-0008 OQ-8); the documented escape hatch is the
+  tempfile pattern. Unknown keys surface as a warning, not an
+  error; type-coercion failures abort before any side effects.
+- **`--set` structured-type semantics (IMPL-0009 Phase D).** The
+  `--set k=v` flag dispatches on the declared `cty.Type`:
+  object-typed variables accept an HCL object literal that is parsed
+  through `hclsyntax.ParseExpression`, evaluated against an empty
+  EvalContext, and coerced to the declared shape
+  (`internal/prompt/prompt.go::parseObjectOverride`); list- and
+  map-typed variables are rejected with the documented `--set on
+  variable X (...) is not supported; use --var-file ...` error.
+  Scalars take the existing string→type coercion path. Structured
+  values flow through the resolution chain as `cty.Value` (carried
+  inside `map[string]any`) end-to-end; `lockfile.ToCtyValues` and
+  `lockfile.ctyForVariableValue` both passthrough `cty.Value`
+  inputs so the lockfile records nested values without
+  Go-shape round-tripping.
 
 ## Code Style
 
@@ -141,7 +231,7 @@ See `docs/impl/0002-mvp-cli-gap-closure.md` for the full history and rationale.
 - Tests use `testify` for assertions; test helpers must call `t.Helper()`
 - Mocks generated with `mockery`
 - `nolint` directives require both an explanation and a specific linter name
-- **gosec baseline:** 5 inline `//nolint:gosec` directives intentionally annotate correct-by-design CLI behaviour (file writes to user-chosen output dirs, `git` against user registry dirs, hook execution from `blueprint.hcl`). They live in `internal/create/create.go`, `internal/sync/overwrite.go`, `internal/hooks/hooks.go`, `internal/registrycmd/registrycmd.go`, `internal/registrycmd/update.go`. Don't remove without a real fix — gosec reports them as G703/G204.
+- **gosec baseline:** Inline `//nolint:gosec` directives intentionally annotate correct-by-design CLI behaviour (file reads/writes against user-chosen output and registry dirs, `git` against user registry dirs, hook execution from `blueprint.hcl`, lockfile and template I/O from known project paths). Active sites: `internal/create/create.go`, `internal/sync/overwrite.go`, `internal/hooks/hooks.go`, `internal/registrycmd/registrycmd.go`, `internal/registrycmd/update.go`, `internal/config/loader_hcl.go`, `internal/lockfile/loader_hcl.go`, `internal/lockfile/emit_hcl.go`, `internal/template/renderer.go`. Don't remove without a real fix — gosec reports them as G304/G703/G204/G306.
 
 ## CI/CD
 

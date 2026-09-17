@@ -5,9 +5,12 @@ tags        = ["go", "api", "grpc"]
 
 variable "project_name" {
   description = "Name of the project"
-  type        = "string"
+  type        = string
   required    = true
-  validate    = "^[a-z][a-z0-9-]*$"
+  validation {
+    condition     = can(regex("^[a-z][a-z0-9-]*$", var.project_name))
+    error_message = "project_name must be lowercase letters, digits, or hyphens, starting with a letter."
+  }
 }
 
 variable "go_module" {

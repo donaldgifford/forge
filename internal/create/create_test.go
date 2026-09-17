@@ -139,10 +139,10 @@ func TestRun_LockfileGenerated(t *testing.T) {
 	_, err := create.Run(&opts)
 	require.NoError(t, err)
 
-	lockPath := filepath.Join(outputDir, lockfile.FileName)
+	lockPath := filepath.Join(outputDir, lockfile.HCLFileName)
 	assert.FileExists(t, lockPath)
 
-	lock, err := lockfile.Read(lockPath)
+	lock, err := lockfile.LoadLockfile(outputDir)
 	require.NoError(t, err)
 
 	assert.Equal(t, "go-api", lock.Blueprint.Name)

@@ -28,12 +28,14 @@ docz create design "Your Design Title"
 - **Abandoned**: Design was not pursued
 
 <!-- BEGIN DOCZ AUTO-GENERATED -->
-## All DESIGNs
+## All Design
 
 | ID | Title | Status | Date | Author | Link |
 |----|-------|--------|------|--------|------|
 | DESIGN-0001 | Blueprint Authoring | Implemented | 2026-05-07 | Donald Gifford | [0001-blueprint-authoring.md](0001-blueprint-authoring.md) |
 | DESIGN-0002 | Registry Layout and Defaults Inheritance | Implemented | 2026-05-07 | Donald Gifford | [0002-registry-layout-and-defaults-inheritance.md](0002-registry-layout-and-defaults-inheritance.md) |
 | DESIGN-0003 | Migrate Template Engine to HCL2 | Implemented | 2026-05-07 | Donald Gifford | [0003-migrate-template-engine-to-hcl2.md](0003-migrate-template-engine-to-hcl2.md) |
-| DESIGN-0004 | Unify Config File Format After HCL2 Cutover | Draft | 2026-05-12 | Donald Gifford | [0004-unify-config-file-format-after-hcl2-cutover.md](0004-unify-config-file-format-after-hcl2-cutover.md) |
+| DESIGN-0004 | Unify Config File Format After HCL2 Cutover | Implemented | 2026-05-12 | Donald Gifford | [0004-unify-config-file-format-after-hcl2-cutover.md](0004-unify-config-file-format-after-hcl2-cutover.md) |
+| DESIGN-0005 | Variable input via vars file | Draft | 2026-05-18 | Donald Gifford | [0005-variable-input-via-vars-file.md](0005-variable-input-via-vars-file.md) |
+| DESIGN-0006 | object and collection variable types | Draft | 2026-06-29 | Donald Gifford | [0006-object-and-collection-variable-types.md](0006-object-and-collection-variable-types.md) |
 <!-- END DOCZ AUTO-GENERATED -->

@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/zclconf/go-cty/cty"
 
 	"github.com/donaldgifford/forge/internal/config"
 	"github.com/donaldgifford/forge/internal/info"
@@ -19,8 +20,8 @@ func sampleBlueprint() *config.Blueprint {
 		Version:     "1.0.0",
 		Tags:        []string{"go", "api"},
 		Variables: []config.Variable{
-			{Name: "project_name", Type: "string", Required: true},
-			{Name: "use_docker", Type: "bool", Default: "true"},
+			{Name: "project_name", Type: cty.String, TypeSource: "string", Required: true},
+			{Name: "use_docker", Type: cty.Bool, TypeSource: "bool", DefaultSource: "true"},
 		},
 		Sync: config.SyncConfig{
 			ManagedFiles: []config.ManagedFile{

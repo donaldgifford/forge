@@ -22,7 +22,7 @@ created: 2026-05-12
   - [Phase A: HCL loader alongside YAML loader](#phase-a-hcl-loader-alongside-yaml-loader)
     - [Tasks](#tasks)
     - [Success Criteria](#success-criteria)
-  - [Phase B: Migration tool — `forge migrate config`](#phase-b-migration-tool--forge-migrate-config)
+  - [Phase B: Migration tool — forge migrate config](#phase-b-migration-tool--forge-migrate-config)
     - [Tasks](#tasks-1)
     - [Success Criteria](#success-criteria-1)
   - [Phase C: Cutover](#phase-c-cutover)

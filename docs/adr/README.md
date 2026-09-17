@@ -32,4 +32,5 @@ docz create adr "Your ADR Title"
 | ID | Title | Status | Date | Author | Link |
 |----|-------|--------|------|--------|------|
 | ADR-0001 | Use HCL2 as the Template Engine | Accepted | 2026-05-07 | Donald Gifford | [0001-use-hcl2-as-the-template-engine.md](0001-use-hcl2-as-the-template-engine.md) |
+| ADR-0002 | Forge does not ship in-tool migrators | Proposed | 2026-05-18 | Donald Gifford | [0002-forge-does-not-ship-in-tool-migrators.md](0002-forge-does-not-ship-in-tool-migrators.md) |
 <!-- END DOCZ AUTO-GENERATED -->

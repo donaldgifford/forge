@@ -6,7 +6,7 @@ implementation plan (how step-by-step). Use a plan when the scope is clear but
 the execution approach needs to be worked out before writing tasks.
 
 <!-- BEGIN DOCZ AUTO-GENERATED -->
-## All PLANs
+## All Plans
 
 | ID | Title | Status | Date | Author | Link |
 |----|-------|--------|------|--------|------|

@@ -38,7 +38,7 @@ func setupProject(t *testing.T) string {
 		},
 	}
 
-	require.NoError(t, lockfile.Write(filepath.Join(dir, lockfile.FileName), lock))
+	require.NoError(t, lockfile.WriteHCL(filepath.Join(dir, lockfile.HCLFileName), lock))
 
 	// Create project files.
 	require.NoError(t, os.WriteFile(filepath.Join(dir, ".editorconfig"), editorContent, 0o644))
@@ -163,7 +163,7 @@ func TestRun_NoHashInLockfile(t *testing.T) {
 		},
 	}
 
-	require.NoError(t, lockfile.Write(filepath.Join(dir, lockfile.FileName), lock))
+	require.NoError(t, lockfile.WriteHCL(filepath.Join(dir, lockfile.HCLFileName), lock))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, ".editorconfig"), []byte("anything"), 0o644))
 
 	var buf bytes.Buffer
@@ -243,7 +243,7 @@ func setupProjectWithRegistry(t *testing.T) (projectDir, registryDir string) {
 		},
 	}
 
-	require.NoError(t, lockfile.Write(filepath.Join(projectDir, lockfile.FileName), lock))
+	require.NoError(t, lockfile.WriteHCL(filepath.Join(projectDir, lockfile.HCLFileName), lock))
 
 	// Create project files matching lockfile hashes.
 	require.NoError(t, os.WriteFile(filepath.Join(projectDir, ".editorconfig"), editorContent, 0o644))

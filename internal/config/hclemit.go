@@ -5,12 +5,8 @@ package config
 // Used by `forge init`, `forge registry init`, `forge registry
 // blueprint`, and `forge registry update` to write registry.hcl files
 // from a *Registry — append a new entry, refresh metadata, and so on.
-//
-// `forge migrate config` has its own YAML→HCL emitter
-// (internal/migratecmd/config_rewrite.go) that builds HCL via
-// strings.Builder so it can preserve `${...}` template sequences in
-// fields like variable.default. Registry entries don't carry templates,
-// so the simpler hclwrite path is fine here.
+// Registry entries don't carry templated values, so the hclwrite path
+// (no special handling for `${...}` sequences) is sufficient here.
 
 import (
 	"fmt"
